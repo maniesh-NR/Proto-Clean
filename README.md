@@ -297,6 +297,24 @@ verified against a real dump (Nov 2026).
   all outbound IPv6 except loopback and the OpenVPN interface — for
   tunneled IPv6 on macOS combine IPv6 support with the kill switch.
 
+## Download & install
+
+Ready-made installers are on the
+[Releases page](https://github.com/maniesh-NR/Proton-Clean/releases)
+(built by the `Release` workflow on every tag):
+
+| Platform | File | Install |
+|---|---|---|
+| Linux Mint / Ubuntu / Debian | `cleanroom_0.1.0-1_amd64.deb` | `sudo apt install ./cleanroom_0.1.0-1_amd64.deb` |
+| Linux (portable) | `Cleanroom-0.1.0-linux-x86_64.tar.gz` | untar, run `cleanroom/cleanroom` |
+| Windows 10 / 11 | `Cleanroom-0.1.0-win64.zip` | unzip, run `Cleanroom.exe` (+ [WireGuard for Windows](https://download.wireguard.com/windows/)) |
+| macOS 12+ | `Cleanroom-0.1.0-macos.zip` | unzip → /Applications (ad-hoc signed) |
+| Android 10+ | `Cleanroom-0.1.0-android.apk` | debug-signed APK; allow "install unknown apps" |
+
+Or from source: `pip install -e .` and `python3 -m cleanroom` (plus
+`bash scripts/install.sh` on Linux / `scripts/install_macos.sh` on macOS
+for the privileged helper).
+
 ## Trademarks & legal
 
 Cleanroom is an **independent, community project** and is **not

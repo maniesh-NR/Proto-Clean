@@ -1,0 +1,220 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  # ------------------------------------------------------------- Linux
+  linux:
+    name: Linux (tar.gz + deb)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build onedir bundle
+        run: bash packaging/linux/build.sh
+
+      - name: Build Debian package
+        run: bash packaging/linux/makedeb.sh
+
+      - name: Tar the portable bundle
+        run: |
+          tar czf "dist/Cleanroom-${VERSION}-linux-x86_64.tar.gz" -C dist cleanroom
+        env:
+          VERSION: 0.1.0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-installers
+          path: |
+            dist/*.deb
+            dist/Cleanroom-*-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+  # ------------------------------------------------------------- Windows
+  windows:
+    name: Windows 10/11 (zip)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build exe
+        run: python -m PyInstaller --noconfirm --clean packaging/windows/cleanroom.spec
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          Copy-Item packaging/windows/cleanroom.ico dist/
+          @'
+          Cleanroom 0.1.0 — Windows 10/11 (64-bit)
+          ========================================
+
+          Install
+          -------
+          1. Copy Cleanroom.exe anywhere you like (e.g. C:\Program Files\Cleanroom\)
+             and run it (right-click -> Run as administrator is NOT required;
+             privileged verbs elevate one batch at a time via UAC).
+          2. Install WireGuard for Windows:  https://download.wireguard.com/windows/
+             (wg.exe / wireguard.exe must be on PATH or in C:\Program Files\WireGuard)
+          3. First launch downloads a Playwright Chromium for the backend-browser
+             login. Pre-seed it with:  python -m playwright install chromium
+
+          Notes
+          -----
+          * OpenVPN is WireGuard-only on Windows by design (no bundled TAP
+            driver); Settings -> Protocol shows WireGuard.
+          * Split tunneling on Windows uses IP-range exclusions (per-app
+            exclusion would need a WFP driver).
+          * The exe is not code-signed (self-published project) — SmartScreen
+            may ask for confirmation on first run (More info -> Run anyway).
+          '@ | Set-Content dist/README-WINDOWS.txt
+          Compress-Archive -Path dist/Cleanroom.exe, dist/README-WINDOWS.txt, `
+            dist/cleanroom.ico -DestinationPath dist/Cleanroom-0.1.0-win64.zip -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/Cleanroom-*-win64.zip
+          if-no-files-found: error
+
+  # ------------------------------------------------------------- macOS
+  macos:
+    name: macOS (.app zip)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build .app bundle
+        run: bash packaging/macos/build.sh
+
+      - name: Zip the bundle
+        run: |
+          cd dist
+          zip -qry "Cleanroom-0.1.0-macos.zip" Cleanroom.app
+          cd ..
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: dist/Cleanroom-*-macos.zip
+          if-no-files-found: error
+
+  # ------------------------------------------------------------- Android
+  android:
+    name: Android (APK)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build debug APK (installable, debug-signed)
+        run: gradle assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk \
+             "$GITHUB_WORKSPACE/Cleanroom-0.1.0-android.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: Cleanroom-0.1.0-android.apk
+          if-no-files-found: error
+
+  # ------------------------------------------------------------- Publish
+  publish:
+    name: Publish GitHub Release
+    needs: [linux, windows, macos, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List assets
+        run: ls -la dist/
+
+      - name: Create / update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0
+          name: Cleanroom v0.1.0
+          body: |
+            First public release — independent clean-room VPN client for
+            Proton accounts.
+
+            ## Downloads
+            | Platform | File | Notes |
+            |---|---|---|
+            | **Linux Mint / Ubuntu / Debian** | `cleanroom_0.1.0-1_amd64.deb` | `sudo apt install ./cleanroom_0.1.0-1_amd64.deb` |
+            | **Linux (portable)** | `Cleanroom-0.1.0-linux-x86_64.tar.gz` | untar, run `cleanroom/cleanroom` |
+            | **Windows 10 / 11** | `Cleanroom-0.1.0-win64.zip` | unzip, run `Cleanroom.exe`; needs [WireGuard for Windows](https://download.wireguard.com/windows/) |
+            | **macOS 12+** | `Cleanroom-0.1.0-macos.zip` | unzip, move to /Applications; ad-hoc signed |
+            | **Android 10+** | `Cleanroom-0.1.0-android.apk` | debug-signed APK — allow "install unknown apps" |
+
+            ## After install
+            * Log in with your own Proton account (credentials stay in your
+              system keyring; TOTP auto-fill optional).
+            * Linux/macOS: enable passwordless privileged verbs via the
+              helper + sudoers line (printed by the deb postinst / see
+              `scripts/install.sh`, `scripts/install_macos.sh`).
+            * First launch downloads a Playwright Chromium for the
+              backend-browser login.
+
+            Not affiliated with or endorsed by Proton AG — see README.
+          files: |
+            dist/*.deb
+            dist/Cleanroom-*-linux-x86_64.tar.gz
+            dist/Cleanroom-*-win64.zip
+            dist/Cleanroom-*-macos.zip
+            dist/Cleanroom-*-android.apk
+          fail_on_unmatched_files: true
+          generate_release_notes: true
