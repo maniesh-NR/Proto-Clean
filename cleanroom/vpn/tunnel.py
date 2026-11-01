@@ -121,6 +121,9 @@ class TunnelManager:
         self.ks = KillSwitch(self.helper)
         self.split = SplitTunnel(self.helper)
         self.protocol = "wireguard"      # protocol of the tunnel last brought up
+        # None = ask the platform backend (production). Tests set True/False to
+        # simulate a platform with/without the OpenVPN drivers installed.
+        self.supports_openvpn: Optional[bool] = None
 
     # ------------------------------------------------------------------ up
     def up(
@@ -153,7 +156,10 @@ class TunnelManager:
         openvpn_driver = "tap" if openvpn_driver == "tap" else "tun"
         self.protocol = protocol
 
-        if protocol == "openvpn" and not capabilities().openvpn_tunnel:
+        ovpn_ok = self.supports_openvpn
+        if ovpn_ok is None:                      # production: ask the platform
+            ovpn_ok = capabilities().openvpn_tunnel
+        if protocol == "openvpn" and not ovpn_ok:
             raise HelperError(
                 "OpenVPN tunnels are not supported on this platform — "
                 "switch the protocol back to WireGuard (Settings → Protocol)")

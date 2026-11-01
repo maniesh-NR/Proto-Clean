@@ -75,6 +75,7 @@ def _manager(monkeypatch):
     mgr.helper = RecordingHelper()
     mgr.ks = type("K", (), {"active": False})()
     mgr.split = type("S", (), {"active": False})()
+    mgr.supports_openvpn = True   # orchestration tests: capable platform
     return mgr
 
 
@@ -89,6 +90,29 @@ def test_wireguard_verb_sequence_and_udp_kill_switch(monkeypatch):
     assert "tunnel-up" in verbs and "ovpn-up" not in verbs
     # kill switch is armed BEFORE the tunnel comes up
     assert verbs.index("ks-on") < verbs.index("tunnel-up")
+
+
+def test_openvpn_refused_without_platform_support(monkeypatch):
+    """Platforms without the OpenVPN driver (Windows) must refuse cleanly
+    before any helper verb is issued — on every host OS."""
+    mgr = _manager(monkeypatch)
+    mgr.supports_openvpn = False
+    try:
+        mgr.up(OVPN_CONFIG, protocol="openvpn")
+    except HelperError as exc:
+        assert "not supported" in str(exc)
+    else:
+        raise AssertionError("expected HelperError")
+    assert mgr.helper.batches == []          # nothing reached the helper
+
+
+def test_wireguard_still_up_without_openvpn_support(monkeypatch):
+    """WireGuard must keep working on OpenVPN-less platforms."""
+    mgr = _manager(monkeypatch)
+    mgr.supports_openvpn = False
+    mgr.up(WG_CONFIG, kill_switch=True)
+    verbs = [c[0] for c in mgr.helper.batches[0]]
+    assert "tunnel-up" in verbs
 
 
 def test_openvpn_verb_sequence_tcp_kill_switch_and_driver(monkeypatch):
