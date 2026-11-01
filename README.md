@@ -1,5 +1,9 @@
 # Cleanroom
 
+<p align="center">
+  <img src="docs/logo.png" width="128" alt="Cleanroom logo">
+</p>
+
 A clean-room client for **ProtonVPN** — **Linux, Windows, macOS and
 Android** — built around your own Proton account:
 
@@ -292,3 +296,15 @@ verified against a real dump (Nov 2026).
   kill switch is on. On macOS the IPv6-leak-protection pf anchor blocks
   all outbound IPv6 except loopback and the OpenVPN interface — for
   tunneled IPv6 on macOS combine IPv6 support with the kill switch.
+
+## Trademarks & legal
+
+Cleanroom is an **independent, community project** and is **not
+affiliated with, endorsed by, or sponsored by Proton AG**. "Proton VPN"
+and "Proton" are trademarks of Proton AG; they are used here solely to
+describe interoperability with a service the user has subscribed to
+(nominative use). All artwork — the logo, icons, color palette and UI
+styling in this repository — is **original Cleanroom branding**, created
+for this project (MIT-licensed, see `LICENSE`); no Proton assets are
+included or reproduced. The client talks to Proton's website only the
+way your own browser would, using your own account.

@@ -3,7 +3,7 @@
 apply_theme(app, mode) styles the whole application:
 
 * "dark"   — the original Cleanroom look;
-* "light"  — a clean light variant with the same violet accent;
+* "light"  — a clean light variant with the same teal accent;
 * "system" — follows the desktop color scheme and live-switches when the
   desktop switches (Qt colorSchemeChanged, Qt >= 6.5; falls back to the
   GNOME color-scheme gsettings key, then to the palette lightness).
@@ -54,7 +54,7 @@ QPushButton:hover { background-color: #2a2e37; }
 QPushButton:disabled { color: #5c6370; background-color: #1b1d23; }
 
 QPushButton#Connect {
-    background-color: #5b21b6;   /* proton-ish violet */
+    background-color: #0f766e;   /* cleanroom teal */
     border: none;
     font-size: 15px;
     font-weight: 700;
@@ -62,7 +62,7 @@ QPushButton#Connect {
     border-radius: 10px;
     color: white;
 }
-QPushButton#Connect:hover { background-color: #6d28d9; }
+QPushButton#Connect:hover { background-color: #0d9488; }
 QPushButton#Connect:disabled { background-color: #3a3f4b; color: #9aa3b2; }
 QPushButton#Disconnect { background-color: #b91c1c; border: none; }
 QPushButton#Disconnect:hover { background-color: #dc2626; }
@@ -72,14 +72,14 @@ QLineEdit, QComboBox, QSpinBox {
     border: 1px solid #2f333d;
     border-radius: 8px;
     padding: 7px 10px;
-    selection-background-color: #5b21b6;
+    selection-background-color: #0f766e;
 }
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: #7c3aed; }
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: #14b8a6; }
 
 QComboBox QAbstractItemView {
     background-color: #1e2128;
     border: 1px solid #2f333d;
-    selection-background-color: #5b21b6;
+    selection-background-color: #0f766e;
 }
 
 QTableWidget {
@@ -98,7 +98,7 @@ QHeaderView::section {
     font-weight: 600;
 }
 QTableWidget::item { padding: 6px; }
-QTableWidget::item:selected { background-color: #312e81; }
+QTableWidget::item:selected { background-color: #134e4a; }
 
 QTabWidget::pane { border: 1px solid #262a33; border-radius: 8px; }
 QTabBar::tab {
@@ -114,7 +114,7 @@ QCheckBox::indicator, QRadioButton::indicator {
     background: #1e2128;
 }
 QCheckBox::indicator:checked, QRadioButton::indicator:checked {
-    background: #7c3aed; border-color: #7c3aed;
+    background: #14b8a6; border-color: #14b8a6;
 }
 
 QStatusBar { color: #9aa3b2; }
@@ -163,7 +163,7 @@ QPushButton:hover { background-color: #eceff3; }
 QPushButton:disabled { color: #9aa3b2; background-color: #eef0f3; }
 
 QPushButton#Connect {
-    background-color: #6d28d9;   /* proton-ish violet */
+    background-color: #0d9488;   /* cleanroom teal */
     border: none;
     font-size: 15px;
     font-weight: 700;
@@ -171,8 +171,8 @@ QPushButton#Connect {
     border-radius: 10px;
     color: white;
 }
-QPushButton#Connect:hover { background-color: #5b21b6; }
-QPushButton#Connect:disabled { background-color: #c9c2d8; color: #f4f5f7; }
+QPushButton#Connect:hover { background-color: #0f766e; }
+QPushButton#Connect:disabled { background-color: #b3c9c6; color: #f4f5f7; }
 QPushButton#Disconnect { background-color: #dc2626; border: none; }
 QPushButton#Disconnect:hover { background-color: #b91c1c; }
 
@@ -181,15 +181,15 @@ QLineEdit, QComboBox, QSpinBox {
     border: 1px solid #c9ced8;
     border-radius: 8px;
     padding: 7px 10px;
-    selection-background-color: #6d28d9;
+    selection-background-color: #0d9488;
     selection-color: #ffffff;
 }
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: #7c3aed; }
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: #14b8a6; }
 
 QComboBox QAbstractItemView {
     background-color: #ffffff;
     border: 1px solid #c9ced8;
-    selection-background-color: #6d28d9;
+    selection-background-color: #0d9488;
     selection-color: #ffffff;
 }
 
@@ -209,7 +209,7 @@ QHeaderView::section {
     font-weight: 600;
 }
 QTableWidget::item { padding: 6px; }
-QTableWidget::item:selected { background-color: #ddd6fe; color: #20242c; }
+QTableWidget::item:selected { background-color: #ccfbf1; color: #20242c; }
 
 QTabWidget::pane { border: 1px solid #d8dce3; border-radius: 8px; }
 QTabBar::tab {
@@ -225,7 +225,7 @@ QCheckBox::indicator, QRadioButton::indicator {
     background: #ffffff;
 }
 QCheckBox::indicator:checked, QRadioButton::indicator:checked {
-    background: #7c3aed; border-color: #7c3aed;
+    background: #14b8a6; border-color: #14b8a6;
 }
 
 QStatusBar { color: #5d6675; }
@@ -342,12 +342,12 @@ def _apply_palette(app, effective: str) -> None:
             QPalette.ColorRole.Text: "#e6e9ef",
             QPalette.ColorRole.Button: "#23262e",
             QPalette.ColorRole.ButtonText: "#e6e9ef",
-            QPalette.ColorRole.Highlight: "#5b21b6",
+            QPalette.ColorRole.Highlight: "#0f766e",
             QPalette.ColorRole.HighlightedText: "#ffffff",
             QPalette.ColorRole.ToolTipBase: "#23262e",
             QPalette.ColorRole.ToolTipText: "#e6e9ef",
             QPalette.ColorRole.PlaceholderText: "#6b7280",
-            QPalette.ColorRole.Link: "#a78bfa",
+            QPalette.ColorRole.Link: "#5eead4",
         }
         disabled = "#5c6370"
     else:
@@ -359,12 +359,12 @@ def _apply_palette(app, effective: str) -> None:
             QPalette.ColorRole.Text: "#20242c",
             QPalette.ColorRole.Button: "#ffffff",
             QPalette.ColorRole.ButtonText: "#20242c",
-            QPalette.ColorRole.Highlight: "#6d28d9",
+            QPalette.ColorRole.Highlight: "#0d9488",
             QPalette.ColorRole.HighlightedText: "#ffffff",
             QPalette.ColorRole.ToolTipBase: "#ffffff",
             QPalette.ColorRole.ToolTipText: "#20242c",
             QPalette.ColorRole.PlaceholderText: "#8a92a3",
-            QPalette.ColorRole.Link: "#6d28d9",
+            QPalette.ColorRole.Link: "#0d9488",
         }
         disabled = "#9aa3b2"
     for role, color in roles.items():

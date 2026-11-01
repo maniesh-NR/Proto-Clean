@@ -14,7 +14,7 @@ def _pixmap(size: int = 64) -> QPixmap:
     return pm
 
 
-def shield_icon(color: str = "#7c3aed", size: int = 64) -> QIcon:
+def shield_icon(color: str = "#0d9488", size: int = 64) -> QIcon:
     pm = _pixmap(size)
     p = QPainter(pm)
     p.setRenderHint(QPainter.Antialiasing)
@@ -71,7 +71,39 @@ def load_bar_pixmap(percent: float, width: int = 90, height: int = 10) -> QPixma
 
 
 def app_icon(size: int = 64) -> QIcon:
-    return shield_icon("#5b21b6", size)
+    """Cleanroom logo: gradient shield with a sparkle, matching docs/logo.png."""
+    pm = _pixmap(size)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing)
+    s = size
+    path = QPainterPath()
+    path.moveTo(s * 0.5, s * 0.06)
+    path.lineTo(s * 0.88, s * 0.20)
+    path.lineTo(s * 0.88, s * 0.48)
+    path.quadTo(s * 0.88, s * 0.78, s * 0.5, s * 0.95)
+    path.quadTo(s * 0.12, s * 0.78, s * 0.12, s * 0.48)
+    path.lineTo(s * 0.12, s * 0.20)
+    path.closeSubpath()
+    from PySide6.QtGui import QLinearGradient
+
+    grad = QLinearGradient(0, 0, 0, s)
+    grad.setColorAt(0.0, QColor("#2dd4bf"))   # teal-400
+    grad.setColorAt(1.0, QColor("#0f766e"))   # teal-700
+    p.fillPath(path, QBrush(grad))
+    # four-point sparkle (the "clean" mark)
+    p.setPen(Qt.NoPen)
+    p.setBrush(QBrush(QColor("#ffffff")))
+    c, r_out, r_in = s * 0.5, s * 0.21, s * 0.055
+    star = QPainterPath()
+    star.moveTo(c, c - r_out)
+    star.quadTo(c + r_in * 0.4, c - r_in * 0.4, c + r_out, c)
+    star.quadTo(c + r_in * 0.4, c + r_in * 0.4, c, c + r_out)
+    star.quadTo(c - r_in * 0.4, c + r_in * 0.4, c - r_out, c)
+    star.quadTo(c - r_in * 0.4, c - r_in * 0.4, c, c - r_out)
+    star.closeSubpath()
+    p.drawPath(star)
+    p.end()
+    return QIcon(pm)
 
 
 def bolt_icon(color: str = "#f59e0b", size: int = 64) -> QPixmap:

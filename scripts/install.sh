@@ -65,15 +65,21 @@ sudo visudo -cf "$SUDOERS_FILE" >/dev/null || {
 }
 
 # ---------------------------------------------------------------- desktop entry
-log "Installing desktop entry…"
-mkdir -p "$HOME/.local/share/applications"
+log "Installing desktop entry + app icon…"
+mkdir -p "$HOME/.local/share/applications" "$HOME/.local/share/icons/hicolor/512x512/apps"
+if [ -f "$ROOT/packaging/linux/cleanroom.png" ]; then
+    cp "$ROOT/packaging/linux/cleanroom.png" \
+       "$HOME/.local/share/icons/hicolor/512x512/apps/cleanroom.png"
+else
+    warn "packaging/linux/cleanroom.png missing — desktop entry falls back to a generic icon"
+fi
 cat > "$HOME/.local/share/applications/cleanroom.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Cleanroom
-Comment=Clean-room ProtonVPN client (WireGuard / OpenVPN)
+Comment=Independent VPN client for Proton accounts (WireGuard / OpenVPN)
 Exec=python3 -m cleanroom
-Icon=network-vpn
+Icon=cleanroom
 Categories=Network;
 StartupNotify=true
 EOF

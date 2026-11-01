@@ -34,7 +34,8 @@ exec "$HERE/usr/cleanroom" "$@"
 EOF
     chmod +x "$APPDIR/AppRun"
     cp packaging/linux/cleanroom.desktop "$APPDIR/usr/share/applications/" || true
-    [ -f packaging/linux/cleanroom.png ] && cp packaging/linux/cleanroom.png "$APPDIR/cleanroom.png" || true
+    cp packaging/linux/cleanroom.png "$APPDIR/usr/share/icons/hicolor/512x512/apps/cleanroom.png" || true
+    cp packaging/linux/cleanroom.png "$APPDIR/cleanroom.png" || true
     appimagetool "$APPDIR" dist/Cleanroom-x86_64.AppImage || echo "appimagetool failed — onedir build still available"
 else
     echo "  appimagetool not found — skipping (onedir build above is ready)"

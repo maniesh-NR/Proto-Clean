@@ -42,7 +42,7 @@ class Tray(QSystemTrayIcon):
             self.setToolTip(f"Cleanroom — protected ({detail})")
         else:
             self.toggle_action.setText("Connect (fastest)")
-            self.setIcon(resources.shield_icon("#5b21b6"))
+            self.setIcon(resources.shield_icon("#0f766e"))
             self.setToolTip(f"Cleanroom — {state.replace('_', ' ')}")
 
     def _toggle(self) -> None:
