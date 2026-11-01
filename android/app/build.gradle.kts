@@ -28,7 +28,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        coreLibraryDesugaringEnabled = true   // required by the WG tunnel lib
+        isCoreLibraryDesugaringEnabled = true   // required by the WG tunnel lib
     }
     kotlinOptions { jvmTarget = "17" }
 
