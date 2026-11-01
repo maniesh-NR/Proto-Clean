@@ -28,6 +28,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled = true   // required by the WG tunnel lib
     }
     kotlinOptions { jvmTarget = "17" }
 
@@ -41,7 +42,10 @@ android {
 
 dependencies {
     // WireGuard userspace backend (wireguard-go + VpnService plumbing)
-    implementation("com.wireguard.android:tunnel:1.2.1")
+    // NOTE: tunnel is published on Maven Central with calendar versions;
+    // 1.2.1 does not exist. Desugaring is required by the library.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+    implementation("com.wireguard.android:tunnel:1.0.20260102")
 
     // UI
     val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
