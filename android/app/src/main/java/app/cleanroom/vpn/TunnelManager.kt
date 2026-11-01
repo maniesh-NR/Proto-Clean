@@ -176,7 +176,7 @@ object TunnelManager {
             val stats = statistics(context)
             if (stats != null && stats.peers().isNotEmpty()) {
                 val handshook = stats.peers().any { key ->
-                    (stats.peer(key)?.latestHandshake?.time ?: 0L) > 0L
+                    (stats.peer(key)?.latestHandshakeEpochMillis ?: 0L) > 0L
                 }
                 if (handshook) return true
             }
@@ -221,7 +221,7 @@ object TunnelManager {
                 val ps = stats.peer(key)
                 rx += ps?.rxBytes ?: 0L
                 tx += ps?.txBytes ?: 0L
-                val hs = ps?.latestHandshake?.time ?: 0L
+                val hs = ps?.latestHandshakeEpochMillis ?: 0L
                 if (hs > 0) handshake = hs
             }
         }
