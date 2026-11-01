@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cleanroom-vpn"
+version = "0.1.0"
+description = "Clean-room client for ProtonVPN on Windows, macOS, Linux and Android: backend-browser login, server-load selection, WireGuard, local blocklist ad-blocking, split tunneling, NAT-PMP port forwarding"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "PySide6>=6.6",
+    "playwright>=1.40",
+    "dnslib>=0.9.25",
+    "httpx>=0.25",
+    "keyring>=24",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+cleanroom = "cleanroom.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["cleanroom*"]

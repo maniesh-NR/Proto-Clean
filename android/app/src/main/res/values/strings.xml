@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cleanroom</string>
+    <string name="notif_channel_vpn">VPN connection</string>
+    <string name="notif_channel_dns">Ad-blocker</string>
+    <string name="notif_vpn_title">Cleanroom VPN</string>
+    <string name="notif_dns_title">Cleanroom ad-blocker</string>
+    <string name="notif_dns_text">Filtering DNS system-wide (VPN off)</string>
+</resources>

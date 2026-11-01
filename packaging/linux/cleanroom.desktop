@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Cleanroom
+Comment=Clean-room ProtonVPN client (WireGuard) — Linux
+Exec=cleanroom
+Icon=network-vpn
+Categories=Network;
+StartupNotify=true
