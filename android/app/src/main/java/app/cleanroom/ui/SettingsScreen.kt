@@ -60,23 +60,23 @@ fun SettingsScreen(vm: AppViewModel) {
             HorizontalDivider()
             ToggleRow("VPN Accelerator (set on the download page)",
                       settings.vpnAccelerator) {
-                vm.updateSettings { v -> it.copy(vpnAccelerator = v) }
+                vm.updateSettings { s -> s.copy(vpnAccelerator = v) }
             }
         }
 
         Section("Advanced") {
             ToggleRow("Alternative routing — try Proton's mirror API hosts\nwhen the direct ones are blocked",
                       settings.alternativeRouting) {
-                vm.updateSettings { v -> it.copy(alternativeRouting = v) }
+                vm.updateSettings { s -> s.copy(alternativeRouting = v) }
             }
             ToggleRow("Allow LAN connections — keep local devices\n(printers, speakers) outside the tunnel",
                       settings.allowLan) {
-                vm.updateSettings { v -> it.copy(allowLan = v) }
+                vm.updateSettings { s -> s.copy(allowLan = v) }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     ToggleRow("Custom DNS servers", settings.customDnsEnabled) {
-                        vm.updateSettings { v -> it.copy(customDnsEnabled = v) }
+                        vm.updateSettings { s -> s.copy(customDnsEnabled = v) }
                     }
                 }
             }
@@ -88,7 +88,7 @@ fun SettingsScreen(vm: AppViewModel) {
                     value = dns,
                     onValueChange = { t ->
                         dns = t
-                        val servers = t.split(",", ";", "\\s+".toRegex())
+                        val servers = t.split(Regex("[,;\\s]+"))
                             .map { it.trim() }
                             .filter { it.isNotEmpty() }
                             .toSet()
@@ -104,14 +104,14 @@ fun SettingsScreen(vm: AppViewModel) {
             }
             ToggleRow("NAT type — Moderate NAT (off = Strict NAT, paid plans)",
                       settings.moderateNat) {
-                vm.updateSettings { v -> it.copy(moderateNat = v) }
+                vm.updateSettings { s -> s.copy(moderateNat = v) }
             }
             ToggleRow("IPv6 support — allow IPv6 traffic through the tunnel",
                       settings.ipv6Support) {
-                vm.updateSettings { v -> it.copy(ipv6Support = v) }
+                vm.updateSettings { s -> s.copy(ipv6Support = v) }
             }
             ToggleRow("IPv6 leak protection (default on)", settings.ipv6LeakProtection) {
-                vm.updateSettings { v -> it.copy(ipv6LeakProtection = v) }
+                vm.updateSettings { s -> s.copy(ipv6LeakProtection = v) }
             }
             Text(
                 "IPv6 leak protection notes: when IPv6 support is off, IPv6 " +
@@ -126,7 +126,7 @@ fun SettingsScreen(vm: AppViewModel) {
 
         Section("Port forwarding (NAT-PMP, paid plans)") {
             ToggleRow("Request in generated config", settings.natPmpInConfig) {
-                vm.updateSettings { v -> it.copy(natPmpInConfig = v) }
+                vm.updateSettings { s -> s.copy(natPmpInConfig = v) }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Internal port (0 = generic)", Modifier.weight(1f))
@@ -145,7 +145,7 @@ fun SettingsScreen(vm: AppViewModel) {
 
         Section("Split tunneling (exclude apps)") {
             ToggleRow("Enable", settings.splitEnabled) {
-                vm.updateSettings { v -> it.copy(splitEnabled = v) }
+                vm.updateSettings { s -> s.copy(splitEnabled = v) }
             }
             Text(
                 "Excluded apps keep using the normal connection (native " +
@@ -185,7 +185,7 @@ fun SettingsScreen(vm: AppViewModel) {
 
         Section("Local config cache") {
             ToggleRow("Cache downloaded configs", settings.cacheConfigs) {
-                vm.updateSettings { v -> it.copy(cacheConfigs = v) }
+                vm.updateSettings { s -> s.copy(cacheConfigs = v) }
             }
             Text(
                 "A server's config is downloaded once and reused; it is " +
@@ -202,7 +202,7 @@ fun SettingsScreen(vm: AppViewModel) {
         Section("Ad blocking") {
             ToggleRow("Answer blocked domains with NXDOMAIN (else 0.0.0.0)",
                       settings.blockNxdomain) {
-                vm.updateSettings { v -> it.copy(blockNxdomain = v) }
+                vm.updateSettings { s -> s.copy(blockNxdomain = v) }
             }
             Text(
                 "While the VPN is connected, DNS uses Proton's in-tunnel " +

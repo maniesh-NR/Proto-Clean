@@ -18,6 +18,7 @@ import app.cleanroom.proton.ProtonWeb
 import app.cleanroom.proton.Selection
 import app.cleanroom.vpn.NatPmp
 import app.cleanroom.vpn.TunnelManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -114,9 +115,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         this.webView = webView
         viewModelScope.launch {
             _ui.value = _ui.value.copy(loginStatus = "starting…")
-            val (ok, msg) = session.login(webView) { status ->
+            val (ok, msg) = session.login(webView, onStatus = { status ->
                 _ui.value = _ui.value.copy(loginStatus = status)
-            }
+            })
             if (ok) {
                 session.openDownloads(webView)
                 _ui.value = _ui.value.copy(loggedIn = true, loginStatus = "logged in",

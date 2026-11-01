@@ -36,7 +36,7 @@ class CleanroomVpnService : GoBackend.VpnService() {
     private fun startInForeground() {
         val notification: Notification =
             androidx.core.app.NotificationCompat.Builder(this, CleanroomApp.CHANNEL_VPN)
-                .setSmallIcon(android.R.drawable.stat_sys_vpn_ic_notification)
+                .setSmallIcon(app.cleanroom.R.drawable.ic_stat_shield)
                 .setContentTitle(getText(app.cleanroom.R.string.notif_vpn_title))
                 .setContentText("WireGuard tunnel active")
                 .setOngoing(true)

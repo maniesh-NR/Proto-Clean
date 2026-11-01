@@ -118,9 +118,8 @@ object TunnelManager {
         }
         if (customDns.isNotEmpty()) {
             text = if (Regex("(?m)^\\s*DNS\\s*=").containsMatchIn(text)) {
-                text.replaceFirst(Regex("(?m)^(\\s*DNS\\s*=\\s*).*$")) { m ->
-                    "${m.groupValues[1]}${customDns.joinToString(", ")}"
-                }
+                text.replaceFirst(Regex("(?m)^\\s*DNS\\s*=.*$"),
+                                  "DNS = ${customDns.joinToString(", ")}")
             } else {
                 text.replaceFirst("[Interface]", "[Interface]\nDNS = ${customDns.joinToString(", ")}")
             }
@@ -146,18 +145,21 @@ object TunnelManager {
         }.getOrDefault(Tunnel.State.DOWN)
     }
 
-    /** Parse a wg-quick config; apply the Android app exclusions. */
+    /**
+     * Parse a wg-quick config; apply the Android app exclusions by injecting
+     * the ExcludedApplications key into the [Interface] section (an Android
+     * wg-quick extension understood by the tunnel library's parser).
+     */
     private fun parseConfig(configText: String, excludedApps: Set<String>): Config {
-        val parsed = Config.parse(ByteArrayInputStream(configText.toByteArray()))
-        return if (excludedApps.isEmpty()) parsed
-        else runCatching {
-            parsed.toBuilder()
-                .setExcludedApplications(excludedApps)
-                .build()
-        }.getOrElse {
-            Log.w(TAG, "could not apply excluded applications: $it")
-            parsed
+        var text = configText
+        if (excludedApps.isNotEmpty()) {
+            val line = "ExcludedApplications = ${excludedApps.joinToString(", ")}"
+            text = if (Regex("(?m)^\\s*\\[Interface]\\s*$").containsMatchIn(text))
+                text.replaceFirst(Regex("(?m)^\\s*\\[Interface]\\s*$"), "[Interface]\n$line")
+            else
+                "$text\n[Interface]\n$line"
         }
+        return Config.parse(ByteArrayInputStream(text.toByteArray()))
     }
 
     /**
@@ -172,10 +174,9 @@ object TunnelManager {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             val stats = statistics(context)
-            if (stats != null && stats.totalPeers() > 0) {
-                var handshook = false
-                stats.peers().forEach { key ->
-                    if ((stats.latestHandshake(key) ?: 0L) > 0L) handshook = true
+            if (stats != null && stats.peers().isNotEmpty()) {
+                val handshook = stats.peers().any { key ->
+                    (stats.peer(key)?.latestHandshake?.time ?: 0L) > 0L
                 }
                 if (handshook) return true
             }
@@ -217,17 +218,17 @@ object TunnelManager {
         var handshake: Long? = null
         if (stats != null) {
             stats.peers().forEach { key ->
-                rx += stats.rx(key) ?: 0L
-                tx += stats.tx(key) ?: 0L
-                stats.latestHandshake(key)?.let { t ->
-                    if (t > 0) handshake = t
-                }
+                val ps = stats.peer(key)
+                rx += ps?.rxBytes ?: 0L
+                tx += ps?.txBytes ?: 0L
+                val hs = ps?.latestHandshake?.time ?: 0L
+                if (hs > 0) handshake = hs
             }
         }
         return Stats(
             up = state == Tunnel.State.UP,
             rx = rx, tx = tx,
-            handshakeAgeSec = handshake?.let { System.currentTimeMillis() / 1000L - it },
+            handshakeAgeSec = handshake?.let { (System.currentTimeMillis() - it) / 1000L },
         )
     }
 }

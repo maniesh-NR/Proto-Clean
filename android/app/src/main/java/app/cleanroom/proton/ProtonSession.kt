@@ -197,6 +197,11 @@ class ProtonSession(
         @Volatile
         var onDone: ((Boolean, String) -> Unit)? = null
 
+        /** Kotlin-side completion (mirrors window.Cleanroom.done from JS). */
+        fun finish(ok: Boolean, msg: String) {
+            onDone?.invoke(ok, msg)
+        }
+
         @JavascriptInterface
         fun done(payload: String) {
             runCatching {

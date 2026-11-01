@@ -46,6 +46,17 @@ import okhttp3.RequestBody.Companion.toRequestBody
  */
 class DnsFilterVpnService : VpnService() {
 
+    /** Set by the ViewModel before the service starts (class-level nested
+     *  object — inside the companion it would only be reachable as
+     *  DnsFilterVpnService.Companion.DomainFilterHolder). */
+    object DomainFilterHolder {
+        @Volatile
+        var filter: DomainFilter? = null
+
+        @Volatile
+        var nxdomain: Boolean = true
+    }
+
     private var tun: ParcelFileDescriptor? = null
     private var reader: Thread? = null
     @Volatile
@@ -226,15 +237,6 @@ class DnsFilterVpnService : VpnService() {
 
         @Volatile
         var blockedQueries = 0L
-
-        /** Set by the ViewModel before the service starts. */
-        object DomainFilterHolder {
-            @Volatile
-            var filter: DomainFilter? = null
-
-            @Volatile
-            var nxdomain: Boolean = true
-        }
 
         fun start(context: android.content.Context) {
             val intent = Intent(context, DnsFilterVpnService::class.java)
