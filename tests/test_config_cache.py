@@ -1,6 +1,6 @@
 """Tests for the local WireGuard-config cache (reuse until failure)."""
 
-from cleanroom.vpn.config_cache import (
+from proton_clean.vpn.config_cache import (
     ConfigCache, fingerprint_of, parse_config_meta, slugify,
 )
 

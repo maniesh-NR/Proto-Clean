@@ -8,9 +8,9 @@ import types
 
 import pytest
 
-from cleanroom import credentials as creds
-from cleanroom.account.browser import AccountSession, LoginOutcome, LoginResult
-from cleanroom.controller import Controller, State
+from proton_clean import credentials as creds
+from proton_clean.account.browser import AccountSession, LoginOutcome, LoginResult
+from proton_clean.controller import Controller, State
 
 
 # --------------------------------------------------------------- session

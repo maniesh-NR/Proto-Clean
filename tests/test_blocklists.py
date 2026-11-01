@@ -1,8 +1,8 @@
 import pytest
 
-from cleanroom.netshield.blocklists import (BlocklistManager, DomainFilter,
+from proton_clean.netshield.blocklists import (BlocklistManager, DomainFilter,
                                                 parse_hosts, slug_for)
-from cleanroom.settings import BlocklistSource
+from proton_clean.settings import BlocklistSource
 
 
 def _lists():

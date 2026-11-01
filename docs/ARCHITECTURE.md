@@ -17,7 +17,7 @@
 │     scrape/config   └─ TunnelMonitor (thread)                  │
 │                          │                                     │
 │                          ▼ sudo -n                             │
-│                /usr/local/bin/cleanroom-helper (root)           │
+│                /usr/local/bin/proton-clean-helper (root)           │
 │                  wg-quick · iptables · ip · cgroup              │
 └────────────────────────────────────────────────────────────────┘
 ```
@@ -27,11 +27,11 @@
 | Thread | Owns |
 | --- | --- |
 | Qt main | all widgets; receives everything via queued signals |
-| `cleanroom-browser` | the single Playwright sync session (jobs are queued through `BrowserWorker.submit`) |
-| `cleanroom-login` / `cleanroom-connect` / `cleanroom-disconnect` / `cleanroom-servers` / `cleanroom-blocklists*` | one Controller operation each; guarded by an operation lock |
-| `cleanroom-dns-*` pool | DNS query handling (thread per query, bounded pool) |
-| `cleanroom-monitor` | polls helper `status` every 5 s |
-| `cleanroom-natpmp` | NAT-PMP lease keep-alive |
+| `proton-clean-browser` | the single Playwright sync session (jobs are queued through `BrowserWorker.submit`) |
+| `proton-clean-login` / `proton-clean-connect` / `proton-clean-disconnect` / `proton-clean-servers` / `proton-clean-blocklists*` | one Controller operation each; guarded by an operation lock |
+| `proton-clean-dns-*` pool | DNS query handling (thread per query, bounded pool) |
+| `proton-clean-monitor` | polls helper `status` every 5 s |
+| `proton-clean-natpmp` | NAT-PMP lease keep-alive |
 
 The Controller is Qt-free (plain callbacks) so it can be exercised by the
 test suite headlessly; `ControllerBridge` converts callbacks into
@@ -74,7 +74,7 @@ a dialog and calls `provide_totp(code)` which releases the event.
    "Free server configs" category
 3. choose server: fastest (`min Score`, tier = 0, online, <90 % load) or
    manual (a paid/stale id falls back to fastest-free with a warning)
-4. **cache lookup**: if `~/.cache/cleanroom/configs/` holds a config for
+4. **cache lookup**: if `~/.cache/proton-clean/configs/` holds a config for
    the server *of the selected protocol* (exact option fingerprint
    preferred, any same-protocol variant accepted — an .ovpn is never
    served to a WireGuard lookup and vice versa), skip the browser
@@ -92,14 +92,14 @@ a dialog and calls `provide_totp(code)` which releases the event.
    line) → store in the cache
 7. validate config (WireGuard: no `PostUp`/`PreUp` hooks; OpenVPN: a
    `remote` line and no `up`/`down`/`script-security` hooks), install to
-   `/etc/wireguard/cleanroom.conf` (or `/etc/openvpn/cleanroom/cleanroom.ovpn`)
+   `/etc/wireguard/proton_clean.conf` (or `/etc/openvpn/proton-clean/proton-clean.ovpn`)
 8. **kill switch on** (before the tunnel exists — no leak window; the
    endpoint allow-rule uses the config's own transport: UDP for
    WireGuard, UDP/TCP for OpenVPN) and **IPv6 leak protection on**
    (default) via `v6-on`, then split-tunnel rules, then DNS redirect
    (your uid exempt)
-9. tunnel up: `wg-quick up cleanroom` or helper `ovpn-up tun|tap`
-   (`openvpn --config … --dev cleanroom0 --dev-type <driver> --daemon`)
+9. tunnel up: `wg-quick up proton-clean` or helper `ovpn-up tun|tap`
+   (`openvpn --config … --dev proton_clean0 --dev-type <driver> --daemon`)
 10. **liveness verification**: wait for `latest-handshake > 0` (default
     25 s; the OpenVPN status verb reports "now" while the daemon is
     alive and its interface has an address). If a *cached* config fails
@@ -133,7 +133,7 @@ redirect off → kill switch off → IPv6 leak protection off.
   (`vpn_options.moderate_nat`), the OpenVPN network driver with the
   TAP/TUN explanations, IPv6 support and IPv6 leak protection.
 
-### Config cache (`~/.cache/cleanroom/configs/`)
+### Config cache (`~/.cache/proton-clean/configs/`)
 
 - One `<server-slug>.<fingerprint>.conf|.ovpn` per server+protocol+options;
   `index.json` tracks created/verified/failures per entry.
@@ -146,7 +146,7 @@ redirect off → kill switch off → IPv6 leak protection off.
 - After a fresh login the controller **harvests** every existing
   certificate textarea on the Downloads page — **both the WireGuard and
   the OpenVPN section** — into the cache (protocol recovered from the
-  text), so configs you created earlier (via Cleanroom or by hand) are
+  text), so configs you created earlier (via Proton Clean or by hand) are
   reused without a download.
 - `cache_configs = false` in settings disables the cache entirely.
 
@@ -154,7 +154,7 @@ redirect off → kill switch off → IPv6 leak protection off.
 
 - Sources live in `settings.json` as `netshield.blocklists:
   [{name, url, enabled}]`; legacy plain-URL `sources` migrate on load.
-- Each list downloads to `~/.cache/cleanroom/blocklists/<sha1(url)[:16]>.txt`
+- Each list downloads to `~/.cache/proton-clean/blocklists/<sha1(url)[:16]>.txt`
   with a `.json` metadata sidecar (domain count, timestamp, last error).
 - Enabled lists are merged (set union) into `merged.json` → `DomainFilter`.
 - The controller exposes add / remove / enable-disable / update-one /
@@ -170,8 +170,8 @@ redirect off → kill switch off → IPv6 leak protection off.
 
 ## Split tunnel details
 
-- Root-level cgroup `cleanroom_split` (created by the helper; cgroup v2).
-- `iptables -t mangle OUTPUT -m cgroup --path cleanroom_split -j MARK --set-mark 0x2a`
+- Root-level cgroup `proton_clean_split` (created by the helper; cgroup v2).
+- `iptables -t mangle OUTPUT -m cgroup --path proton_clean_split -j MARK --set-mark 0x2a`
 - `ip rule add fwmark 0x2a table 51821 priority 100` (evaluated before
   wg-quick's auto rules) → table 51821 holds a default route via the
   pre-tunnel gateway.
@@ -184,7 +184,7 @@ redirect off → kill switch off → IPv6 leak protection off.
 
 - Server: dnslib, UDP+TCP on `127.0.0.1:5353` and `[::1]:5353`.
 - `iptables -t nat OUTPUT`: `-m owner --uid-owner <app uid> RETURN`
-  first (so Cleanroom's own upstream queries never loop), then
+  first (so Proton Clean's own upstream queries never loop), then
   `REDIRECT --to-ports 5353` for udp/tcp 53 (v4+v6).
 - Upstream: DoH POST (`application/dns-message`) to
   `https://doh.protonvpn.ch/dns-query`, bootstrapped over plain UDP via
@@ -206,20 +206,20 @@ redirect off → kill switch off → IPv6 leak protection off.
   `route-ipv6 ::/0`, plus `tun-ipv6` with the TUN driver) so v6 flows
   through the tunnel — better compatibility with v6-only sites.
 - **IPv6 leak protection on** (default): the `v6-on` helper verb adds
-  an ip6tables `CLEANROOM_V6` OUTPUT chain (macOS: the `cleanroom.v6`
-  pf anchor; Windows: the `CleanroomV6` firewall group) that blocks
+  an ip6tables `PROTON_CLEAN_V6` OUTPUT chain (macOS: the `proton_clean.v6`
+  pf anchor; Windows: the `ProtonCleanV6` firewall group) that blocks
   all IPv6 except loopback, both tunnel interfaces and the
   split-tunnel mark — armed **before** tunnel-up, independent of the
   kill switch, and torn down by `v6-off`.
 
 ## Helper hardening
 
-- Single binary at `/usr/local/bin/cleanroom-helper`; sudoers grants
+- Single binary at `/usr/local/bin/proton-clean-helper`; sudoers grants
   NOPASSWD for exactly that path.
 - Verbs are an exact allow-list; every argument is validated
   (interface regex, `ipaddress` parse, port/uid ranges, absolute paths).
 - `install-config` only accepts sources under
-  `~/.cache/cleanroom/` or `/tmp/cleanroom-`, requires the file to parse
+  `~/.cache/proton-clean/` or `/tmp/protonclean-`, requires the file to parse
   as a WireGuard config and **rejects `PreUp`/`PostUp` hooks** so a
   crafted config can't run shell commands as root.
 - `ovpn-install-config` applies the same rules to `.ovpn` files: source
@@ -238,9 +238,9 @@ redirect off → kill switch off → IPv6 leak protection off.
 | --- | --- |
 | CAPTCHA during headless login | `captcha` event → visible Chromium window (credentials pre-filled) + banner + desktop notification; session captured on completion |
 | 2FA without stored secret | UI dialog (180 s) — enter the code, login continues |
-| Proton UI redesign | `ScrapeError` with a debug screenshot in `~/.cache/cleanroom/screenshots`; server cache still serves the UI |
+| Proton UI redesign | `ScrapeError` with a debug screenshot in `~/.cache/proton-clean/screenshots`; server cache still serves the UI |
 | Cached config revoked server-side | interface comes up but no handshake → entry invalidated, config re-downloaded once automatically |
-| All blocklist sources fail | previous merged list stays in `~/.cache/cleanroom/blocklists/merged.json` |
+| All blocklist sources fail | previous merged list stays in `~/.cache/proton-clean/blocklists/merged.json` |
 | One blocklist source fails | others still merge; the entry shows the error in the manager; its old cache file (if any) keeps contributing |
 | DoH upstream down | plain-UDP fallback to `10.2.0.1`; if that fails too, SERVFAIL |
 | NAT-PMP "not authorized" (free plan) | one-shot message, no retries |

@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Cleanroom
-Comment=Independent VPN client for Proton accounts (WireGuard / OpenVPN) — Linux
-Exec=cleanroom
-Icon=cleanroom
-Categories=Network;
-StartupNotify=true

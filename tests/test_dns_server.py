@@ -12,8 +12,8 @@ import time
 import pytest
 from dnslib import DNSRecord, QTYPE
 
-from cleanroom.netshield.blocklists import DomainFilter
-from cleanroom.netshield.dns_server import DnsBlocker, DnsUpstream
+from proton_clean.netshield.blocklists import DomainFilter
+from proton_clean.netshield.dns_server import DnsBlocker, DnsUpstream
 
 BLOCKED = {"doubleclick.net", "ads.example.com"}
 
@@ -101,7 +101,7 @@ def test_doh_tls_is_verified_against_the_hostname(monkeypatch):
     """DoH connects to a literal IP; the TLS handshake must still verify
     the certificate against the real hostname (SNI), or every query would
     fail verification and silently fall back to plain UDP."""
-    from cleanroom.netshield import dns_server as dns_mod
+    from proton_clean.netshield import dns_server as dns_mod
 
     captured = {}
 

@@ -1,6 +1,6 @@
 import json
 
-from cleanroom import settings as S
+from proton_clean import settings as S
 
 
 def test_defaults_roundtrip(tmp_path, monkeypatch):

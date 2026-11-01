@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "app.cleanroom"
+    namespace = "app.protonclean"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "app.cleanroom"
+        applicationId = "app.protonclean"
         minSdk = 29            // Android 10
         targetSdk = 34
         versionCode = 1

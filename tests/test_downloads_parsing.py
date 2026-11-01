@@ -1,8 +1,8 @@
 """Parsing tests for the Downloads-page scrapers, using cell text sampled
 from the real logged-in page dump."""
 
-from cleanroom.account import downloads_page as dp
-from cleanroom.account.downloads_page import (
+from proton_clean.account import downloads_page as dp
+from proton_clean.account.downloads_page import (
     FREE_CATEGORY_SELECTORS, LOGICALS_ALT_FETCH_URLS, OVPN,
     OVPN_FREE_CATEGORY_SELECTORS, OVPN_TCP_SELECTORS, OVPN_UDP_SELECTORS,
     OVPN_CONFIG_NAME_SELECTORS, OPENVPN_LINK_SELECTORS, WG,

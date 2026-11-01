@@ -4,10 +4,10 @@ from importlib.machinery import SourceFileLoader
 
 import pytest
 
-from cleanroom.vpn.wgconf import WgConfigError, WgQuickConf
+from proton_clean.vpn.wgconf import WgConfigError, WgQuickConf
 
 GOOD = """[Interface]
-# Cleanroom captured config
+# Proton Clean captured config
 PrivateKey = kPd7xXJ=example=
 Address = 10.2.0.2/32
 DNS = 10.2.0.1
@@ -48,9 +48,9 @@ def test_missing_fields_rejected():
 
 
 def _load_helper():
-    """Import helper/cleanroom-helper (a standalone script) as a module."""
-    path = pathlib.Path(__file__).resolve().parent.parent / "helper" / "cleanroom-helper"
-    loader = SourceFileLoader("cleanroom_helper_test", str(path))
+    """Import helper/proton-clean-helper (a standalone script) as a module."""
+    path = pathlib.Path(__file__).resolve().parent.parent / "helper" / "proton-clean-helper"
+    loader = SourceFileLoader("proton_clean_helper_test", str(path))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     mod = importlib.util.module_from_spec(spec)
     loader.exec_module(mod)

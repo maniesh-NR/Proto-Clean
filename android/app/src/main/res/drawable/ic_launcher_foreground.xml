@@ -2,7 +2,7 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- cleanroom shield (brand teal) -->
+    <!-- proton-clean shield (brand teal) -->
     <path
         android:fillColor="#14B8A6"
         android:pathData="M54,26 L74,34 v16 c0,15 -9,25 -20,31 C43,75 34,65 34,50 V34 Z" />

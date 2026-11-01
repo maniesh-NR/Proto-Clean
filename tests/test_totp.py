@@ -1,4 +1,4 @@
-from cleanroom.totp import code_from, totp
+from proton_clean.totp import code_from, totp
 
 # RFC 6238 test vectors for the 8-digit/SHA1 cases use this base32 secret:
 SECRET = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"   # "12345678901234567890"

@@ -16,13 +16,13 @@ import types
 
 import pytest
 
-from cleanroom import settings as S
-from cleanroom.account.downloads_page import ScrapeResult
-from cleanroom.controller import Controller, State
-from cleanroom.servers import store as store_mod
-from cleanroom.servers.models import LogicalServer
-from cleanroom.vpn.config_cache import ConfigCache
-from cleanroom.vpn import tunnel as tunnel_mod
+from proton_clean import settings as S
+from proton_clean.account.downloads_page import ScrapeResult
+from proton_clean.controller import Controller, State
+from proton_clean.servers import store as store_mod
+from proton_clean.servers.models import LogicalServer
+from proton_clean.vpn.config_cache import ConfigCache
+from proton_clean.vpn import tunnel as tunnel_mod
 
 CONFIG = """[Interface]
 # NAT-PMP (Port Forwarding) = off
@@ -52,7 +52,7 @@ class FakeDownloads:
     def scrape_servers(self):
         return [_server()]
 
-    def create_config(self, server, options, config_name="Cleanroom",
+    def create_config(self, server, options, config_name="ProtonClean",
                       fastest=False):
         self.calls.append(server.name)
         return ScrapeResult(config_text=CONFIG, server=server)
@@ -123,7 +123,7 @@ def controller(tmp_path, monkeypatch):
     ctl.connected_via = {}
     ctl.helper_ready = lambda: True
 
-    import cleanroom.controller as ctl_mod
+    import proton_clean.controller as ctl_mod
     monkeypatch.setattr(ctl_mod, "TunnelManager", FakeTunnelManager)
     return ctl
 

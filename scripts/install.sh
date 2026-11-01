@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Cleanroom installer — run:  bash scripts/install.sh
+# Proton Clean installer — run:  bash scripts/install.sh
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HELPER_SRC="$HERE/helper/cleanroom-helper"
-HELPER_DST="/usr/local/bin/cleanroom-helper"
+HELPER_SRC="$HERE/helper/proton-clean-helper"
+HELPER_DST="/usr/local/bin/proton-clean-helper"
 
 log()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m ->\033[0m %s\n' "$*"; }
@@ -57,7 +57,7 @@ log "Installing the privileged helper…"
 sudo install -m 0755 "$HELPER_SRC" "$HELPER_DST"
 
 log "Creating the sudoers entry (passwordless, limited to the helper)…"
-SUDOERS_FILE="/etc/sudoers.d/cleanroom"
+SUDOERS_FILE="/etc/sudoers.d/proton-clean"
 echo "$USER ALL=(root) NOPASSWD: $HELPER_DST" | sudo tee "$SUDOERS_FILE" >/dev/null
 sudo chmod 0440 "$SUDOERS_FILE"
 sudo visudo -cf "$SUDOERS_FILE" >/dev/null || {
@@ -67,24 +67,24 @@ sudo visudo -cf "$SUDOERS_FILE" >/dev/null || {
 # ---------------------------------------------------------------- desktop entry
 log "Installing desktop entry + app icon…"
 mkdir -p "$HOME/.local/share/applications" "$HOME/.local/share/icons/hicolor/512x512/apps"
-if [ -f "$ROOT/packaging/linux/cleanroom.png" ]; then
-    cp "$ROOT/packaging/linux/cleanroom.png" \
-       "$HOME/.local/share/icons/hicolor/512x512/apps/cleanroom.png"
+if [ -f "$ROOT/packaging/linux/proton-clean.png" ]; then
+    cp "$ROOT/packaging/linux/proton-clean.png" \
+       "$HOME/.local/share/icons/hicolor/512x512/apps/proton-clean.png"
 else
-    warn "packaging/linux/cleanroom.png missing — desktop entry falls back to a generic icon"
+    warn "packaging/linux/proton-clean.png missing — desktop entry falls back to a generic icon"
 fi
-cat > "$HOME/.local/share/applications/cleanroom.desktop" <<EOF
+cat > "$HOME/.local/share/applications/proton-clean.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Cleanroom
+Name=Proton Clean
 Comment=Independent VPN client for Proton accounts (WireGuard / OpenVPN)
-Exec=python3 -m cleanroom
-Icon=cleanroom
+Exec=python3 -m proton_clean
+Icon=proton-clean
 Categories=Network;
 StartupNotify=true
 EOF
 
-log "Done. Start with:  python3 -m cleanroom"
+log "Done. Start with:  python3 -m proton_clean"
 warn "First launch: Settings → Account → enter your Proton credentials."
 warn "The sudoers entry grants your user passwordless access to the helper"
 warn "binary ONLY — review $SUDOERS_FILE any time."

@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from cleanroom import settings as S
+from proton_clean import settings as S
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -62,7 +62,7 @@ def test_save_keeps_legacy_flag_in_sync(tmp_path, monkeypatch):
 
 # ----------------------------------------------------------------- resolver
 def test_resolve_explicit_modes():
-    from cleanroom.ui.theme import resolve_theme
+    from proton_clean.ui.theme import resolve_theme
 
     assert resolve_theme("light") == "light"
     assert resolve_theme("dark") == "dark"
@@ -70,7 +70,7 @@ def test_resolve_explicit_modes():
 
 
 def test_resolve_system_uses_desktop_scheme(monkeypatch):
-    from cleanroom.ui import theme as T
+    from proton_clean.ui import theme as T
 
     monkeypatch.setattr(T, "system_prefers_dark", lambda: True)
     assert T.resolve_theme("system") == "dark"
@@ -79,7 +79,7 @@ def test_resolve_system_uses_desktop_scheme(monkeypatch):
 
 
 def test_stylesheets_differ_and_alias_holds():
-    from cleanroom.ui.theme import DARK_QSS, LIGHT_QSS, QSS, stylesheet_for
+    from proton_clean.ui.theme import DARK_QSS, LIGHT_QSS, QSS, stylesheet_for
 
     assert QSS is DARK_QSS                 # backward-compat alias
     assert DARK_QSS != LIGHT_QSS
@@ -93,7 +93,7 @@ def test_stylesheets_differ_and_alias_holds():
 
 
 def test_state_colors_shared_between_themes():
-    from cleanroom.ui.theme import STATE_COLORS
+    from proton_clean.ui.theme import STATE_COLORS
 
     assert STATE_COLORS["connected"][0] == "#22c55e"
     assert STATE_COLORS["connected"][1] == "Protected"
@@ -109,7 +109,7 @@ def qapp():
 
 
 def test_apply_theme_switches_stylesheet(qapp):
-    from cleanroom.ui import theme as T
+    from proton_clean.ui import theme as T
 
     eff = T.apply_theme(qapp, "light")
     assert eff == "light"
@@ -128,7 +128,7 @@ def test_apply_theme_switches_stylesheet(qapp):
 
 
 def test_apply_theme_system_resolves(qapp, monkeypatch):
-    from cleanroom.ui import theme as T
+    from proton_clean.ui import theme as T
 
     monkeypatch.setattr(T, "system_prefers_dark", lambda: False)
     assert T.apply_theme(qapp, "system") == "light"
@@ -140,7 +140,7 @@ def test_apply_theme_system_resolves(qapp, monkeypatch):
 
 
 def test_apply_theme_sets_matching_palette(qapp):
-    from cleanroom.ui import theme as T
+    from proton_clean.ui import theme as T
 
     T.apply_theme(qapp, "dark")
     assert qapp.palette().window().color().name() == "#16181d"
@@ -150,8 +150,8 @@ def test_apply_theme_sets_matching_palette(qapp):
 
 
 def test_load_bar_uses_theme_track(qapp):
-    from cleanroom.ui import resources
-    from cleanroom.ui import theme as T
+    from proton_clean.ui import resources
+    from proton_clean.ui import theme as T
 
     # x=80 sits beyond the 50% fill, so the pixel shows the track color
     T.apply_theme(qapp, "dark")

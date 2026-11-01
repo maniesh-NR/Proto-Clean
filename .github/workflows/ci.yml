@@ -38,7 +38,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Byte-compile check
-        run: python -m compileall -q cleanroom
+        run: python -m compileall -q proton_clean
 
       - name: Run tests
         run: pytest tests/ -q
@@ -62,7 +62,7 @@ jobs:
       - name: Smoke-test wheel install
         run: |
           pip install dist/*.whl
-          python -c "import cleanroom, cleanroom.settings, cleanroom.vpn.wgconf; print('wheel OK:', cleanroom.__file__)"
+          python -c "import proton_clean, proton_clean.settings, proton_clean.vpn.wgconf; print('wheel OK:', proton_clean.__file__)"
 
       - uses: actions/upload-artifact@v4
         with:
