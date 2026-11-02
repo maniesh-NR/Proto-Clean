@@ -75,9 +75,13 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
-          # vendor wheels so the flatpak build sandbox needs no network;
-          # they land in ./wheels which the manifest's dir-source copies in
-          pip download --dest wheels PySide6 shiboken6 playwright dnslib httpx keyring
+          # vendor wheels for the runtime's Python (24.08 = py3.12) so the
+          # flatpak build sandbox needs no network; the runner's default
+          # python (3.13) would vendor cp313-only deps like greenlet
+          pip download --python-version 3.12 --only-binary=:all: \
+            --implementation cp --platform manylinux_2_28_x86_64 \
+            --dest wheels PySide6 shiboken6 playwright dnslib httpx keyring
+          pip download --python-version 3.12 --dest wheels greenlet
           pip wheel --no-deps -w wheels .
           cd packaging/flatpak
           flatpak --user remote-add --if-not-exists flathub \
