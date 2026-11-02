@@ -79,9 +79,8 @@ jobs:
           # flatpak build sandbox needs no network; the runner's default
           # python (3.13) would vendor cp313-only deps like greenlet
           pip download --python-version 3.12 --only-binary=:all: \
-            --implementation cp --platform manylinux_2_28_x86_64 \
-            --dest wheels PySide6 shiboken6 playwright dnslib httpx keyring
-          pip download --python-version 3.12 --dest wheels greenlet
+            --dest wheels PySide6 shiboken6 playwright dnslib httpx keyring \
+            greenlet
           pip wheel --no-deps -w wheels .
           cd packaging/flatpak
           flatpak --user remote-add --if-not-exists flathub \
