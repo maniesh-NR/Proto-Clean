@@ -94,4 +94,6 @@ dpkg-deb --root-owner-group --build "$PKGDIR" \
     "dist/proto-clean_${VERSION}-1_${ARCH}.deb"
 echo ""
 echo "Built: dist/proto-clean_${VERSION}-1_${ARCH}.deb"
-dpkg-deb --info "dist/proto-clean_${VERSION}-1_${ARCH}.deb" | head -8
+# sed instead of head: head closes the pipe early, and with
+# pipefail dpkg-deb then dies of SIGPIPE (exit 141)
+dpkg-deb --info "dist/proto-clean_${VERSION}-1_${ARCH}.deb" | sed -n 1,8p
