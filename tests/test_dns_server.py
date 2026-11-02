@@ -110,6 +110,11 @@ def test_doh_tls_is_verified_against_the_hostname(monkeypatch):
             pass
 
     class FakeCtx:
+        # py3.8's HTTPSConnection.__init__ reads verify_mode (to warn about
+        # unverified contexts) — provide it so the fake works everywhere
+        verify_mode = None
+        check_hostname = True
+
         def wrap_socket(self, sock, server_hostname=None):
             captured["sni"] = server_hostname
             return FakeSock()
