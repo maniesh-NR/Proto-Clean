@@ -70,7 +70,7 @@ def test_apply_local_edits_combined_with_cidr_exclusion():
 
 def _manager(monkeypatch):
     monkeypatch.setattr(tunnel_mod, "_default_route",
-                        staticmethod(lambda: ("eth0", "192.168.1.1")))
+                        lambda: ("eth0", "192.168.1.1"))
     mgr = TunnelManager.__new__(TunnelManager)
     mgr.helper = RecordingHelper()
     mgr.ks = type("K", (), {"active": False})()
