@@ -12,7 +12,7 @@
     "--device=dri",
     "--talk-name=org.freedesktop.secrets",
     "--talk-name=org.kde.StatusNotifierWatcher",
-    "--own-name=org.kde.StatusNotifierItem-*",
+    "--talk-name=org.freedesktop.Notifications",
     "--env=PROTO_CLEAN_FLATPAK=1"
   ],
   "modules": [
