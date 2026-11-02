@@ -31,12 +31,35 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
+def _write_executable(tmp_path, name, body_py, fail=False):
+    """A runnable stand-in binary for xray on any CI OS: a python script
+    with a shebang on POSIX, a .bat wrapper around the same script on
+    Windows."""
+    if sys.platform.startswith("win"):
+        impl = tmp_path / (name + "-impl.py")
+        impl.write_text(textwrap.dedent(body_py))
+        bat = tmp_path / (name + ".bat")
+        if fail:
+            bat.write_text(
+                "@echo failed to start: bad config 1>&2\r\n@exit /b 3\r\n")
+        else:
+            bat.write_text(
+                f'@echo off\r\n"{sys.executable}" "%~dp0{name}-impl.py" %*\r\n')
+        return str(bat)
+    script = tmp_path / name
+    if fail:
+        script.write_text("#!/bin/sh\necho 'failed to start: bad config' >&2\nexit 3\n")
+    else:
+        script.write_text("#!/usr/bin/env python3\n" + textwrap.dedent(body_py))
+    script.chmod(0o755)
+    return str(script)
+
+
 @pytest.fixture()
 def fake_xray(tmp_path):
     """A stand-in for the xray binary: reads the config passed via -c,
     binds the SOCKS inbound port and idles until killed."""
-    script = tmp_path / "fake-xray"
-    script.write_text("#!/usr/bin/env python3\n" + textwrap.dedent(f"""
+    return _write_executable(tmp_path, "fake-xray", """
         import json, socket, sys, time
         cfg = sys.argv[sys.argv.index("-c") + 1]
         with open(cfg) as f:
@@ -47,17 +70,12 @@ def fake_xray(tmp_path):
         srv.listen(4)
         while True:
             time.sleep(0.2)
-    """))
-    script.chmod(0o755)
-    return str(script)
+    """)
 
 
 @pytest.fixture()
 def failing_xray(tmp_path):
-    script = tmp_path / "bad-xray"
-    script.write_text("#!/bin/sh\necho 'failed to start: bad config' >&2\nexit 3\n")
-    script.chmod(0o755)
-    return str(script)
+    return _write_executable(tmp_path, "bad-xray", "", fail=True)
 
 
 # ---------------------------------------------------------------- lifecycle
@@ -123,8 +141,6 @@ def test_bad_profile_raises_config_error(fake_xray):
 
 # ------------------------------------------------------------ system proxy
 def test_linux_system_proxy_roundtrip(monkeypatch):
-    if sys.platform.startswith("win"):
-        pytest.skip("linux path")
     calls = []
 
     def fake_gs(*args):
@@ -138,6 +154,7 @@ def test_linux_system_proxy_roundtrip(monkeypatch):
         return R()
 
     monkeypatch.setattr(X.shutil, "which", lambda n: "/usr/bin/gsettings")
+    monkeypatch.setattr(X, "PLATFORM_NAME", "linux")   # run the linux path anywhere
     monkeypatch.setattr(X.XrayManager, "_gs", fake_gs)
     m = X.XrayManager()
     m.socks_port, m.http_port = 10808, 10809
