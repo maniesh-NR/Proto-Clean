@@ -119,6 +119,11 @@ OPENVPN_DRIVERS = ("tun", "tap")
 
 # Xray / v2ray proxy protocols (see vpn/xrayconf.py).
 XRAY_PROTOCOLS = ("vless-reality", "trojan")
+# Which proxy engine the Start button drives (see controller.py):
+# "xray" (VLESS REALITY / Trojan) or "samizdat" (Lantern's protocol).
+PROXY_PROVIDERS = ("xray", "samizdat")
+# How the backend browser (and blocklist downloads) reach the internet.
+BROWSER_PROXY_MODES = ("direct", "auto", "custom")
 
 # UI themes: "system" follows the desktop color scheme (and live-switches
 # when the desktop changes), "light" and "dark" force a fixed look.
@@ -166,6 +171,12 @@ class AdvancedSettings:
     custom_dns_servers: List[str] = field(default_factory=list)  # e.g. ["1.1.1.1"]
     ipv6_support: bool = False          # allow IPv6 through the tunnel
     ipv6_leak_protection: bool = True   # block IPv6 outside the tunnel
+    # How the backend browser + blocklist downloads reach the internet.
+    # "auto" rides the running proxy (Xray or samizdat); "custom" points
+    # at any local proxy — e.g. Lantern (lantern-headless-client) on
+    # 127.0.0.1:8787 — so Proton access works even where it is censored.
+    browser_proxy_mode: str = "direct"  # "direct" | "auto" | "custom"
+    browser_proxy_custom: str = "http://127.0.0.1:8787"
 
     def custom_dns_list(self) -> List[str]:
         """Validated custom DNS servers (IPv4/IPv6 addresses, deduplicated)."""
@@ -203,7 +214,10 @@ class XraySettings:
     the connection is made to look like ordinary HTTPS to that site.
     ``mode`` selects whether the OS proxy is switched automatically
     ("system") or the inbounds stay manual ("manual").
+    ``provider`` selects the proxy engine for the Start button: "xray"
+    or "samizdat" (whose own profile lives in ``Settings.samizdat``).
     """
+    provider: str = "xray"                   # "xray" | "samizdat"
     protocol: str = "vless-reality"          # "vless-reality" | "trojan"
     address: str = ""
     port: int = 443
@@ -228,6 +242,7 @@ class XraySettings:
         flow = self.flow if self.flow in FLOWS else (
             "xtls-rprx-vision" if proto == "vless-reality" else "")
         mode = self.mode if self.mode in ("system", "manual") else "system"
+        provider = self.provider if self.provider in PROXY_PROVIDERS else "xray"
         try:
             port = int(self.port)
         except (TypeError, ValueError):
@@ -241,6 +256,7 @@ class XraySettings:
         except (TypeError, ValueError):
             http = 10809
         return XraySettings(
+            provider=provider,
             protocol=proto, address=self.address.strip(), port=port,
             name=self.name.strip(), uuid=self.uuid.strip(),
             public_key=self.public_key.strip(), short_id=self.short_id.strip(),
@@ -249,6 +265,66 @@ class XraySettings:
             spider_x=self.spider_x or "/", mode=mode,
             socks_port=socks if 1 <= socks <= 65535 else 10808,
             http_port=http if 1 <= http <= 65535 else 10809,
+        )
+
+
+@dataclass
+class SamizdatSettings:
+    """Samizdat profile (Lantern's censorship-resistance protocol — see
+    vpn/samizdatconf.py). ``server_name`` is the masquerade *cover* SNI
+    the connection pretends to visit (e.g. ok.ru)."""
+    address: str = ""
+    port: int = 443
+    name: str = ""
+    public_key: str = ""                     # server X25519 public key (64 hex)
+    short_id: str = ""                       # pre-shared id (16 hex)
+    server_name: str = ""                    # cover/masquerade SNI
+    fingerprint: str = "chrome"
+    padding_profile: str = "chrome"
+    max_jitter_ms: int = 30
+    max_streams_per_conn: int = 100
+    data_threshold: int = 14000
+    disable_padding: bool = False
+    disable_jitter: bool = False
+    disable_tcp_fragmentation: bool = False
+    disable_record_fragmentation: bool = False
+    idle_timeout: str = "5m"
+    connect_timeout: str = "15s"
+    mode: str = "system"                     # "system" | "manual"
+    mixed_port: int = 10810                  # local SOCKS+HTTP inbound
+
+    def normalized(self) -> "SamizdatSettings":
+        from .vpn.samizdatconf import FINGERPRINTS, PADDING_PROFILES
+        fp = self.fingerprint if self.fingerprint in FINGERPRINTS else "chrome"
+        pp = (self.padding_profile if self.padding_profile in PADDING_PROFILES
+              else "chrome")
+        mode = self.mode if self.mode in ("system", "manual") else "system"
+
+        def clamp(v, lo, hi, dflt):
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                return dflt
+            return max(lo, min(hi, v))
+
+        return SamizdatSettings(
+            address=self.address.strip(),
+            port=clamp(self.port, 1, 65535, 443),
+            name=self.name.strip(),
+            public_key=self.public_key.strip().lower(),
+            short_id=self.short_id.strip().lower(),
+            server_name=self.server_name.strip(),
+            fingerprint=fp, padding_profile=pp,
+            max_jitter_ms=clamp(self.max_jitter_ms, 0, 1000, 30),
+            max_streams_per_conn=clamp(self.max_streams_per_conn, 1, 1000, 100),
+            data_threshold=clamp(self.data_threshold, 0, 1_000_000, 14000),
+            disable_padding=bool(self.disable_padding),
+            disable_jitter=bool(self.disable_jitter),
+            disable_tcp_fragmentation=bool(self.disable_tcp_fragmentation),
+            disable_record_fragmentation=bool(self.disable_record_fragmentation),
+            idle_timeout=self.idle_timeout, connect_timeout=self.connect_timeout,
+            mode=mode,
+            mixed_port=clamp(self.mixed_port, 1024, 65535, 10810),
         )
 
 
@@ -276,6 +352,7 @@ class Settings:
     protocol: ProtocolSettings = field(default_factory=ProtocolSettings)
     advanced: AdvancedSettings = field(default_factory=AdvancedSettings)
     xray: XraySettings = field(default_factory=XraySettings)
+    samizdat: SamizdatSettings = field(default_factory=SamizdatSettings)
     # UI
     theme: str = "dark"                    # "system" | "light" | "dark"
     prefer_dark_theme: bool = True         # legacy (superseded by `theme`)
@@ -315,6 +392,7 @@ def load_settings() -> Settings:
                 protocol=_protocol_from_json(_sub(raw, "protocol")),
                 advanced=AdvancedSettings(**{**asdict(AdvancedSettings()), **_sub(raw, "advanced")}),
                 xray=_xray_from_json(_sub(raw, "xray")),
+                samizdat=_samizdat_from_json(_sub(raw, "samizdat")),
             )
             return s
         except TypeError:
@@ -325,6 +403,12 @@ def _xray_from_json(raw: dict) -> XraySettings:
     """XraySettings with unknown/legacy values coerced back to defaults."""
     base = {**asdict(XraySettings()), **raw}
     return XraySettings(**base).normalized()
+
+
+def _samizdat_from_json(raw: dict) -> SamizdatSettings:
+    """SamizdatSettings with unknown/legacy values coerced to defaults."""
+    base = {**asdict(SamizdatSettings()), **raw}
+    return SamizdatSettings(**base).normalized()
 
 
 def _protocol_from_json(raw: dict) -> ProtocolSettings:

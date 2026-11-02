@@ -80,7 +80,15 @@ def find_xray_binary(explicit: str = "") -> Optional[str]:
 
 
 class XrayManager:
-    """Owns the xray process and (optionally) the system proxy state."""
+    """Owns the xray process and (optionally) the system proxy state.
+
+    The lifecycle (spawn → wait for the inbound port → system proxy) is
+    factored into small overridable hooks so other proxy engines that take
+    a JSON config and expose local inbounds — like the samizdat client
+    (sing-box/lantern-box) — can reuse it wholesale.
+    """
+
+    proxy_kind = "xray"                     # config/log dir + file names
 
     def __init__(self, binary: str = "") -> None:
         self._binary = binary
@@ -92,13 +100,28 @@ class XrayManager:
         self.http_port = DEFAULT_HTTP_PORT
         self.profile: Optional[XrayProfile] = None
 
+    # ------------------------------------------------------------ overrides
+    def _find_binary(self, explicit: str = "") -> Optional[str]:
+        return find_xray_binary(explicit or self._binary)
+
+    def _write_config(self, profile, path: str) -> None:
+        write_xray_config(profile, path, self.socks_port, self.http_port)
+
+    def _run_args(self, exe: str, config_path: str) -> list:
+        return [exe, "run", "-c", config_path]
+
+    def _binary_help(self) -> str:
+        return ("the xray binary was not found — install Xray-core "
+                "(https://github.com/XTLS/Xray-core) or set "
+                "PROTO_CLEAN_XRAY_BIN")
+
     # ------------------------------------------------------------ lifecycle
     @property
     def running(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
 
     def _dir(self) -> Path:
-        d = CACHE_DIR / "xray"
+        d = CACHE_DIR / self.proxy_kind
         d.mkdir(parents=True, exist_ok=True)
         try:
             os.chmod(d, 0o700)
@@ -109,22 +132,18 @@ class XrayManager:
     def start(self, profile: XrayProfile, socks_port: int = DEFAULT_SOCKS_PORT,
               http_port: int = DEFAULT_HTTP_PORT, timeout: float = 10.0,
               binary: str = "") -> None:
-        """Write the config, spawn xray and wait until the SOCKS inbound
-        accepts connections."""
+        """Write the config, spawn the engine and wait until the local
+        inbound accepts connections."""
         if self.running:
-            raise XrayError("the Xray proxy is already running")
-        exe = find_xray_binary(binary or self._binary)
+            raise XrayError(f"the {self.proxy_kind} proxy is already running")
+        exe = self._find_binary(binary)
         if not exe:
-            raise XrayError(
-                "the xray binary was not found — install Xray-core "
-                "(https://github.com/XTLS/Xray-core) or set "
-                "PROTO_CLEAN_XRAY_BIN")
+            raise XrayError(self._binary_help())
         self.socks_port, self.http_port = int(socks_port), int(http_port)
         self._config_path = str(self._dir() / "config.json")
-        write_xray_config(profile, self._config_path,
-                          self.socks_port, self.http_port)
+        self._write_config(profile, self._config_path)
         self.profile = profile
-        logf = open(self._dir() / "xray.log", "ab", buffering=0)
+        logf = open(self._dir() / f"{self.proxy_kind}.log", "ab", buffering=0)
         popen_kw = dict(
             stdout=logf, stderr=subprocess.STDOUT,
             cwd=str(self._dir()),
@@ -133,22 +152,23 @@ class XrayManager:
             popen_kw["creationflags"] = _CREATE_NO_WINDOW
         else:
             popen_kw["start_new_session"] = True
-        log.info("starting %s -c %s", exe, self._config_path)
-        self._proc = subprocess.Popen([exe, "run", "-c", self._config_path],
-                                      **popen_kw)
+        run_args = self._run_args(exe, self._config_path)
+        log.info("starting %s", " ".join(run_args))
+        self._proc = subprocess.Popen(run_args, **popen_kw)
         deadline = time.time() + timeout
         while time.time() < deadline:
             if self._proc.poll() is not None:
-                raise XrayError("xray exited immediately — " +
+                raise XrayError(f"{self.proxy_kind} exited immediately — " +
                                 self._log_tail())
             if self._port_open(self.socks_port):
-                log.info("xray up (socks %d, http %d)",
+                log.info("%s up (socks %d, http %d)", self.proxy_kind,
                          self.socks_port, self.http_port)
                 return
             time.sleep(0.15)
         self.stop(revert_proxy=False)
-        raise XrayError(f"xray did not open port {self.socks_port} "
-                        f"within {timeout:.0f}s — " + self._log_tail())
+        raise XrayError(f"{self.proxy_kind} did not open port "
+                        f"{self.socks_port} within {timeout:.0f}s — " +
+                        self._log_tail())
 
     def stop(self, revert_proxy: bool = True, timeout: float = 3.0) -> None:
         """Terminate xray (the whole process tree on Windows, where the
@@ -177,12 +197,12 @@ class XrayManager:
                     self._proc.kill()
                     self._proc.wait(timeout)
         self._proc = None
-        log.info("xray stopped")
+        log.info("%s stopped", self.proxy_kind)
 
     def _log_tail(self, lines: int = 6) -> str:
         try:
-            text = (self._dir() / "xray.log").read_text(encoding="utf-8",
-                                                        errors="replace")
+            text = (self._dir() / f"{self.proxy_kind}.log").read_text(
+                encoding="utf-8", errors="replace")
             tail = text.strip().splitlines()[-lines:]
             return "; ".join(tail) or "no log output"
         except OSError:

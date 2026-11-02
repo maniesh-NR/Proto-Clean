@@ -96,8 +96,9 @@ step fails). Check Proton's terms of service before relying on it.
 
 - Linux: `wg`, `wg-quick` (wireguard-tools), `ip`, `iptables`, cgroup v2
   (only for app-based split tunneling) — any modern distro works.
-  Optional: `openvpn` for the OpenVPN protocol (`sudo apt install openvpn`)
-  and `xray` (Xray-core) for the v2ray proxy feature.
+  Optional: `openvpn` for the OpenVPN protocol (`sudo apt install openvpn`),
+  `xray` (Xray-core) for the v2ray proxy feature and `lantern-box` for
+  samizdat.
 - macOS: `brew install wireguard-tools` (`pfctl`/`networksetup` are built
   in). Optional: `brew install openvpn`, `brew install xray`.
 - Windows 7+ (use the `-win7-` legacy builds) / Windows 10+ (modern
@@ -248,6 +249,55 @@ credentials) is stored `chmod 600` in `~/.cache/proto-clean/xray/` and
 never leaves the machine. The proxy is independent of the WireGuard/
 OpenVPN Connect button — you can run either, or both.
 
+## Samizdat (Lantern) — proxy through DPI that blocks everything else
+
+[Samizdat](https://github.com/getlantern/samizdat) is the Lantern
+project's censorship-resistance protocol, built for nation-state DPI
+(Russian TSPU-class): it makes proxy traffic look like **a browser
+visiting a real website over HTTP/2** — a single TLS 1.3 layer with a
+uTLS Chrome fingerprint (no TLS-over-TLS), HTTP/2 CONNECT tunnels
+multiplexed on one connection, PSK authentication hidden in the TLS
+SessionID, Geneva-style ClientHello fragmentation, padding and timing
+jitter. When an active probe connects without valid auth, the server
+transparently forwards to the real *cover site*, so it is
+indistinguishable from the genuine domain.
+
+How to use it in Proto Clean:
+
+1. Install **[lantern-box](https://github.com/getlantern/lantern-box)**
+   (Lantern's sing-box fork — the binary that implements samizdat; not
+   bundled) and put it on `PATH` or set `PROTO_CLEAN_BOX_BIN`.
+2. **Settings → Proxy → engine "Samizdat (Lantern)"**, then fill the
+   profile from your server operator (or **Import samizdat:// URL** with
+   `samizdat://server:443?pbk=<64-hex>&sid=<16-hex>&sni=ok.ru`).
+3. Start — a local **mixed inbound** (SOCKS5 + HTTP on one port,
+   default 127.0.0.1:10810) comes up, and (in system mode) the OS proxy
+   is switched to it while it runs, exactly like the Xray engine.
+
+### Interop with the rest of Proto Clean
+
+* **Reaching Proton when it is censored** — Settings → Proxy →
+  *Reaching Proton & blocklists* offers **through the running proxy**
+  (auto: rides the Xray/samizdat inbounds) or **custom** (any local
+  proxy, e.g. Lantern itself: run
+  `lantern-headless-client start --http-proxy-addr 127.0.0.1:8787
+  --socks-proxy-addr 127.0.0.1:8788` and point Proto Clean at
+  127.0.0.1:8787). The backend-browser login, config downloads and
+  blocklist updates all flow through it.
+* **Fallback fetching, Lantern-style** — blocklist downloads that fail
+  directly are retried through the configured proxy, so your ad-blocker
+  keeps updating on censored networks.
+* Both engines share the tray toggle, system-proxy switching
+  (gsettings / WinINET / networksetup) and the local-only, `chmod 600`
+  config storage.
+
+**Licensing (important):** Lantern, samizdat and lantern-box are
+**GPL-3 projects by the Lantern team**. Proto Clean is MIT and contains
+**no Lantern code** — this feature is clean-room interop via the
+*documented* lantern-box client config format and standard local proxy
+ports. Install their GPL binaries separately; your profile credentials
+never leave your machine.
+
 ## Security notes
 
 - Credentials: system keyring preferred; the fallback file is `~/.config/proto-clean/credentials.json`, `chmod 600`, and never logged. (Windows: DPAPI-backed keyring / protected file. Android: EncryptedSharedPreferences.)
@@ -330,8 +380,8 @@ verified against a real dump (Nov 2026).
   driver is WireGuard only) — selecting OpenVPN there shows a clear error
   at connect; keep WireGuard. **Android**: same — the tunnel runs
   WireGuard (GoBackend), so OpenVPN is shown disabled in the app's
-  settings. The Xray proxy is desktop-only for now (Android needs the
-  libxray Go core — on the roadmap).
+  settings. The Xray and samizdat proxies are desktop-only for now
+  (Android needs the Go cores — on the roadmap).
 - The Xray proxy routes apps that honor the system proxy (or that you
   point at the SOCKS/HTTP inbounds); it is not a system-wide TUN device.
 - Flatpak build: the sandbox cannot run the privileged helper, so
@@ -406,6 +456,14 @@ Proto Clean builds on outstanding open-source work:
 - [Xray-core](https://github.com/XTLS/Xray-core) (© XTLS project) — the
   optional proxy engine for the VLESS REALITY / Trojan feature (not
   bundled; install it separately)
+- [Lantern](https://github.com/getlantern) — the samizdat
+  censorship-resistance protocol and the lantern-box engine it
+  inspired are GPL-3 works by the Lantern team (Brave New Software /
+  getlantern). Proto Clean's samizdat support is clean-room interop
+  with their documented config format; no Lantern code is included and
+  their binaries are optional, separate installs. "Lantern" is a
+  trademark of its owners; Proto Clean is not affiliated with the
+  Lantern project.
 - [WireGuard](https://www.wireguard.com) by Jason A. Donenfeld — "WireGuard"
   and the WireGuard logo are registered trademarks; Proto Clean is not
   affiliated with the WireGuard project and simply drives its tools

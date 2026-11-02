@@ -52,7 +52,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._adblock_tab(), "Ad blocking")
         tabs.addTab(self._split_tab(), "Split tunneling")
         tabs.addTab(self._portfwd_tab(), "Port forwarding")
-        tabs.addTab(self._xray_tab(), "Xray proxy")
+        tabs.addTab(self._xray_tab(), "Proxy")
 
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.reject)
@@ -62,18 +62,33 @@ class SettingsDialog(QDialog):
         layout.addWidget(tabs)
         layout.addWidget(buttons)
 
-    # ------------------------------------------------------------ Xray
+    # -------------------------------------------------- Proxy (Xray/samizdat)
     def _xray_tab(self) -> QWidget:
-        """Xray-core proxy profile: VLESS + REALITY (SNI masking) or Trojan.
-
-        Fields can be filled from a vless:// / trojan:// share URL. The
-        proxy runs xray locally (SOCKS + HTTP inbounds) and optionally
-        switches the system proxy.
-        """
+        """Proxy engines: Xray (VLESS + REALITY SNI masking / Trojan) and
+        samizdat (Lantern's DPI-resistant HTTP/2 masquerade), plus the
+        browser-routing option that carries Proton logins/config downloads
+        and blocklist updates through the running proxy (or an external
+        Lantern on 127.0.0.1:8787)."""
         w = QWidget()
-        form = QFormLayout(w)
+        outer = QVBoxLayout(w)
         s = self.controller.settings.xray.normalized()
+        sam = self.controller.settings.samizdat.normalized()
+        adv = self.controller.settings.advanced
 
+        # ---- engine selector ----
+        self.proxy_provider = QComboBox()
+        self.proxy_provider.addItem("Xray — VLESS + REALITY (SNI masking) / Trojan", "xray")
+        self.proxy_provider.addItem("Samizdat (Lantern) — HTTP/2 masquerade", "samizdat")
+        self.proxy_provider.setCurrentIndex(0 if s.provider == "xray" else 1)
+        self.proxy_provider.currentIndexChanged.connect(self._proxy_persist)
+        prov_row = QHBoxLayout()
+        prov_row.addWidget(QLabel("Engine"))
+        prov_row.addWidget(self.proxy_provider, 1)
+        outer.addLayout(prov_row)
+
+        # ---- Xray group ----
+        xg = QGroupBox("Xray profile (vless:// / trojan://)")
+        form = QFormLayout(xg)
         self.xray_proto = QComboBox()
         self.xray_proto.addItem("VLESS + REALITY (SNI masking)", "vless-reality")
         self.xray_proto.addItem("Trojan (TLS)", "trojan")
@@ -92,7 +107,6 @@ class SettingsDialog(QDialog):
                    "edge", "randomized"):
             self.xray_fp.addItem(fp, fp)
         self.xray_fp.setCurrentIndex(max(0, self.xray_fp.findData(s.fingerprint)))
-
         self.xray_uuid = QLineEdit(s.uuid)
         self.xray_uuid.setPlaceholderText("VLESS user id (UUID) — REALITY only")
         self.xray_pbk = QLineEdit(s.public_key)
@@ -108,7 +122,6 @@ class SettingsDialog(QDialog):
         self.xray_password.setPlaceholderText("trojan password")
         self.xray_insecure = QCheckBox("allow insecure TLS (trojan only)")
         self.xray_insecure.setChecked(s.allow_insecure)
-
         self.xray_mode = QComboBox()
         self.xray_mode.addItem("Set the system proxy automatically", "system")
         self.xray_mode.addItem("Manual (inbounds only — I configure apps myself)",
@@ -120,21 +133,6 @@ class SettingsDialog(QDialog):
         self.xray_http = QSpinBox()
         self.xray_http.setRange(1024, 65535)
         self.xray_http.setValue(s.http_port)
-
-        import_btn = QPushButton("Import share URL…")
-        import_btn.setToolTip("Paste a vless:// (REALITY) or trojan:// link")
-        import_btn.clicked.connect(self._xray_import_url)
-        start_btn = QPushButton("Start proxy")
-        start_btn.clicked.connect(self.controller.start_proxy_async)
-        stop_btn = QPushButton("Stop proxy")
-        stop_btn.clicked.connect(self.controller.stop_proxy_async)
-        btns = QHBoxLayout()
-        btns.addWidget(import_btn)
-        btns.addWidget(start_btn)
-        btns.addWidget(stop_btn)
-
-        self.xray_status = QLabel(self._xray_status_text())
-        self.xray_status.setWordWrap(True)
 
         form.addRow("Protocol", self.xray_proto)
         form.addRow("Label", self.xray_name)
@@ -151,12 +149,94 @@ class SettingsDialog(QDialog):
         form.addRow("Mode", self.xray_mode)
         form.addRow("SOCKS port", self.xray_socks)
         form.addRow("HTTP port", self.xray_http)
-        form.addRow("", btns)
-        form.addRow("", self.xray_status)
-        form.addRow("", QLabel(
-            "Requires the Xray-core binary (xray) on PATH or "
-            "PROTO_CLEAN_XRAY_BIN — see README. The config is stored "
-            "locally with your credentials and never uploaded."))
+        outer.addWidget(xg)
+
+        # ---- Samizdat group ----
+        sg = QGroupBox("Samizdat profile (Lantern) — samizdat://")
+        sform = QFormLayout(sg)
+        self.sam_address = QLineEdit(sam.address)
+        self.sam_port = QSpinBox()
+        self.sam_port.setRange(1, 65535)
+        self.sam_port.setValue(sam.port)
+        self.sam_name = QLineEdit(sam.name)
+        self.sam_pbk = QLineEdit(sam.public_key)
+        self.sam_pbk.setPlaceholderText("server X25519 public key (pbk, 64 hex)")
+        self.sam_sid = QLineEdit(sam.short_id)
+        self.sam_sid.setPlaceholderText("short id (sid, 16 hex)")
+        self.sam_sni = QLineEdit(sam.server_name)
+        self.sam_sni.setPlaceholderText("cover site the connection pretends to "
+                                        "visit (e.g. ok.ru)")
+        self.sam_fp = QComboBox()
+        for fp in ("chrome", "firefox", "safari"):
+            self.sam_fp.addItem(fp, fp)
+        self.sam_fp.setCurrentIndex(max(0, self.sam_fp.findData(sam.fingerprint)))
+        self.sam_profile = QComboBox()
+        for pp in ("chrome", "firefox"):
+            self.sam_profile.addItem(pp, pp)
+        self.sam_profile.setCurrentIndex(max(0, self.sam_profile.findData(sam.padding_profile)))
+        self.sam_mode = QComboBox()
+        self.sam_mode.addItem("Set the system proxy automatically", "system")
+        self.sam_mode.addItem("Manual (mixed inbound only)", "manual")
+        self.sam_mode.setCurrentIndex(0 if sam.mode == "system" else 1)
+        self.sam_mixed = QSpinBox()
+        self.sam_mixed.setRange(1024, 65535)
+        self.sam_mixed.setValue(sam.mixed_port)
+        sam_import = QPushButton("Import samizdat:// URL…")
+        sam_import.clicked.connect(self._samizdat_import_url)
+        sform.addRow("Server", self.sam_address)
+        sform.addRow("Port", self.sam_port)
+        sform.addRow("Label", self.sam_name)
+        sform.addRow("Public key (pbk)", self.sam_pbk)
+        sform.addRow("Short id (sid)", self.sam_sid)
+        sform.addRow("Cover SNI", self.sam_sni)
+        sform.addRow("uTLS fingerprint", self.sam_fp)
+        sform.addRow("Padding profile", self.sam_profile)
+        sform.addRow("Mode", self.sam_mode)
+        sform.addRow("Mixed port (SOCKS+HTTP)", self.sam_mixed)
+        sform.addRow("", sam_import)
+        outer.addWidget(sg)
+
+        # ---- browser routing (the Lantern interop) ----
+        bg = QGroupBox("Reaching Proton & blocklists (works even if protonvpn.com is blocked)")
+        bform = QFormLayout(bg)
+        self.route_mode = QComboBox()
+        self.route_mode.addItem("Direct connection", "direct")
+        self.route_mode.addItem("Through the running proxy (Xray / samizdat)", "auto")
+        self.route_mode.addItem("Custom proxy (e.g. Lantern on 127.0.0.1:8787)", "custom")
+        self.route_mode.setCurrentIndex(
+            ("direct", "auto", "custom").index(adv.browser_proxy_mode)
+            if adv.browser_proxy_mode in ("direct", "auto", "custom") else 0)
+        self.route_mode.currentIndexChanged.connect(self._route_persist)
+        self.route_custom = QLineEdit(adv.browser_proxy_custom)
+        self.route_custom.setPlaceholderText("http://127.0.0.1:8787 — e.g. "
+                                             "lantern-headless-client / Lantern")
+        self.route_custom.textChanged.connect(self._route_persist)
+        bform.addRow("Route", self.route_mode)
+        bform.addRow("Custom proxy", self.route_custom)
+        outer.addWidget(bg)
+
+        # ---- buttons + status ----
+        import_btn = QPushButton("Import vless:// trojan:// URL…")
+        import_btn.setToolTip("Paste a vless:// (REALITY) or trojan:// link")
+        import_btn.clicked.connect(self._xray_import_url)
+        start_btn = QPushButton("Start proxy")
+        start_btn.clicked.connect(self.controller.start_proxy_async)
+        stop_btn = QPushButton("Stop proxy")
+        stop_btn.clicked.connect(self.controller.stop_proxy_async)
+        btns = QHBoxLayout()
+        btns.addWidget(import_btn)
+        btns.addWidget(start_btn)
+        btns.addWidget(stop_btn)
+        outer.addLayout(btns)
+
+        self.xray_status = QLabel(self._xray_status_text())
+        self.xray_status.setWordWrap(True)
+        outer.addWidget(self.xray_status)
+        outer.addWidget(QLabel(
+            "Engines are separate binaries (not bundled): Xray-core for "
+            "vless/trojan, lantern-box (Lantern's sing-box fork) for "
+            "samizdat — see the README. Profiles are stored locally with "
+            "your credentials and never uploaded."))
 
         # persist on every edit
         for wdg, sig in ((self.xray_proto, "currentIndexChanged"),
@@ -175,12 +255,27 @@ class SettingsDialog(QDialog):
                          (self.xray_password, "textChanged"),
                          (self.xray_insecure, "toggled")):
             getattr(wdg, sig).connect(self._xray_persist)
+        for wdg, sig in ((self.sam_fp, "currentIndexChanged"),
+                         (self.sam_profile, "currentIndexChanged"),
+                         (self.sam_mode, "currentIndexChanged"),
+                         (self.sam_port, "valueChanged"),
+                         (self.sam_mixed, "valueChanged"),
+                         (self.sam_address, "textChanged"),
+                         (self.sam_name, "textChanged"),
+                         (self.sam_pbk, "textChanged"),
+                         (self.sam_sid, "textChanged"),
+                         (self.sam_sni, "textChanged")):
+            getattr(wdg, sig).connect(self._samizdat_persist)
         self.controller.add_proxy_listener(self._xray_on_proxy_state)
         return w
+
+    def _proxy_persist(self, *_) -> None:
+        self.controller.save_xray_settings(self._xray_collect())
 
     def _xray_collect(self):
         from ..settings import XraySettings
         return XraySettings(
+            provider=self.proxy_provider.currentData(),
             protocol=self.xray_proto.currentData(),
             address=self.xray_address.text(),
             port=self.xray_port.value(),
@@ -201,6 +296,32 @@ class SettingsDialog(QDialog):
     def _xray_persist(self, *_) -> None:
         self.controller.save_xray_settings(self._xray_collect())
 
+    def _samizdat_collect(self):
+        from ..settings import SamizdatSettings
+        return SamizdatSettings(
+            address=self.sam_address.text(),
+            port=self.sam_port.value(),
+            name=self.sam_name.text(),
+            public_key=self.sam_pbk.text(),
+            short_id=self.sam_sid.text(),
+            server_name=self.sam_sni.text(),
+            fingerprint=self.sam_fp.currentData(),
+            padding_profile=self.sam_profile.currentData(),
+            mode=self.sam_mode.currentData(),
+            mixed_port=self.sam_mixed.value(),
+        ).normalized()
+
+    def _samizdat_persist(self, *_) -> None:
+        self.controller.save_samizdat_settings(self._samizdat_collect())
+
+    def _route_persist(self, *_) -> None:
+        from ..settings import update
+        update(**{
+            "advanced.browser_proxy_mode": self.route_mode.currentData(),
+            "advanced.browser_proxy_custom": self.route_custom.text(),
+        })
+        self.controller.settings = load_settings()
+
     def _xray_import_url(self) -> None:
         from ..vpn.xrayconf import XrayConfigError, parse_xray_url
         from proto_clean.qtcompat import QInputDialog
@@ -214,6 +335,7 @@ class SettingsDialog(QDialog):
         except XrayConfigError as e:
             QMessageBox.warning(self, "Proto Clean", f"Could not import:\n{e}")
             return
+        self.proxy_provider.setCurrentIndex(0)   # engine: xray
         self.xray_proto.setCurrentIndex(0 if p.protocol == "vless-reality" else 1)
         self.xray_name.setText(p.name)
         self.xray_address.setText(p.address)
@@ -231,6 +353,35 @@ class SettingsDialog(QDialog):
             f"Imported {p.protocol} profile \"{p.name or p.address}\" "
             f"(SNI {p.sni}).")
 
+    def _samizdat_import_url(self) -> None:
+        from ..vpn.samizdatconf import SamizdatConfigError, parse_samizdat_url
+        from proto_clean.qtcompat import QInputDialog
+        url, ok = QInputDialog.getMultiLineText(
+            self, "Import samizdat share URL",
+            "Paste a samizdat:// link (pbk, sid, sni):")
+        if not ok or not url.strip():
+            return
+        try:
+            p = parse_samizdat_url(url)
+        except SamizdatConfigError as e:
+            QMessageBox.warning(self, "Proto Clean", f"Could not import:\n{e}")
+            return
+        self.proxy_provider.setCurrentIndex(1)   # engine: samizdat
+        self.sam_address.setText(p.address)
+        self.sam_port.setValue(p.port)
+        self.sam_name.setText(p.name)
+        self.sam_pbk.setText(p.public_key)
+        self.sam_sid.setText(p.short_id)
+        self.sam_sni.setText(p.server_name)
+        self.sam_fp.setCurrentIndex(max(0, self.sam_fp.findData(p.fingerprint)))
+        self.sam_profile.setCurrentIndex(
+            max(0, self.sam_profile.findData(p.padding_profile)))
+        self._samizdat_persist()
+        QMessageBox.information(
+            self, "Proto Clean",
+            f"Imported samizdat profile \"{p.name or p.address}\" "
+            f"(cover {p.server_name or 'default'}).")
+
     def _xray_on_proxy_state(self, state: str, detail: str) -> None:
         if not hasattr(self, "xray_status"):
             return
@@ -245,9 +396,13 @@ class SettingsDialog(QDialog):
         if detail:
             text += f" — {detail}"
         if st != "on":
+            from ..vpn.samizdat import find_box_binary
             from ..vpn.xray import find_xray_binary
             if not find_xray_binary():
                 text += "\n(xray binary not found — see README to install Xray-core)"
+            if not find_box_binary():
+                text += ("\n(lantern-box binary not found — needed for "
+                         "samizdat; see README)")
         return text
 
     # ------------------------------------------------------------- account

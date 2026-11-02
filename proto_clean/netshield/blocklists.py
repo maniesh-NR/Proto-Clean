@@ -125,6 +125,10 @@ class BlocklistManager:
         self.cache_dir = cache_dir
         self.filter = DomainFilter([])
         self._errors: Dict[str, str] = {}
+        # Optional upstream proxy URL for blocklist downloads (e.g. the
+        # running Xray/samizdat inbound or Lantern on 127.0.0.1:8787) —
+        # the Lantern-style fallback path when direct fetches are blocked.
+        self.proxy: Optional[str] = None
 
     # ------------------------------------------------------------- sources
     def set_sources(self, sources: List[BlocklistSource]) -> None:
@@ -152,7 +156,8 @@ class BlocklistManager:
     # ------------------------------------------------------------ updating
     def _download(self, url: str, timeout: float) -> Set[str]:
         with httpx.Client(follow_redirects=True, timeout=timeout,
-                          headers={"User-Agent": USER_AGENT}) as client:
+                          headers={"User-Agent": USER_AGENT},
+                          proxy=self.proxy) as client:
             resp = client.get(url)
             resp.raise_for_status()
             return parse_hosts(resp.text)

@@ -179,6 +179,11 @@ class AccountSession:
         self.logged_in = False
         self.user_plan_hint: Optional[str] = None
         self.on_event: Callable[[str, str], None] = lambda kind, detail: None
+        # Optional upstream proxy for the backend browser, e.g.
+        # {"server": "socks5://127.0.0.1:10810"} (samizdat) or
+        # {"server": "http://127.0.0.1:8787"} (Lantern) — set by the
+        # controller so Proton access works through the running proxy.
+        self.proxy: Optional[dict] = None
 
     def _emit(self, kind: str, detail: str = "") -> None:
         """Relay a login event to the UI (called on the browser thread)."""
@@ -204,7 +209,10 @@ class AccountSession:
         # there anyway, and elevation is handled by UAC instead.
         if hasattr(os, "geteuid") and (os.geteuid() == 0 or self._in_flatpak()):
             args.append("--no-sandbox")
-        browser = pw.chromium.launch(headless=headless, args=args)
+        launch_kw = {"headless": headless, "args": args}
+        if self.proxy:
+            launch_kw["proxy"] = self.proxy
+        browser = pw.chromium.launch(**launch_kw)
         ua = None
         if headless:
             # Avoid the HeadlessChrome UA fingerprint.
@@ -395,7 +403,10 @@ class AccountSession:
         self._emit("interactive_open",
                    "finish logging in in the browser window "
                    "(5 minutes to complete)")
-        browser = pw.chromium.launch(headless=False)
+        launch_kw = {"headless": False}
+        if self.proxy:
+            launch_kw["proxy"] = self.proxy
+        browser = pw.chromium.launch(**launch_kw)
         try:
             ctx = browser.new_context(
                 storage_state=self.state_file if os.path.exists(self.state_file) else None

@@ -28,8 +28,26 @@ from .vpn.portforward import PortForwarder
 from .vpn.tunnel import TunnelManager
 from .vpn.xray import PROXY_ERROR, PROXY_OFF, PROXY_ON, PROXY_STARTING, XrayError, XrayManager
 from .vpn.xrayconf import XrayProfile, XrayConfigError
+from .vpn.samizdat import SamizdatManager
+from .vpn.samizdatconf import SamizdatProfile, SamizdatConfigError
 
 log = get("controller")
+
+
+def _proxy_server_dict(raw: str) -> Optional[dict]:
+    """Normalize a user-entered proxy ("127.0.0.1:8787",
+    "socks5://host:1080", "http://host:3128") into a Playwright proxy
+    dict; None when unusable."""
+    s = (raw or "").strip()
+    if not s:
+        return None
+    if "://" not in s:
+        s = "http://" + s
+    scheme, _, rest = s.partition("://")
+    if scheme not in ("http", "https", "socks4", "socks5") or not rest \
+            or ":" not in rest:
+        return None
+    return {"server": s}
 
 
 class State(str, Enum):
@@ -82,8 +100,9 @@ class Controller:
         self.current_server: Optional[LogicalServer] = None
         self.connected_via: dict = {}
 
-        # Xray / v2ray proxy (VLESS REALITY / Trojan)
+        # Xray / v2ray proxy (VLESS REALITY / Trojan) + samizdat (Lantern)
         self.xray = XrayManager()
+        self.samizdat = SamizdatManager()
         self.proxy_state: str = PROXY_OFF
         self._proxy_lock = threading.Lock()
 
@@ -165,6 +184,7 @@ class Controller:
         if not self._op_lock.acquire(blocking=False):
             self.on_message("another account operation is running", "warn")
             return
+        self._apply_browser_proxy()      # maybe log in through the proxy
         request = self._login_request or {"mode": "stored"}
         self._login_request = None
         try:
@@ -327,6 +347,7 @@ class Controller:
         if not self._op_lock.acquire(blocking=False):
             self.on_message("busy — try again in a moment", "warn")
             return
+        self._apply_browser_proxy()      # downloads may need the proxy
         try:
             self._set_state(State.CONNECTING, "choosing server…")
             if not self.session.logged_in:
@@ -699,6 +720,7 @@ class Controller:
                     "proto_clean-blocklists-refresh")
 
     def _update_blocklists(self, name: Optional[str] = None) -> None:
+        self._apply_browser_proxy()      # blocklist fallback via proxy
         result = (self.blocklists.update_one(name) if name
                   else self.blocklists.update_all())
         if result.ok:
@@ -739,8 +761,60 @@ class Controller:
         update(**{"xray": xray})
         self.settings = load_settings()
 
+    def save_samizdat_settings(self, sam) -> None:
+        """Persist a SamizdatSettings (already normalized by the caller)."""
+        from .settings import update
+        update(**{"samizdat": sam})
+        self.settings = load_settings()
+
+    def _proxy_provider(self) -> str:
+        p = self.settings.xray.provider
+        return p if p in ("xray", "samizdat") else "xray"
+
+    def _active_proxy_manager(self):
+        """The manager the Start button drives (per settings.xray.provider)."""
+        return self.samizdat if self._proxy_provider() == "samizdat" \
+            else self.xray
+
+    # ------------------------------------------------- browser / fetch proxy
+    def browser_proxy(self) -> Optional[dict]:
+        """Upstream proxy for the backend browser (and blocklist downloads),
+        honoring advanced.browser_proxy_mode:
+
+        * direct — None
+        * auto   — the running proxy's local inbound (samizdat mixed port
+          or the Xray SOCKS inbound)
+        * custom — any host:port, e.g. Lantern on 127.0.0.1:8787
+        """
+        adv = getattr(getattr(self, "settings", None), "advanced", None)
+        mode = getattr(adv, "browser_proxy_mode", "direct")
+        if mode == "custom":
+            return _proxy_server_dict(
+                getattr(adv, "browser_proxy_custom",
+                        "http://127.0.0.1:8787"))
+        if mode == "auto":
+            for mgr in (self.samizdat, self.xray):
+                if mgr.running:
+                    return {"server": f"socks5://127.0.0.1:{mgr.socks_port}"}
+        return None
+
+    def _apply_browser_proxy(self) -> None:
+        """Push the resolved browser proxy into the backend browser and
+        the blocklist downloader (called before network operations)."""
+        p = self.browser_proxy()
+        try:
+            self.session.proxy = p
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            self.blocklists.proxy = p["server"] if p else None
+        except Exception:  # noqa: BLE001
+            pass
+        if p:
+            log.info("browser/downloads routed through %s", p["server"])
+
     def start_proxy_async(self) -> None:
-        """Start the Xray proxy with the saved profile (system or manual)."""
+        """Start the selected proxy (Xray or samizdat) with its profile."""
         self._spawn(self._proxy_start_worker, "proto_clean-proxy")
 
     def stop_proxy_async(self) -> None:
@@ -756,39 +830,74 @@ class Controller:
             spider_x=x.spider_x,
         )
 
+    def _samizdat_profile_from_settings(self) -> SamizdatProfile:
+        s = self.settings.samizdat.normalized()
+        return SamizdatProfile(
+            address=s.address, port=s.port, name=s.name,
+            public_key=s.public_key, short_id=s.short_id,
+            server_name=s.server_name, fingerprint=s.fingerprint,
+            padding_profile=s.padding_profile, max_jitter_ms=s.max_jitter_ms,
+            max_streams_per_conn=s.max_streams_per_conn,
+            data_threshold=s.data_threshold,
+            disable_padding=s.disable_padding,
+            disable_jitter=s.disable_jitter,
+            disable_tcp_fragmentation=s.disable_tcp_fragmentation,
+            disable_record_fragmentation=s.disable_record_fragmentation,
+            idle_timeout=s.idle_timeout, connect_timeout=s.connect_timeout,
+        )
+
     def _proxy_start_worker(self) -> None:
         if not self._proxy_lock.acquire(blocking=False):
             self.on_message("a proxy operation is already running", "warn")
             return
         try:
-            if self.xray.running:
-                self.on_message("the Xray proxy is already running", "warn")
+            mgr = self._active_proxy_manager()
+            provider = self._proxy_provider()
+            if mgr.running:
+                self.on_message(f"the {provider} proxy is already running",
+                                "warn")
                 return
             self._set_proxy(PROXY_STARTING)
-            x = self.settings.xray.normalized()
-            try:
-                profile = self._profile_from_settings()
-                self.xray.start(profile, socks_port=x.socks_port,
-                                http_port=x.http_port)
-            except (XrayError, XrayConfigError) as e:
-                self._set_proxy(PROXY_ERROR, str(e))
-                self.on_message(f"Xray proxy: {e}", "error")
-                return
-            if x.mode == "system":
+            if provider == "samizdat":
+                s = self.settings.samizdat.normalized()
                 try:
-                    self.xray.apply_system_proxy()
+                    profile = self._samizdat_profile_from_settings()
+                    mgr.start(profile, socks_port=s.mixed_port)
+                except (XrayError, SamizdatConfigError) as e:
+                    self._set_proxy(PROXY_ERROR, str(e))
+                    self.on_message(f"samizdat proxy: {e}", "error")
+                    return
+                mode, port, label = s.mode, s.mixed_port, (
+                    s.server_name or s.address)
+                kind = "samizdat"
+            else:
+                x = self.settings.xray.normalized()
+                try:
+                    profile = self._profile_from_settings()
+                    self.xray.start(profile, socks_port=x.socks_port,
+                                    http_port=x.http_port)
+                except (XrayError, XrayConfigError) as e:
+                    self._set_proxy(PROXY_ERROR, str(e))
+                    self.on_message(f"Xray proxy: {e}", "error")
+                    return
+                mgr, mode, port = self.xray, x.mode, x.socks_port
+                label = x.sni or x.address
+                kind = profile.protocol
+            if mode == "system":
+                try:
+                    mgr.apply_system_proxy()
                 except Exception as e:  # noqa: BLE001
                     # proxy process is up; only the system switch failed
                     self.on_message(
-                        f"Xray is running but the system proxy could not be "
-                        f"set ({e}). Manual: SOCKS 127.0.0.1:{x.socks_port} "
-                        f"/ HTTP 127.0.0.1:{x.http_port}", "warn")
-            label = x.sni or x.address
-            self._set_proxy(PROXY_ON, f"{profile.protocol} → {label}")
+                        f"The proxy is running but the system proxy could "
+                        f"not be set ({e}). Manual: SOCKS 127.0.0.1:{port}",
+                        "warn")
+            self._set_proxy(PROXY_ON, f"{kind} → {label}")
             self.on_message(
-                f"Xray proxy on ({profile.protocol}, SNI {label}) — "
-                f"SOCKS 127.0.0.1:{x.socks_port}, HTTP 127.0.0.1:{x.http_port}",
-                "info")
+                f"Proxy on ({kind}, masquerade {label}) — "
+                f"SOCKS 127.0.0.1:{port}", "info")
+            # a proxy just came up: re-route browser/downloads if asked to
+            self._apply_browser_proxy()
         finally:
             self._proxy_lock.release()
 
@@ -797,21 +906,31 @@ class Controller:
             self.on_message("a proxy operation is already running", "warn")
             return
         try:
-            if not self.xray.running and not self.xray._proxy_applied:
+            if not self.xray.running and not self.samizdat.running \
+                    and not self.xray._proxy_applied \
+                    and not self.samizdat._proxy_applied:
                 self._set_proxy(PROXY_OFF)
                 return
             try:
                 self.xray.stop()
             except Exception as e:  # noqa: BLE001
                 self.on_message(f"Xray stop failed: {e}", "warn")
+            try:
+                self.samizdat.stop()
+            except Exception as e:  # noqa: BLE001
+                self.on_message(f"samizdat stop failed: {e}", "warn")
             self._set_proxy(PROXY_OFF)
-            self.on_message("Xray proxy off", "info")
+            self.on_message("Proxy off", "info")
+            self._apply_browser_proxy()
         finally:
             self._proxy_lock.release()
 
     def proxy_status(self) -> dict:
         """Synchronous snapshot for UI (tray / settings)."""
-        return self.xray.status()
+        st = self.xray.status()
+        st.update(self.samizdat.status())
+        st["provider"] = self._proxy_provider()
+        return st
 
     # ----------------------------------------------------------- split apps
     def move_pid_to_split(self, pid: int) -> bool:
@@ -843,6 +962,10 @@ class Controller:
         try:
             try:
                 self.xray.stop()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                self.samizdat.stop()
             except Exception:  # noqa: BLE001
                 pass
             self._teardown_partial()

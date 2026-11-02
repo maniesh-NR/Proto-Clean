@@ -11,8 +11,8 @@ android {
         applicationId = "app.protoclean"
         minSdk = 26            // Android 8.0 Oreo
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     // Per-ABI APKs (armv7 + arm64) as requested for the release matrix.
