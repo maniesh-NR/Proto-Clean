@@ -151,19 +151,31 @@ class XrayManager:
                         f"within {timeout:.0f}s — " + self._log_tail())
 
     def stop(self, revert_proxy: bool = True, timeout: float = 3.0) -> None:
-        """Terminate xray and restore the previous system proxy."""
+        """Terminate xray (the whole process tree on Windows, where the
+        binary may be a .bat/cmd wrapper) and restore the system proxy."""
         if revert_proxy and self._proxy_applied:
             try:
                 self.revert_system_proxy()
             except Exception as e:  # noqa: BLE001
                 log.warning("proxy revert failed: %s", e)
         if self._proc is not None and self._proc.poll() is None:
-            self._proc.terminate()
-            try:
-                self._proc.wait(timeout)
-            except subprocess.TimeoutExpired:
-                self._proc.kill()
-                self._proc.wait(timeout)
+            if sys.platform.startswith("win"):
+                # /T kills the wrapper *and* its children (an orphaned
+                # child would keep the inbound port open)
+                subprocess.run(["taskkill", "/F", "/T", "/PID",
+                                str(self._proc.pid)],
+                               capture_output=True, check=False)
+                try:
+                    self._proc.wait(timeout)
+                except subprocess.TimeoutExpired:
+                    pass
+            else:
+                self._proc.terminate()
+                try:
+                    self._proc.wait(timeout)
+                except subprocess.TimeoutExpired:
+                    self._proc.kill()
+                    self._proc.wait(timeout)
         self._proc = None
         log.info("xray stopped")
 

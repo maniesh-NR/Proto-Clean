@@ -62,7 +62,7 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y --no-install-recommends \
-            libegl1 libgl1 libxkbcommon0 git
+            libegl1 libgl1 libxkbcommon0 libglib2.0-0 git
 
       - uses: actions/checkout@v4
 
