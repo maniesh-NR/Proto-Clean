@@ -2,7 +2,7 @@
 ; Build inside packaging/windows/ after the PyInstaller onedir exists in
 ; dist/ProtoClean:
 ;   iscc installer.iss
-#defineAppName "Proto Clean"
+#define AppName "Proto Clean"
 #define AppVersion "0.2.0"
 #define AppPublisher "Proto Clean contributors"
 #define AppExeName "ProtoClean.exe"
