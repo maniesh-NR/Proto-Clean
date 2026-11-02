@@ -12,13 +12,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-HELPER = Path(__file__).resolve().parent.parent / "helper" / "proton-clean-helper"
+HELPER = Path(__file__).resolve().parent.parent / "helper" / "proto-clean-helper"
 
 
 def _load_helper():
     spec = importlib.util.spec_from_loader(
-        "proton_clean_helper_test", importlib.machinery.SourceFileLoader(
-            "proton_clean_helper_test", str(HELPER)))
+        "proto_clean_helper_test", importlib.machinery.SourceFileLoader(
+            "proto_clean_helper_test", str(HELPER)))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -104,7 +104,7 @@ def test_split_launch_dispatch_matches_documented_format(monkeypatch):
                         lambda uid, gid, cmd: captured.update(uid=uid,
                                                               gid=gid,
                                                               cmd=list(cmd)))
-    argv = ["proton-clean-helper", "split-launch", "1000", "1000", "--",
+    argv = ["proto-clean-helper", "split-launch", "1000", "1000", "--",
             "/usr/bin/firefox", "--new-window"]
     old = sys.argv
     sys.argv = argv

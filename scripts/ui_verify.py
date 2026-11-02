@@ -8,10 +8,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
-from proton_clean.controller import Controller, State
-from proton_clean.netshield.blocklists import BlocklistEntry
-from proton_clean.servers.models import LogicalServer
-from proton_clean.ui.main_window import MainWindow
+from proto_clean.controller import Controller, State
+from proto_clean.netshield.blocklists import BlocklistEntry
+from proto_clean.servers.models import LogicalServer
+from proto_clean.ui.main_window import MainWindow
 
 
 def _mk(name, cc, city, load, score, tier=0, features=0):
@@ -84,7 +84,7 @@ print("OK menu:", labels[:2], "…", len(checkable), "checkable lists with",
       "update/remove submenus")
 
 # ---- 3. manager dialog reflects entries
-from proton_clean.ui.blocklists_dialog import AddBlocklistDialog, BlocklistsDialog
+from proto_clean.ui.blocklists_dialog import AddBlocklistDialog, BlocklistsDialog
 dlg = BlocklistsDialog(controller, w)
 dlg.refresh(BLOCKLISTS)
 app.processEvents()
@@ -106,7 +106,7 @@ assert add.url.text().startswith("https://")
 print("OK add-dialog presets:", len(presets) - 1, "known lists")
 
 # ---- 5. login dialog + CAPTCHA banner
-from proton_clean.ui.login_dialog import LoginDialog  # noqa: E402
+from proto_clean.ui.login_dialog import LoginDialog  # noqa: E402
 
 dlg = LoginDialog(controller, w)
 assert dlg.remember.isChecked() is True
@@ -157,9 +157,9 @@ print("OK login button label:", w.login_btn.text())
 
 # ---- 6. pixel sanity of the screenshots
 from PIL import Image
-for f, min_dark in (("/tmp/protonclean-ui.png", 0.25),
-                    ("/tmp/protonclean-ui-menu.png", 0.25),
-                    ("/tmp/protonclean-ui-dialog.png", 0.20)):
+for f, min_dark in (("/tmp/protoclean-ui.png", 0.25),
+                    ("/tmp/protoclean-ui-menu.png", 0.25),
+                    ("/tmp/protoclean-ui-dialog.png", 0.20)):
     im = Image.open(f).convert("RGB")
     px = list(im.getdata())
     dark = sum(1 for p in px if sum(p) < 200) / len(px)

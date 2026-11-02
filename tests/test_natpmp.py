@@ -3,7 +3,7 @@ import struct
 
 import pytest
 
-from proton_clean.vpn.portforward import (
+from proto_clean.vpn.portforward import (
     NatPmpClient, NatPmpError, build_map_request, parse_map_response,
 )
 

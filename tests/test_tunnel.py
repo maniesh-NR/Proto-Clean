@@ -3,9 +3,9 @@ kill-switch transport parameter — driven against a recording fake helper."""
 
 from __future__ import annotations
 
-from proton_clean.vpn import tunnel as tunnel_mod
-from proton_clean.vpn.tunnel import TunnelManager, apply_local_edits
-from proton_clean.vpn.helper import Helper, HelperError
+from proto_clean.vpn import tunnel as tunnel_mod
+from proto_clean.vpn.tunnel import TunnelManager, apply_local_edits
+from proto_clean.vpn.helper import Helper, HelperError
 
 WG_CONFIG = """[Interface]
 # NAT-PMP (Port Forwarding) = off

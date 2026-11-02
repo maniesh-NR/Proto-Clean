@@ -1,10 +1,10 @@
-# Proton Clean across platforms
+# Proto Clean across platforms
 
-Proton Clean ships for **Windows, macOS, Linux and Android**. The account
+Proto Clean ships for **Windows, macOS, Linux and Android**. The account
 logic — backend-browser login, free-only server list, config creation and
 caching, blocklists, NAT-PMP, fastest-server scoring — is identical
 everywhere; only the *network plumbing* is per-OS, behind the
-`proton_clean/platforms/` layer (desktop) and the Android services.
+`proto_clean/platforms/` layer (desktop) and the Android services.
 
 ## Feature matrix
 
@@ -18,7 +18,7 @@ everywhere; only the *network plumbing* is per-OS, behind the
 | Protocol selection + per-protocol page options | ✅ | ✅ (download side) | ✅ | ✅ (download side; WireGuard tunnel) |
 | Advanced: alternative routing / custom DNS / NAT type | ✅ | ✅ | ✅ | ✅ (custom DNS via config edit; leak protection via system lockdown) |
 | IPv6 support (v6 through the tunnel) | ✅ config keeps `::/0` / `route-ipv6 ::/0` | ✅ (WireGuard) | ✅ | ✅ (config edit, GoBackend) |
-| IPv6 leak protection (block v6 outside the tunnel) | ✅ ip6tables `PROTON_CLEAN_V6` chain | ✅ `ProtonCleanV6` firewall group (physical adapters) | ✅ `proton_clean.v6` pf anchor | ⚠️ system "Block connections without VPN" lockdown |
+| IPv6 leak protection (block v6 outside the tunnel) | ✅ ip6tables `PROTO_CLEAN_V6` chain | ✅ `ProtoCleanV6` firewall group (physical adapters) | ✅ `proto_clean.v6` pf anchor | ⚠️ system "Block connections without VPN" lockdown |
 | Allow LAN while the kill switch is on | ✅ KS allow-list | ✅ KS allow-list | ✅ KS allow-list | ✅ LAN ranges carved out of AllowedIPs |
 | Local config cache, re-download only on failure | ✅ | ✅ | ✅ | ✅ (WireGuard configs) |
 | Ad/malware blocking (local blocklists) | ✅ in-path (iptables redirect :53 → :5353) | ✅ in-path (config DNS = `127.0.0.1`, blocker binds :53) | ✅ in-path (root relay :53 → :5353 + `networksetup`) | ⚠️ **standalone mode** (DNS-filter VPN; see below) |
@@ -40,7 +40,7 @@ iptables, macOS pf, Windows "config DNS = 127.0.0.1"). Android offers no
 packet hook to user space, and the WireGuard tunnel library (GoBackend)
 hands the tun fd straight to wireguard-go — so nothing can sit between the
 system resolver and the tunnel while it is up. Android also allows **one
-VpnService per app**. Proton Clean therefore ships a second, DNS-only
+VpnService per app**. Proto Clean therefore ships a second, DNS-only
 VpnService (`DnsFilterVpnService`, the personalDNSfilter/Intra design): a
 virtual address that is also the DNS server, a /32 route so *only* DNS
 enters the tun, blocklist verdicts answered locally, everything else
@@ -55,44 +55,44 @@ vice-versa). While the tunnel is up, DNS uses Proton's in-tunnel resolver
 
 ```bash
 bash scripts/install.sh          # deps + helper + sudoers + desktop entry
-python3 -m proton_clean             # GUI
+python3 -m proto_clean             # GUI
 ```
 
 Requirements: cgroup v2 (for app split tunneling), `wg`/`wg-quick`,
 `iptables`, `ip`. Everything else is in `requirements.txt`.
 
 **OpenVPN protocol** (optional): `sudo apt install openvpn` — the helper
-`ovpn-up tun|tap` runs `openvpn --config /etc/openvpn/proton-clean/proton-clean.ovpn
---dev proton_clean0 --dev-type <driver> --daemon --writepid
-/var/run/protonclean-openvpn.pid --log-append /var/log/protonclean-openvpn.log`;
-status reads the pidfile + `/sys/class/net/proton_clean0` counters; the kill
+`ovpn-up tun|tap` runs `openvpn --config /etc/openvpn/proto-clean/proto-clean.ovpn
+--dev proto_clean0 --dev-type <driver> --daemon --writepid
+/var/run/protoclean-openvpn.pid --log-append /var/log/protoclean-openvpn.log`;
+status reads the pidfile + `/sys/class/net/proto_clean0` counters; the kill
 switch allows the endpoint over TCP or UDP as the config says; the
-`PROTON_CLEAN_V6` ip6tables chain provides IPv6 leak protection.
+`PROTO_CLEAN_V6` ip6tables chain provides IPv6 leak protection.
 
-Paths: `~/.config/proton-clean`, `~/.cache/proton-clean`, `~/.local/state/proton-clean`.
+Paths: `~/.config/proto-clean`, `~/.cache/proto-clean`, `~/.local/state/proto-clean`.
 
 ## macOS
 
 ```bash
 brew install wireguard-tools
-bash scripts/install_macos.sh    # deps + helper + sudoers + ~/Applications/Proton Clean.app
-open ~/Applications/Proton Clean.app
+bash scripts/install_macos.sh    # deps + helper + sudoers + ~/Applications/Proto Clean.app
+open ~/Applications/Proto Clean.app
 ```
 
-How the plumbing differs from Linux (all inside `helper/proton-clean-helper`,
+How the plumbing differs from Linux (all inside `helper/proto-clean-helper`,
 same verbs):
 
 * **Kill switch — pf.** `ks-on` writes an anchor
   (`pass out quick` for lo0, the tunnel's utun, the OpenVPN interface, the
   VPN endpoint over **its own transport** (UDP or TCP, as the config says)
   and optionally LAN, then `block drop out quick all`) and inserts a
-  marker-guarded `anchor "proton-clean"` + `anchor "proton_clean.v6"` pair into
-  `/etc/pf.conf` (original backed up to `pf.conf.proton-clean-bak`, fully
+  marker-guarded `anchor "proto-clean"` + `anchor "proto_clean.v6"` pair into
+  `/etc/pf.conf` (original backed up to `pf.conf.proto-clean-bak`, fully
   reverted on `ks-off`). pf is enabled only if it was off (recorded, and
   reverted on teardown).
 * **IPv6 leak protection — pf.** `v6-on` loads a second anchor,
-  `proton_clean.v6` (`pass out quick on lo0 inet6`, `pass out quick on
-proton_clean0 inet6`, then `block drop out quick inet6`); `v6-off` flushes
+  `proto_clean.v6` (`pass out quick on lo0 inet6`, `pass out quick on
+proto_clean0 inet6`, then `block drop out quick inet6`); `v6-off` flushes
   it. For tunneled IPv6 combine IPv6 support with the kill switch.
 * **Tunnel interface.** wg-quick maps the tunnel name to a dynamic `utunN`;
   the helper finds ours by matching the installed config's peer public key
@@ -110,7 +110,7 @@ proton_clean0 inet6`, then `block drop out quick inet6`); `v6-off` flushes
   `ovpn-*` verbs as Linux drive the brew binary with the TUN/TAP driver
   from Settings → Advanced.
 
-Paths: `~/Library/Application Support/Proton Clean`, `~/Library/Caches/Proton Clean`.
+Paths: `~/Library/Application Support/Proto Clean`, `~/Library/Caches/Proto Clean`.
 
 ## Windows
 
@@ -121,16 +121,16 @@ Python ≥ 3.10 for the from-source run.
 ```powershell
 pip install -r requirements.txt
 python -m playwright install chromium
-python -m proton_clean                  # GUI (run as Administrator to skip UAC)
+python -m proto_clean                  # GUI (run as Administrator to skip UAC)
 ```
 
 * **Privileges.** No sudo on Windows: the verbs live in
-  `proton_clean/helper_win.py`. When the app is elevated they run in-process;
+  `proto_clean/helper_win.py`. When the app is elevated they run in-process;
   otherwise each **batch** is executed through a single UAC prompt
   (`ShellExecuteW("runas")`, results via a temp JSON file) — a whole
   connect is one batch, so you see one prompt, not six.
 * **Tunnel.** `wireguard.exe /installtunnelservice <conf>` /
-  `/uninstalltunnelservice proton-clean`; status from `wg.exe show proton-clean
+  `/uninstalltunnelservice proto-clean`; status from `wg.exe show proto-clean
   dump`. The handshake wait runs inside the elevated helper
   (`wait-handshake`) so polling does not spam UAC; a non-elevated app
   shows the freshest status any elevated verb reported. **OpenVPN is not
@@ -138,7 +138,7 @@ python -m proton_clean                  # GUI (run as Administrator to skip UAC)
   validate but return a clear "not supported" error, and the Protocol tab
   explains it — keep WireGuard selected.
 * **IPv6 leak protection.** `v6-on` adds outbound IPv6 BLOCK rules for
-  `::/0` on every *physical* adapter (group `ProtonCleanV6`, removed by
+  `::/0` on every *physical* adapter (group `ProtoCleanV6`, removed by
   `v6-off`); the WireGuard tunnel adapter is virtual and untouched, so
   IPv6 inside the tunnel still flows.
 * **Kill switch.** Windows Firewall block rules beat allow rules, so each
@@ -146,7 +146,7 @@ python -m proton_clean                  # GUI (run as Administrator to skip UAC)
   "everything except the endpoint (+LAN if chosen)" — computed by CIDR
   subtraction from `0.0.0.0/0` and `::/0`. The WireGuard adapter is
   virtual, never enumerated as physical, so tunneled traffic is untouched.
-  All rules live in the removable group `ProtonCleanKS`.
+  All rules live in the removable group `ProtoCleanKS`.
 * **DNS.** No firewall rule needed: Windows lets any user bind port 53, so
   the embedded blocker binds `127.0.0.1:53` and the config's DNS line is
   rewritten to `127.0.0.1` before install (only on the installed copy —
@@ -154,8 +154,8 @@ python -m proton_clean                  # GUI (run as Administrator to skip UAC)
 * **Split tunneling.** App-based routing needs a WFP kernel driver
   (out of scope); IP-range exclusions work via AllowedIPs subtraction.
 
-Paths: `%APPDATA%\proton-clean` (config), `%LOCALAPPDATA%\proton-clean` (cache,
-state), `%ProgramData%\Proton Clean` (staged tunnel config).
+Paths: `%APPDATA%\proto-clean` (config), `%LOCALAPPDATA%\proto-clean` (cache,
+state), `%ProgramData%\Proto Clean` (staged tunnel config).
 
 ## Android
 
@@ -195,9 +195,9 @@ Highlights and how they map to the desktop:
 
 | Platform | Command | Output |
 | --- | --- | --- |
-| Windows | `pyinstaller packaging/windows/proton-clean.spec` (or `packaging/windows/build.ps1`) | `dist\ProtonClean.exe` |
-| macOS | `bash packaging/macos/build.sh` | `dist/Proton Clean.app` (ad-hoc signed) |
-| Linux | `bash packaging/linux/build.sh` | `dist/proton-clean/` (+ optional AppImage) |
+| Windows | `pyinstaller packaging/windows/proto-clean.spec` (or `packaging/windows/build.ps1`) | `dist\ProtoClean.exe` |
+| macOS | `bash packaging/macos/build.sh` | `dist/Proto Clean.app` (ad-hoc signed) |
+| Linux | `bash packaging/linux/build.sh` | `dist/proto-clean/` (+ optional AppImage) |
 | Android | `cd android && ./gradlew assembleDebug` | `app/build/outputs/apk/debug/app-debug.apk` |
 
 Notes:
@@ -206,8 +206,8 @@ Notes:
   per-user on first run (or pre-seed with `python -m playwright install
   chromium`).
 * On frozen Windows builds the exe re-executes itself with
-  `--protonclean-helper-win` to run the privileged verbs through UAC — the
-  dispatch lives in `proton_clean/__main__.py`.
+  `--protoclean-helper-win` to run the privileged verbs through UAC — the
+  dispatch lives in `proto_clean/__main__.py`.
 
 ## Testing
 

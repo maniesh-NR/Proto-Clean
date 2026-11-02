@@ -1,4 +1,4 @@
-# Proton Clean for Android
+# Proto Clean for Android
 
 Clean, room-temperature ProtonVPN client for Android — the same clean-room
 philosophy as the desktop apps, in Kotlin + Jetpack Compose, built on the
@@ -56,8 +56,8 @@ packaged AAR — no extra setup needed.
 ## Project layout
 
 ```
-app/src/main/java/app/protonclean/
-├── ProtonCleanApp.kt        # application: settings, blocklists, config cache, channels
+app/src/main/java/app/protoclean/
+├── ProtoCleanApp.kt        # application: settings, blocklists, config cache, channels
 ├── MainActivity.kt        # Compose host + bottom navigation + VPN consent
 ├── AppViewModel.kt        # state machine (the desktop Controller's analogue)
 ├── ui/                    # Compose screens: Login, Servers, Blocklists, Settings
@@ -80,6 +80,6 @@ app/src/main/java/app/protonclean/
   resolver falls back to UDP, which is handled.
 * minSdk 29 (Android 10), targetSdk 34.
 
-Proton Clean is an independent client; it is not affiliated with or endorsed
+Proto Clean is an independent client; it is not affiliated with or endorsed
 by Proton AG. Automating the account web app is a convenience for *your
 own account* — check Proton's terms of service before relying on it.

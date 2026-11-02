@@ -25,11 +25,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from playwright.sync_api import sync_playwright
 
-from proton_clean.account.downloads_page import (
+from proto_clean.account.downloads_page import (
     FREE_CATEGORY_SELECTORS, DownloadsPage, PageBot, PLATFORM_RADIO_SELECTORS,
     WG,
 )
-from proton_clean.vpn.config_cache import parse_config_meta
+from proto_clean.vpn.config_cache import parse_config_meta
 
 DUMP_CANDIDATES = [
     sys.argv[1] if len(sys.argv) > 1 else None,

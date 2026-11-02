@@ -1,13 +1,13 @@
-# Proton Clean
+# Proto Clean
 
 <p align="center">
-  <img src="docs/logo.png" width="128" alt="Proton Clean logo">
+  <img src="docs/logo.png" width="128" alt="Proto Clean logo">
 </p>
 
 A clean-room client for **ProtonVPN** — **Linux, Windows, macOS and
 Android** — built around your own Proton account:
 
-- **Backend-browser login with saved credentials** — Proton Clean drives a
+- **Backend-browser login with saved credentials** — Proto Clean drives a
   bundled Chromium (Playwright) to log into `account.protonvpn.com`.
   Save your credentials once (**Log in… → Remember me**) and every launch
   — and every session expiry mid-connect — logs in automatically.
@@ -15,7 +15,7 @@ Android** — built around your own Proton account:
   with an optional TOTP secret that answers 2FA prompts by itself.
 - **CAPTCHA relayed to you** — when Proton challenges the automatic login
   with a CAPTCHA / human verification, a **browser window opens on exactly
-  that step**, and Proton Clean tells you what's going on: a banner in the
+  that step**, and Proto Clean tells you what's going on: a banner in the
   main window, a status-bar message and a desktop notification. Finish the
   verification in the window and login continues by itself — no restart,
   no re-typing (credentials are pre-filled in the window). You can also
@@ -29,7 +29,7 @@ Android** — built around your own Proton account:
 - **Fastest server, one toggle** — the toggle at the top auto-connects to
   the fastest available free server using Proton's own live server score.
 - **Protocol choice: WireGuard or OpenVPN** — Settings → Protocol picks
-  which config Proton Clean downloads from the Proton page. **WireGuard**
+  which config Proto Clean downloads from the Proton page. **WireGuard**
   (default) shows the NAT-PMP (Port Forwarding) and VPN Accelerator
   toggles, both on by default. **OpenVPN** adds a TCP/UDP transport
   choice, and the network driver is selectable in Advanced: **TUN**
@@ -84,10 +84,10 @@ Android** — built around your own Proton account:
 Per-OS plumbing, packaging and limitations: **[docs/PLATFORMS.md](docs/PLATFORMS.md)**
 (Android app: **[android/README.md](android/README.md)**).
 
-Proton Clean is an independent client. It is not affiliated with or endorsed
+Proto Clean is an independent client. It is not affiliated with or endorsed
 by Proton AG. Automating the account web app is a convenience for *your
 own account*; if Proton changes their UI, the scrapers may need updating
-(they log debug screenshots to `~/.cache/proton-clean/screenshots` when a
+(they log debug screenshots to `~/.cache/proto-clean/screenshots` when a
 step fails). Check Proton's terms of service before relying on it.
 
 ---
@@ -110,7 +110,7 @@ step fails). Check Proton's terms of service before relying on it.
 **Linux**
 
 ```bash
-cd proton-clean
+cd proto-clean
 bash scripts/install.sh
 ```
 
@@ -126,7 +126,7 @@ bash scripts/install_macos.sh
 ```powershell
 pip install -r requirements.txt
 python -m playwright install chromium
-python -m proton_clean
+python -m proto_clean
 ```
 
 **Android** — build the APK from [`android/`](android/) with
@@ -135,9 +135,9 @@ python -m proton_clean
 The Linux/macOS installers:
 
 1. installs Python dependencies (+ Chromium for Playwright, ~170 MB, once)
-2. installs the privileged helper to `/usr/local/bin/proton-clean-helper`
+2. installs the privileged helper to `/usr/local/bin/proto-clean-helper`
 3. adds a **sudoers entry limited to that single binary** — no blanket
-   sudo: `youruser ALL=(root) NOPASSWD: /usr/local/bin/proton-clean-helper`
+   sudo: `youruser ALL=(root) NOPASSWD: /usr/local/bin/proto-clean-helper`
 
 Uninstall with `bash scripts/uninstall.sh`.
 
@@ -148,13 +148,13 @@ verbs run in-process; otherwise each connect shows **one UAC prompt**
 ## Run
 
 ```bash
-python3 -m proton_clean            # GUI
-python3 -m proton_clean --cli      # headless environment check
-python3 -m proton_clean -v         # debug logging
+python3 -m proto_clean            # GUI
+python3 -m proto_clean --cli      # headless environment check
+python3 -m proto_clean -v         # debug logging
 ```
 
 First launch: the **login dialog** opens by itself. Enter your Proton
-username and password, keep **Remember me** checked (default) and Proton Clean
+username and password, keep **Remember me** checked (default) and Proto Clean
 auto-logs-in from then on — at launch and whenever the session expires.
 Optionally store your **TOTP secret** so two-factor prompts are answered
 automatically; if Proton shows a CAPTCHA, finish it in the window that
@@ -173,30 +173,30 @@ in browser…**.
 - **Theme ▾** (bottom bar) switches Dark / Light / System instantly —
   no restart; System keeps following the desktop scheme.
 - The tray icon gives you connect/disconnect/quit; closing the window
-  keeps Proton Clean in the tray.
+  keeps Proto Clean in the tray.
 - While connected you get live stats (handshake age, up/down bytes,
   endpoint) and, on paid plans, the forwarded external port.
-- Configs are cached in `~/.cache/proton-clean/configs/`; connect twice to
+- Configs are cached in `~/.cache/proto-clean/configs/`; connect twice to
   the same server and the second attempt skips the download entirely.
 
 ## How each feature works
 
 | Feature | Mechanism |
 | --- | --- |
-| Login | Playwright Chromium; two-step form (`#username` → Continue → `#password`); storage-state cached in `~/.config/proton-clean/browser-state.json`; login dialog with **Remember me** (keyring / chmod-600 file + optional TOTP secret); CAPTCHA/2FA → visible window for that step only, relayed to you via banner + notification |
+| Login | Playwright Chromium; two-step form (`#username` → Continue → `#password`); storage-state cached in `~/.config/proto-clean/browser-state.json`; login dialog with **Remember me** (keyring / chmod-600 file + optional TOTP secret); CAPTCHA/2FA → visible window for that step only, relayed to you via banner + notification |
 | Server list (free only) | the logged-in page's own logicals XHR (Load/Score/Tier/Features), filtered to Tier 0 → fallback: same-origin fetch by the page (with **alternative routing**: mirror hosts `api.protonvpn.com` / `vpn-api.proton.me`) → fallback: scrape of the rendered "Free server configs" country tables (`#section-wireguard-configuration`, 121 free servers verified against the real page) |
 | Fastest | min `Score` among online free-tier logicals (Proton's own metric); local load-based heuristic if Score is missing; saturated (>90%) servers deprioritised |
 | Protocol | Settings → Protocol: WireGuard (default) or OpenVPN. **WireGuard**: NAT-PMP (Port Forwarding) + VPN Accelerator toggles (both on by default) — set on the page via `#feature-PortForwarding` / `#feature-SplitTCP`. **OpenVPN**: the page section `#section-openvpn-configuration` with layered selector candidates, TCP or UDP transport radios, same Linux platform / free-category / exact-row Create flow; the TUN/TAP driver is a *local* choice applied at `ovpn-up` |
 | Config | Platform=GNU/Linux radio, option toggles by id, "Free server configs" category, exact-match server row → Create → capture (XHR body, the new certificate's textarea, or the Download file); WireGuard configs look like `[Interface]`+`PrivateKey`, OpenVPN captures require a `remote` line |
-| Config cache | per-server cache in `~/.cache/proton-clean/configs/` keyed by server + protocol + transport + option fingerprint (`wg-acc1-nat0`, `ovpn-tcp-acc1-nat1`, …) — a lookup never crosses protocols; connect flow: cached config → tunnel up → **handshake verified**; on failure the entry is invalidated and the config re-downloaded once; existing certificates (both sections) are harvested from the page to warm the cache |
-| Tunnel (WireGuard) | captured config validated (hooks like `PostUp` are refused) → staged (`/etc/wireguard/proton_clean.conf`, 0600) → `wg-quick up` (Linux/macOS) or `wireguard.exe /installtunnelservice` (Windows) — all through the same verb whitelist |
-| Tunnel (OpenVPN) | `.ovpn` validated (must have `remote`; `up`/`down`/`script-security` shell hooks refused — same stance as WireGuard's PostUp) → staged to `/etc/openvpn/proton-clean/proton-clean.ovpn` (0600, dir 0700) → helper `ovpn-up tun|tap` runs `openvpn --config … --dev proton_clean0 --dev-type <driver> --daemon --writepid` → status via pidfile + interface counters (reports a live "handshake" to the app's liveness check); `ovpn-down` SIGTERMs the pid |
+| Config cache | per-server cache in `~/.cache/proto-clean/configs/` keyed by server + protocol + transport + option fingerprint (`wg-acc1-nat0`, `ovpn-tcp-acc1-nat1`, …) — a lookup never crosses protocols; connect flow: cached config → tunnel up → **handshake verified**; on failure the entry is invalidated and the config re-downloaded once; existing certificates (both sections) are harvested from the page to warm the cache |
+| Tunnel (WireGuard) | captured config validated (hooks like `PostUp` are refused) → staged (`/etc/wireguard/proto_clean.conf`, 0600) → `wg-quick up` (Linux/macOS) or `wireguard.exe /installtunnelservice` (Windows) — all through the same verb whitelist |
+| Tunnel (OpenVPN) | `.ovpn` validated (must have `remote`; `up`/`down`/`script-security` shell hooks refused — same stance as WireGuard's PostUp) → staged to `/etc/openvpn/proto-clean/proto-clean.ovpn` (0600, dir 0700) → helper `ovpn-up tun|tap` runs `openvpn --config … --dev proto_clean0 --dev-type <driver> --daemon --writepid` → status via pidfile + interface counters (reports a live "handshake" to the app's liveness check); `ovpn-down` SIGTERMs the pid |
 | Advanced: custom DNS | the embedded DNS blocker answers system-wide and forwards to your servers (ordered fallback) — works identically over WireGuard and OpenVPN; when ad blocking is off it runs with an empty filter |
-| Advanced: IPv6 | **support on**: WireGuard config keeps `::/0` (OpenVPN gets `route-ipv6 ::/0` + `tun-ipv6` for TUN); **support off**: IPv6 is stripped from the config so it never enters the tunnel. **Leak protection on** (default): `v6-on` verb adds an ip6tables chain (macOS: `proton_clean.v6` pf anchor; Windows: `ProtonCleanV6` firewall group) blocking IPv6 except loopback, both tunnel interfaces and the split-tunnel mark — independent of the kill switch, armed before tunnel-up |
+| Advanced: IPv6 | **support on**: WireGuard config keeps `::/0` (OpenVPN gets `route-ipv6 ::/0` + `tun-ipv6` for TUN); **support off**: IPv6 is stripped from the config so it never enters the tunnel. **Leak protection on** (default): `v6-on` verb adds an ip6tables chain (macOS: `proto_clean.v6` pf anchor; Windows: `ProtoCleanV6` firewall group) blocking IPv6 except loopback, both tunnel interfaces and the split-tunnel mark — independent of the kill switch, armed before tunnel-up |
 | Ad blocking | DNS server (dnslib) on loopback — port 5353 on Linux/macOS, port 53 on Windows; port-53 traffic is redirected there (Linux: iptables REDIRECT; macOS: root relay + `networksetup`; Windows: the config's DNS is rewritten to `127.0.0.1`); upstream = DoH to Proton's `doh.protonvpn.ch` through the tunnel, plain-UDP `10.2.0.1` (or your custom DNS servers) as fallback; blocked names → NXDOMAIN or `0.0.0.0` |
-| Blocklist management | per-list cache files (`~/.cache/proton-clean/blocklists/<slug>.txt` + metadata); add / remove / enable / update-one / update-all; enabled lists merged into `merged.json` → hot-swapped into the live DNS filter (answer cache flushed) |
-| Split tunnel | **IP ranges (all desktop OSes):** the CIDRs are subtracted from the tunnel's AllowedIPs, so they keep the original route. **Apps (Linux):** excluded apps live in the root-level cgroup `proton_clean_split`; an iptables mangle rule fwmarks their packets (mark 42); `ip rule fwmark 42 → table 51821` routes them via your original gateway. **Apps (Android):** native `excludedApplications` |
-| Kill switch | Linux: iptables/ip6tables OUTPUT chain (allow lo + both tunnel interfaces + the endpoint over **its own transport, udp or tcp** (+LAN) + fwmark 42, drop the rest); Windows: per-physical-adapter block rules with the endpoint (+LAN) carved out by CIDR subtraction (group `ProtonCleanKS`); macOS: pf anchor with the same allow list, auto-added and reverted in `/etc/pf.conf`; Android: full-route tunnel + lockdown detection |
+| Blocklist management | per-list cache files (`~/.cache/proto-clean/blocklists/<slug>.txt` + metadata); add / remove / enable / update-one / update-all; enabled lists merged into `merged.json` → hot-swapped into the live DNS filter (answer cache flushed) |
+| Split tunnel | **IP ranges (all desktop OSes):** the CIDRs are subtracted from the tunnel's AllowedIPs, so they keep the original route. **Apps (Linux):** excluded apps live in the root-level cgroup `proto_clean_split`; an iptables mangle rule fwmarks their packets (mark 42); `ip rule fwmark 42 → table 51821` routes them via your original gateway. **Apps (Android):** native `excludedApplications` |
+| Kill switch | Linux: iptables/ip6tables OUTPUT chain (allow lo + both tunnel interfaces + the endpoint over **its own transport, udp or tcp** (+LAN) + fwmark 42, drop the rest); Windows: per-physical-adapter block rules with the endpoint (+LAN) carved out by CIDR subtraction (group `ProtoCleanKS`); macOS: pf anchor with the same allow list, auto-added and reverted in `/etc/pf.conf`; Android: full-route tunnel + lockdown detection |
 | Port forwarding | NAT-PMP MAP-UDP (RFC 6886) to `10.2.0.1:5351`, lease kept alive at ~75 %; on free plans Proton answers "not authorized" and the UI reports it |
 | 2FA | stored TOTP secret → RFC 6238 code generated locally (no network); otherwise a dialog asks for the code |
 | Theme | `ui/theme.py` ships two full stylesheets (`DARK_QSS`, `LIGHT_QSS`) + matching `QPalette`s; `apply_theme(app, mode)` resolves `system` via Qt's `colorScheme` hint (Qt ≥ 6.5), the GNOME `color-scheme` gsettings key, or palette lightness; in system mode `colorSchemeChanged` re-applies live. Persisted as `settings.theme`; legacy `prefer_dark_theme: false` migrates to `light`. Runtime painters ask `theme.is_dark()` (load-bar tracks, icons) |
@@ -204,25 +204,25 @@ in browser…**.
 
 ## Security notes
 
-- Credentials: system keyring preferred; the fallback file is `~/.config/proton-clean/credentials.json`, `chmod 600`, and never logged. (Windows: DPAPI-backed keyring / protected file. Android: EncryptedSharedPreferences.)
+- Credentials: system keyring preferred; the fallback file is `~/.config/proto-clean/credentials.json`, `chmod 600`, and never logged. (Windows: DPAPI-backed keyring / protected file. Android: EncryptedSharedPreferences.)
 - The helper runs as root but only accepts a fixed verb list with
   strict argument validation (interfaces, IPs, ports, uid/gids are
   regex/IP-validated; config files must parse as WireGuard configs with
-  no shell hooks). Review `helper/proton-clean-helper` (Linux/macOS) and
-  `proton_clean/helper_win.py` (Windows) yourself.
+  no shell hooks). Review `helper/proto-clean-helper` (Linux/macOS) and
+  `proto_clean/helper_win.py` (Windows) yourself.
 - The kill switch is installed *before* the tunnel comes up, so there is
   no leak window during connect; it is removed on disconnect/quit.
 - WireGuard configs are root-readable only (Linux/macOS:
-  `/etc/wireguard/proton_clean.conf`, 0600). OpenVPN configs likewise
-  (`/etc/openvpn/proton-clean/proton-clean.ovpn`, 0600, dir 0700) — and the
+  `/etc/wireguard/proto_clean.conf`, 0600). OpenVPN configs likewise
+  (`/etc/openvpn/proto-clean/proto-clean.ovpn`, 0600, dir 0700) — and the
   helper refuses `.ovpn` files carrying `up`/`down`/`script-security`
   shell hooks, exactly as it refuses `PreUp`/`PostUp` in wg-quick files.
 
 ## Layout
 
 ```
-proton_clean/
-├── proton_clean/
+proto_clean/
+├── proto_clean/
 │   ├── account/       # backend browser: login + downloads-page scraping
 │   ├── platforms/     # per-OS backends: factory, capabilities, Linux
 │   │                  # (sudo/iptables/cgroup), Windows (UAC/firewall),
@@ -239,7 +239,7 @@ proton_clean/
 │   ├── credentials.py # keyring/file storage
 │   ├── settings.py    # settings.json (per-OS paths)
 │   └── totp.py        # RFC 6238 codes for automatic 2FA
-├── helper/proton-clean-helper  # privileged verb-whitelisted helper (root,
+├── helper/proto-clean-helper  # privileged verb-whitelisted helper (root,
 │                           # Linux + macOS implementations)
 ├── android/           # Android app: Kotlin + Compose + GoBackend +
 │                      # DNS-filter VpnService (see android/README.md)
@@ -274,8 +274,8 @@ verified against a real dump (Nov 2026).
 ## Known limits
 
 - Web-UI automation can break when Proton ships a redesign; debug
-  screenshots land in `~/.cache/proton-clean/screenshots`. The OpenVPN
-  section's ids are less stable than the WireGuard ones — Proton Clean uses
+  screenshots land in `~/.cache/proto-clean/screenshots`. The OpenVPN
+  section's ids are less stable than the WireGuard ones — Proto Clean uses
   layered selector candidates there, and a failure logs a screenshot.
 - Free plan: no NAT-PMP port forwarding, no Proton-side NetShield and no
   Moderate NAT — Proton enforces this server-side. The local blocklist
@@ -300,29 +300,29 @@ verified against a real dump (Nov 2026).
 ## Download & install
 
 Ready-made installers are on the
-[Releases page](https://github.com/maniesh-NR/Proton-Clean/releases)
+[Releases page](https://github.com/maniesh-NR/Proto-Clean/releases)
 (built by the `Release` workflow on every tag):
 
 | Platform | File | Install |
 |---|---|---|
-| Linux Mint / Ubuntu / Debian | `proton-clean_0.1.0-1_amd64.deb` | `sudo apt install ./proton-clean_0.1.0-1_amd64.deb` |
-| Linux (portable) | `Proton-Clean-0.1.0-linux-x86_64.tar.gz` | untar, run `proton-clean/proton-clean` |
-| Windows 10 / 11 | `Proton-Clean-0.1.0-win64.zip` | unzip, run `ProtonClean.exe` (+ [WireGuard for Windows](https://download.wireguard.com/windows/)) |
-| macOS 12+ | `Proton-Clean-0.1.0-macos.zip` | unzip → /Applications (ad-hoc signed) |
-| Android 10+ | `Proton-Clean-0.1.0-android.apk` | debug-signed APK; allow "install unknown apps" |
+| Linux Mint / Ubuntu / Debian | `proto-clean_0.1.0-1_amd64.deb` | `sudo apt install ./proto-clean_0.1.0-1_amd64.deb` |
+| Linux (portable) | `Proto-Clean-0.1.0-linux-x86_64.tar.gz` | untar, run `proto-clean/proto-clean` |
+| Windows 10 / 11 | `Proto-Clean-0.1.0-win64.zip` | unzip, run `ProtoClean.exe` (+ [WireGuard for Windows](https://download.wireguard.com/windows/)) |
+| macOS 12+ | `Proto-Clean-0.1.0-macos.zip` | unzip → /Applications (ad-hoc signed) |
+| Android 10+ | `Proto-Clean-0.1.0-android.apk` | debug-signed APK; allow "install unknown apps" |
 
-Or from source: `pip install -e .` and `python3 -m proton_clean` (plus
+Or from source: `pip install -e .` and `python3 -m proto_clean` (plus
 `bash scripts/install.sh` on Linux / `scripts/install_macos.sh` on macOS
 for the privileged helper).
 
 ## Trademarks & legal
 
-Proton Clean is an **independent, community project** and is **not
+Proto Clean is an **independent, community project** and is **not
 affiliated with, endorsed by, or sponsored by Proton AG**. "Proton VPN"
 and "Proton" are trademarks of Proton AG; they are used here solely to
 describe interoperability with a service the user has subscribed to
 (nominative use). All artwork — the logo, icons, color palette and UI
-styling in this repository — is **original Proton Clean branding**, created
+styling in this repository — is **original Proto Clean branding**, created
 for this project (MIT-licensed, see `LICENSE`); no Proton assets are
 included or reproduced. The client talks to Proton's website only the
 way your own browser would, using your own account.

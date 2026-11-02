@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def smoke_login_page() -> int:
-    from proton_clean.account.browser import (
+    from proto_clean.account.browser import (
         PASSWORD_SELECTORS, SUBMIT_SELECTORS, USERNAME_SELECTORS,
     )
     from playwright.sync_api import sync_playwright
@@ -25,7 +25,7 @@ def smoke_login_page() -> int:
         browser = pw.chromium.launch(headless=True, args=["--no-sandbox",
                                                           "--disable-dev-shm-usage"])
         page = browser.new_page()
-        from proton_clean.account.browser import settle
+        from proto_clean.account.browser import settle
         page.goto("https://account.protonvpn.com/login",
                   wait_until="domcontentloaded", timeout=60000)
         settle(page)
@@ -53,7 +53,7 @@ def smoke_login_page() -> int:
         probe("username field", USERNAME_SELECTORS)
         probe("submit button", SUBMIT_SELECTORS)
         # password appears only after Continue — verify the two-step flow
-        page.locator(",".join(USERNAME_SELECTORS)).first.fill("proton_clean-smoke")
+        page.locator(",".join(USERNAME_SELECTORS)).first.fill("proto_clean-smoke")
         page.locator(",".join(SUBMIT_SELECTORS)).first.click()
         try:
             page.locator(",".join(PASSWORD_SELECTORS)).first \
@@ -81,7 +81,7 @@ def smoke_login_page() -> int:
 
 
 def smoke_blocklist() -> int:
-    from proton_clean.netshield.blocklists import BlocklistManager
+    from proto_clean.netshield.blocklists import BlocklistManager
 
     mgr = BlocklistManager()
     result = mgr.update()
@@ -99,8 +99,8 @@ def smoke_qt() -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
 
-    from proton_clean.controller import Controller
-    from proton_clean.ui.main_window import MainWindow
+    from proto_clean.controller import Controller
+    from proto_clean.ui.main_window import MainWindow
 
     app = QApplication([])
     controller = Controller()
@@ -113,7 +113,7 @@ def smoke_qt() -> int:
     window._on_servers(controller.store.servers)
     window._on_stats({"up": True, "rx": 1234, "tx": 99, "handshake_age": 3.0,
                       "endpoint": "1.2.3.4:51820"})
-    from proton_clean.ui.settings_dialog import SettingsDialog
+    from proto_clean.ui.settings_dialog import SettingsDialog
 
     dlg = SettingsDialog(controller, window)
     print("UI instantiated offscreen: OK")

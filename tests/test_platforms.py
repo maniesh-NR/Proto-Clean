@@ -7,12 +7,12 @@ import ipaddress
 
 import pytest
 
-from proton_clean.helper_win import (WinHelperError, ps_quote, subtract_from_default,
+from proto_clean.helper_win import (WinHelperError, ps_quote, subtract_from_default,
                                   validate_call, validate_wg_conf)
-from proton_clean.platforms import capabilities, get_platform
-from proton_clean.platforms.base import Capabilities
-from proton_clean.vpn.tunnel import apply_local_edits
-from proton_clean.vpn.wgconf import WgQuickConf, WgConfigError
+from proto_clean.platforms import capabilities, get_platform
+from proto_clean.platforms.base import Capabilities
+from proto_clean.vpn.tunnel import apply_local_edits
+from proto_clean.vpn.wgconf import WgQuickConf, WgConfigError
 
 SAMPLE = """
 [Interface]
@@ -148,9 +148,9 @@ def test_platform_factory_matches_os():
 
 def test_linux_client_paths_and_batch(monkeypatch, tmp_path):
     """SudoHelperClient builds helper commands and loops a batch."""
-    from proton_clean.platforms.linux import SudoHelperClient
+    from proto_clean.platforms.linux import SudoHelperClient
 
-    fake_bin = tmp_path / "proton-clean-helper"
+    fake_bin = tmp_path / "proto-clean-helper"
     fake_bin.write_text("#!/bin/sh\n")
     calls_seen = []
 
@@ -163,7 +163,7 @@ def test_linux_client_paths_and_batch(monkeypatch, tmp_path):
         calls_seen.append(cmd)
         return FakeProc()
 
-    import proton_clean.platforms.linux as linux_mod
+    import proto_clean.platforms.linux as linux_mod
     monkeypatch.setattr(linux_mod.subprocess, "run", fake_run)
     client = linux_mod.SudoHelperClient(str(fake_bin))
     res = client.call_batch([("tunnel-up",), ("status",)])

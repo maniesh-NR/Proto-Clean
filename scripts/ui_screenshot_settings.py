@@ -12,10 +12,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QTabWidget, QRadioButton  # noqa: E402
 
-from proton_clean.controller import Controller  # noqa: E402
-from proton_clean.settings import update  # noqa: E402
-from proton_clean.ui.settings_dialog import SettingsDialog  # noqa: E402
-from proton_clean.ui.theme import apply_theme  # noqa: E402
+from proto_clean.controller import Controller  # noqa: E402
+from proto_clean.settings import update  # noqa: E402
+from proto_clean.ui.settings_dialog import SettingsDialog  # noqa: E402
+from proto_clean.ui.theme import apply_theme  # noqa: E402
 
 # seed a few interesting values so both protocols' panes are populated
 update(**{
@@ -37,7 +37,7 @@ dlg.show()
 
 tabs = dlg.findChild(QTabWidget)
 out_prefix = (sys.argv[1] if len(sys.argv) > 1
-              else "/tmp/protonclean-settings")
+              else "/tmp/protoclean-settings")
 
 # render both the WireGuard and the OpenVPN variant of the Protocol tab
 for protocol, transport in (("wireguard", "udp"), ("openvpn", "tcp")):
@@ -70,7 +70,7 @@ for i in range(tabs.count()):
 print("all tabs rendered:", names)
 
 # the driver descriptions requested verbatim must be present
-from proton_clean.ui.settings_dialog import TAP_DESCRIPTION, TUN_DESCRIPTION  # noqa: E402
+from proto_clean.ui.settings_dialog import TAP_DESCRIPTION, TUN_DESCRIPTION  # noqa: E402
 wg_dlg = SettingsDialog(controller)
 assert TAP_DESCRIPTION.startswith("TAP: Bridges network traffic.")
 assert TUN_DESCRIPTION.startswith("TUN: Routes traffic between")

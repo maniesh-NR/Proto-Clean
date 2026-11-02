@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "app.protonclean"
+    namespace = "app.protoclean"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "app.protonclean"
+        applicationId = "app.protoclean"
         minSdk = 29            // Android 10
         targetSdk = 34
         versionCode = 1

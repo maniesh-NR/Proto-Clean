@@ -2,7 +2,7 @@
 
 import pytest
 
-from proton_clean.vpn.ovpnconf import OvpnConf, OvpnConfigError, apply_ovpn_edits
+from proto_clean.vpn.ovpnconf import OvpnConf, OvpnConfigError, apply_ovpn_edits
 
 SAMPLE = """client
 proto udp

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Proto Clean
+Comment=Independent VPN client for Proton accounts (WireGuard / OpenVPN) — Linux
+Exec=proto-clean
+Icon=proto-clean
+Categories=Network;
+StartupNotify=true

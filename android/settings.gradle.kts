@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ProtonClean"
+rootProject.name = "ProtoClean"
 include(":app")

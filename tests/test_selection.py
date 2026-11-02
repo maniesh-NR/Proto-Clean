@@ -1,7 +1,7 @@
 import pytest
 
-from proton_clean.servers.models import LogicalServer, parse_logical_servers
-from proton_clean.servers.selection import fastest_server, rank_servers, score_of
+from proto_clean.servers.models import LogicalServer, parse_logical_servers
+from proto_clean.servers.selection import fastest_server, rank_servers, score_of
 
 SAMPLE = {
     "ID": "abc-1",
@@ -92,7 +92,7 @@ def test_rank_free_only_never_returns_paid():
 
 
 def test_store_free_servers_filters_paid(tmp_path, monkeypatch):
-    from proton_clean.servers import store as store_mod
+    from proto_clean.servers import store as store_mod
 
     monkeypatch.setattr(store_mod, "SERVER_CACHE_FILE",
                         tmp_path / "servers.json")

@@ -16,13 +16,13 @@ import types
 
 import pytest
 
-from proton_clean import settings as S
-from proton_clean.account.downloads_page import ScrapeResult
-from proton_clean.controller import Controller, State
-from proton_clean.servers import store as store_mod
-from proton_clean.servers.models import LogicalServer
-from proton_clean.vpn.config_cache import ConfigCache
-from proton_clean.vpn import tunnel as tunnel_mod
+from proto_clean import settings as S
+from proto_clean.account.downloads_page import ScrapeResult
+from proto_clean.controller import Controller, State
+from proto_clean.servers import store as store_mod
+from proto_clean.servers.models import LogicalServer
+from proto_clean.vpn.config_cache import ConfigCache
+from proto_clean.vpn import tunnel as tunnel_mod
 
 CONFIG = """[Interface]
 # NAT-PMP (Port Forwarding) = off
@@ -52,7 +52,7 @@ class FakeDownloads:
     def scrape_servers(self):
         return [_server()]
 
-    def create_config(self, server, options, config_name="ProtonClean",
+    def create_config(self, server, options, config_name="ProtoClean",
                       fastest=False):
         self.calls.append(server.name)
         return ScrapeResult(config_text=CONFIG, server=server)
@@ -123,7 +123,7 @@ def controller(tmp_path, monkeypatch):
     ctl.connected_via = {}
     ctl.helper_ready = lambda: True
 
-    import proton_clean.controller as ctl_mod
+    import proto_clean.controller as ctl_mod
     monkeypatch.setattr(ctl_mod, "TunnelManager", FakeTunnelManager)
     return ctl
 

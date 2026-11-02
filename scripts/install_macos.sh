@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Proton Clean installer for macOS — run:  bash scripts/install_macos.sh
+# Proto Clean installer for macOS — run:  bash scripts/install_macos.sh
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HELPER_SRC="$HERE/helper/proton-clean-helper"
-HELPER_DST="/usr/local/bin/proton-clean-helper"
+HELPER_SRC="$HERE/helper/proto-clean-helper"
+HELPER_DST="/usr/local/bin/proto-clean-helper"
 
 log()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m ->\033[0m %s\n' "$*"; }
@@ -47,7 +47,7 @@ log "Installing the privileged helper…"
 sudo install -m 0755 "$HELPER_SRC" "$HELPER_DST"
 
 log "Creating the sudoers entry (passwordless, limited to the helper)…"
-SUDOERS_FILE="/etc/sudoers.d/proton-clean"
+SUDOERS_FILE="/etc/sudoers.d/proto-clean"
 echo "$USER ALL=(root) NOPASSWD: $HELPER_DST" | sudo tee "$SUDOERS_FILE" >/dev/null
 sudo chmod 0440 "$SUDOERS_FILE"
 sudo visudo -cf "$SUDOERS_FILE" >/dev/null || {
@@ -55,23 +55,23 @@ sudo visudo -cf "$SUDOERS_FILE" >/dev/null || {
 }
 
 # ---------------------------------------------------------------- .app wrapper
-log "Creating ~/Applications/Proton Clean.app (launcher wrapper)…"
-APP_DIR="$HOME/Applications/Proton Clean.app"
+log "Creating ~/Applications/Proto Clean.app (launcher wrapper)…"
+APP_DIR="$HOME/Applications/Proto Clean.app"
 mkdir -p "$APP_DIR/Contents/MacOS"
-cat > "$APP_DIR/Contents/MacOS/ProtonClean" <<EOF
+cat > "$APP_DIR/Contents/MacOS/ProtoClean" <<EOF
 #!/bin/bash
 cd "$HERE" || exit 1
-exec python3 -m proton_clean
+exec python3 -m proto_clean
 EOF
-chmod +x "$APP_DIR/Contents/MacOS/ProtonClean"
+chmod +x "$APP_DIR/Contents/MacOS/ProtoClean"
 cat > "$APP_DIR/Contents/Info.plist" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleExecutable</key> <string>ProtonClean</string>
-  <key>CFBundleIdentifier</key> <string>app.protonclean.vpn</string>
-  <key>CFBundleName</key> <string>Proton Clean</string>
+  <key>CFBundleExecutable</key> <string>ProtoClean</string>
+  <key>CFBundleIdentifier</key> <string>app.protoclean.vpn</string>
+  <key>CFBundleName</key> <string>Proto Clean</string>
   <key>CFBundlePackageType</key> <string>APPL</string>
   <key>CFBundleShortVersionString</key> <string>0.1.0</string>
   <key>LSMinimumSystemVersion</key> <string>12.0</string>
@@ -80,7 +80,7 @@ cat > "$APP_DIR/Contents/Info.plist" <<'EOF'
 </plist>
 EOF
 
-log "Done. Start with:  open ~/Applications/Proton Clean.app"
+log "Done. Start with:  open ~/Applications/Proto Clean.app"
 warn "First launch: Settings → Account → enter your Proton credentials."
 warn "The sudoers entry grants your user passwordless access to the helper"
 warn "binary ONLY — review $SUDOERS_FILE any time."

@@ -14,10 +14,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
-from proton_clean.controller import Controller  # noqa: E402
-from proton_clean.netshield.blocklists import BlocklistEntry  # noqa: E402
-from proton_clean.servers.models import LogicalServer  # noqa: E402
-from proton_clean.ui.main_window import MainWindow  # noqa: E402
+from proto_clean.controller import Controller  # noqa: E402
+from proto_clean.netshield.blocklists import BlocklistEntry  # noqa: E402
+from proto_clean.servers.models import LogicalServer  # noqa: E402
+from proto_clean.ui.main_window import MainWindow  # noqa: E402
 
 
 def _mk(name, cc, city, load, score, tier=0, features=0):
@@ -51,16 +51,16 @@ FAKE_BLOCKLISTS = [
 ]
 
 app = QApplication([])
-from proton_clean.ui.theme import apply_theme  # noqa: E402
+from proto_clean.ui.theme import apply_theme  # noqa: E402
 
 theme = sys.argv[3] if len(sys.argv) > 3 else "dark"
 # persist the rendered theme so menus/dialogs show a matching checkmark
-from proton_clean.settings import update as _update  # noqa: E402
+from proto_clean.settings import update as _update  # noqa: E402
 
 _update(theme=theme)
 apply_theme(app, theme)
 # the script owns the theme — stop MainWindow from re-applying settings
-app.setProperty("proton_clean_theme_applied", True)
+app.setProperty("proto_clean_theme_applied", True)
 controller = Controller()
 controller.blocklist_entries = lambda: list(FAKE_BLOCKLISTS)
 window = MainWindow(controller)
@@ -74,7 +74,7 @@ window._on_stats({"up": True, "rx": 148_234_112, "tx": 12_302_112,
 window._on_servers(FAKE)
 window._on_blocklists(FAKE_BLOCKLISTS)
 window._on_port(51827)
-out = sys.argv[1] if len(sys.argv) > 1 else "/tmp/protonclean-ui.png"
+out = sys.argv[1] if len(sys.argv) > 1 else "/tmp/protoclean-ui.png"
 window.grab().save(out)
 print("saved", out)
 
@@ -130,7 +130,7 @@ if len(sys.argv) > 2 and sys.argv[2] == "all":
     menu.hide()
 
     # ---- manage dialog
-    from proton_clean.ui.blocklists_dialog import BlocklistsDialog  # noqa: E402
+    from proto_clean.ui.blocklists_dialog import BlocklistsDialog  # noqa: E402
 
     dlg = BlocklistsDialog(controller, window)
     dlg.refresh(FAKE_BLOCKLISTS)
@@ -142,7 +142,7 @@ if len(sys.argv) > 2 and sys.argv[2] == "all":
 
 if len(sys.argv) > 2 and sys.argv[2] in ("all", "login"):
     # ---- login experience: CAPTCHA banner + login dialog
-    from proton_clean.ui.login_dialog import LoginDialog  # noqa: E402
+    from proto_clean.ui.login_dialog import LoginDialog  # noqa: E402
 
     window._on_login_event(
         "captcha", "human verification required — browser window opened")

@@ -35,7 +35,7 @@ jobs:
 
       - name: Tar the portable bundle
         run: |
-          tar czf "dist/Proton-Clean-${VERSION}-linux-x86_64.tar.gz" -C dist proton-clean
+          tar czf "dist/Proto-Clean-${VERSION}-linux-x86_64.tar.gz" -C dist proto-clean
         env:
           VERSION: 0.1.0
 
@@ -44,7 +44,7 @@ jobs:
           name: linux-installers
           path: |
             dist/*.deb
-            dist/Proton-Clean-*-linux-x86_64.tar.gz
+            dist/Proto-Clean-*-linux-x86_64.tar.gz
           if-no-files-found: error
 
   # ------------------------------------------------------------- Windows
@@ -64,19 +64,19 @@ jobs:
           pip install -r requirements.txt pyinstaller
 
       - name: Build exe
-        run: python -m PyInstaller --noconfirm --clean packaging/windows/proton-clean.spec
+        run: python -m PyInstaller --noconfirm --clean packaging/windows/proto-clean.spec
 
       - name: Package zip
         shell: pwsh
         run: |
-          Copy-Item packaging/windows/proton-clean.ico dist/
+          Copy-Item packaging/windows/proto-clean.ico dist/
           @'
-          Proton Clean 0.1.0 — Windows 10/11 (64-bit)
+          Proto Clean 0.1.0 — Windows 10/11 (64-bit)
           ========================================
 
           Install
           -------
-          1. Copy ProtonClean.exe anywhere you like (e.g. C:\Program Files\Proton Clean\)
+          1. Copy ProtoClean.exe anywhere you like (e.g. C:\Program Files\Proto Clean\)
              and run it (right-click -> Run as administrator is NOT required;
              privileged verbs elevate one batch at a time via UAC).
           2. Install WireGuard for Windows:  https://download.wireguard.com/windows/
@@ -93,13 +93,13 @@ jobs:
           * The exe is not code-signed (self-published project) — SmartScreen
             may ask for confirmation on first run (More info -> Run anyway).
           '@ | Set-Content dist/README-WINDOWS.txt
-          Compress-Archive -Path dist/ProtonClean.exe, dist/README-WINDOWS.txt, `
-            dist/proton-clean.ico -DestinationPath dist/Proton-Clean-0.1.0-win64.zip -Force
+          Compress-Archive -Path dist/ProtoClean.exe, dist/README-WINDOWS.txt, `
+            dist/proto-clean.ico -DestinationPath dist/Proto-Clean-0.1.0-win64.zip -Force
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: dist/Proton-Clean-*-win64.zip
+          path: dist/Proto-Clean-*-win64.zip
           if-no-files-found: error
 
   # ------------------------------------------------------------- macOS
@@ -124,13 +124,13 @@ jobs:
       - name: Zip the bundle
         run: |
           cd dist
-          zip -qry "Proton-Clean-0.1.0-macos.zip" "Proton Clean.app"
+          zip -qry "Proto-Clean-0.1.0-macos.zip" "Proto Clean.app"
           cd ..
 
       - uses: actions/upload-artifact@v4
         with:
           name: macos-installer
-          path: dist/Proton-Clean-*-macos.zip
+          path: dist/Proto-Clean-*-macos.zip
           if-no-files-found: error
 
   # ------------------------------------------------------------- Android
@@ -158,12 +158,12 @@ jobs:
       - name: Rename APK
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk \
-             "$GITHUB_WORKSPACE/Proton-Clean-0.1.0-android.apk"
+             "$GITHUB_WORKSPACE/Proto-Clean-0.1.0-android.apk"
 
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: Proton-Clean-0.1.0-android.apk
+          path: Proto-Clean-0.1.0-android.apk
           if-no-files-found: error
 
   # ------------------------------------------------------------- Publish
@@ -186,7 +186,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.1.0
-          name: Proton Clean v0.1.0
+          name: Proto Clean v0.1.0
           body: |
             First public release — independent clean-room VPN client for
             Proton accounts.
@@ -194,11 +194,11 @@ jobs:
             ## Downloads
             | Platform | File | Notes |
             |---|---|---|
-            | **Linux Mint / Ubuntu / Debian** | `proton-clean_0.1.0-1_amd64.deb` | `sudo apt install ./proton-clean_0.1.0-1_amd64.deb` |
-            | **Linux (portable)** | `Proton-Clean-0.1.0-linux-x86_64.tar.gz` | untar, run `proton-clean/proton-clean` |
-            | **Windows 10 / 11** | `Proton-Clean-0.1.0-win64.zip` | unzip, run `ProtonClean.exe`; needs [WireGuard for Windows](https://download.wireguard.com/windows/) |
-            | **macOS 12+** | `Proton-Clean-0.1.0-macos.zip` | unzip, move to /Applications; ad-hoc signed |
-            | **Android 10+** | `Proton-Clean-0.1.0-android.apk` | debug-signed APK — allow "install unknown apps" |
+            | **Linux Mint / Ubuntu / Debian** | `proto-clean_0.1.0-1_amd64.deb` | `sudo apt install ./proto-clean_0.1.0-1_amd64.deb` |
+            | **Linux (portable)** | `Proto-Clean-0.1.0-linux-x86_64.tar.gz` | untar, run `proto-clean/proto-clean` |
+            | **Windows 10 / 11** | `Proto-Clean-0.1.0-win64.zip` | unzip, run `ProtoClean.exe`; needs [WireGuard for Windows](https://download.wireguard.com/windows/) |
+            | **macOS 12+** | `Proto-Clean-0.1.0-macos.zip` | unzip, move to /Applications; ad-hoc signed |
+            | **Android 10+** | `Proto-Clean-0.1.0-android.apk` | debug-signed APK — allow "install unknown apps" |
 
             ## After install
             * Log in with your own Proton account (credentials stay in your
@@ -212,9 +212,9 @@ jobs:
             Not affiliated with or endorsed by Proton AG — see README.
           files: |
             dist/*.deb
-            dist/Proton-Clean-*-linux-x86_64.tar.gz
-            dist/Proton-Clean-*-win64.zip
-            dist/Proton-Clean-*-macos.zip
-            dist/Proton-Clean-*-android.apk
+            dist/Proto-Clean-*-linux-x86_64.tar.gz
+            dist/Proto-Clean-*-win64.zip
+            dist/Proto-Clean-*-macos.zip
+            dist/Proto-Clean-*-android.apk
           fail_on_unmatched_files: true
           generate_release_notes: true

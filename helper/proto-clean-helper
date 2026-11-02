@@ -1,0 +1,1003 @@
+#!/usr/bin/env python3
+"""proto-clean-helper — privileged helper for the Proto Clean VPN client.
+
+Installed at /usr/local/bin/proto-clean-helper (Linux and macOS) and invoked
+through a sudoers NOPASSWD entry limited to this exact binary. Every verb is
+whitelisted and every argument strictly validated so this cannot be turned
+into a generic root shell.
+
+On Linux the kill switch uses iptables, DNS interception is an iptables nat
+REDIRECT of port 53 and split tunneling is cgroup-v2 based. On macOS the
+same verbs are implemented with pf (anchor + kill switch rules), a tiny root
+relay 127.0.0.1:53 -> 127.0.0.1:5353 plus `networksetup -setdnsservers`, and
+CIDR-exclusion split tunneling (per-app routing is not possible for user
+space on macOS). (Windows uses proto_clean/helper_win.py instead of this
+script.)
+
+Verbs:
+    install-config SRC            copy a validated wg-quick config into place
+    tunnel-up / tunnel-down       wg-quick up|down proto_clean
+    ovpn-install-config SRC       copy a validated OpenVPN config into place
+    ovpn-up DRIVER                start openvpn (driver: tun or tap) as a daemon
+    ovpn-down                     stop the openvpn daemon
+    status                        JSON tunnel status (wg dump; falls back to
+                                  the OpenVPN daemon + its tun/tap interface)
+    ks-on IFACE ENDPOINT_IP PORT ALLOW_LAN [PROTO]
+                                  enable kill switch (PROTO = udp|tcp endpoint
+                                  transport, default udp — OpenVPN/TCP needs it)
+    ks-off                        disable kill switch
+    v6-on / v6-off                IPv6 leak protection: block IPv6 that would
+                                  bypass the tunnel (independent of the kill
+                                  switch)
+    dns-on UID                    port 53 -> local blocker (Linux: iptables
+                                  redirect, macOS: root relay + system DNS)
+    dns-off
+    split-on IFACE GW_IP          enable exclude-apps split routing (Linux)
+    split-off
+    split-add-pid PID             move PID into the split cgroup (Linux)
+    split-launch UID GID -- CMD…  run a command as UID/GID inside the split
+                                  cgroup (Linux)
+    cgroup-ensure                 create /sys/fs/cgroup/proto_clean_split
+"""
+
+from __future__ import annotations
+
+import ipaddress
+import json
+import os
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import time
+
+DARWIN = sys.platform == "darwin"
+
+WG_IFACE = "proto_clean"
+WG_CONF = f"/etc/wireguard/{WG_IFACE}.conf"
+CHAIN_KS = "PROTO_CLEAN_KS"
+CHAIN_DNS = "PROTO_CLEAN_DNS"
+CHAIN_ST = "PROTO_CLEAN_ST"
+CHAIN_V6 = "PROTO_CLEAN_V6"
+MARK = "0x2a"            # 42 — fwmark for bypass traffic
+TABLE = "51821"          # custom routing table (wg-quick uses 51820)
+CGROUP = "/sys/fs/cgroup/proto_clean_split"
+IPT = shutil.which("iptables") or shutil.which("iptables-nft") or "/usr/sbin/iptables"
+IP6T = shutil.which("ip6tables") or shutil.which("ip6tables-nft") or "/usr/sbin/ip6tables"
+
+# OpenVPN tunnel (TUN or TAP driver chosen by the app)
+OVPN_IFACE = "proto_clean0"
+OVPN_CONF_DIR = "/etc/openvpn/protoclean"
+OVPN_CONF = f"{OVPN_CONF_DIR}/proto_clean.ovpn"
+OVPN_PID_FILE = "/var/run/protoclean-openvpn.pid"
+OVPN_LOG = "/var/log/protoclean-openvpn.log"
+
+
+def openvpn_binary() -> str:
+    for cand in ("openvpn", "/usr/sbin/openvpn", "/opt/homebrew/sbin/openvpn",
+                 "/usr/local/sbin/openvpn"):
+        hit = shutil.which(cand) if "/" not in cand else (cand if os.path.isfile(cand) else None)
+        if hit:
+            return hit
+    fail("openvpn not found — install it (e.g. 'sudo apt install openvpn' "
+         "or 'brew install openvpn') to use the OpenVPN protocol")
+
+# macOS bookkeeping
+PF_ANCHOR = "proto_clean"
+PF_ANCHOR_FILE = "/var/run/protoclean-ks.anchor"
+PF_V6_ANCHOR = "proto_clean.v6"
+PF_V6_ANCHOR_FILE = "/var/run/protoclean-v6.anchor"
+PF_CONF = "/etc/pf.conf"
+PF_ENABLED_FLAG = "/var/run/protoclean-pf-enabled"
+DNS_RELAY_PID = "/var/run/protoclean-dns-relay.pid"
+DNS_SERVICE_FILE = "/var/run/protoclean-dns-service"
+DNS_RELAY_FROM = ("127.0.0.1", 53)
+DNS_RELAY_TO = ("127.0.0.1", 5353)
+
+IFACE_RE = re.compile(r"^[a-zA-Z0-9._-]{1,15}$")
+PATH_RE = re.compile(r"^[A-Za-z0-9._/+@=-]+$")
+PEER_KEY_RE = re.compile(r"^\s*PublicKey\s*=\s*([A-Za-z0-9+/]{43}=)\s*$", re.M)
+
+
+def fail(msg: str, code: int = 2) -> "None":
+    print(json.dumps({"ok": False, "error": msg}))
+    sys.exit(code)
+
+
+def ok(**data) -> None:
+    print(json.dumps({"ok": True, **data}))
+
+
+def run(cmd: list, check: bool = True) -> subprocess.CompletedProcess:
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError as e:
+        raise RuntimeError(f"required tool not installed: {e.filename}") from e
+    if check and p.returncode != 0:
+        raise RuntimeError(f"{' '.join(cmd)} failed: {p.stderr.strip() or p.stdout.strip()}")
+    return p
+
+
+def ipt(*args: str, check: bool = True) -> None:
+    run([IPT, "-w", *args], check=check)
+
+
+def ip6t(*args: str, check: bool = True) -> None:
+    run([IP6T, "-w", *args], check=check)
+
+
+def valid_iface(name: str) -> str:
+    if not IFACE_RE.match(name):
+        fail(f"invalid interface name {name!r}")
+    return name
+
+
+def valid_ip(name: str, allow_empty: bool = False) -> str:
+    if allow_empty and name == "":
+        return name
+    try:
+        ipaddress.ip_address(name)
+    except ValueError:
+        fail(f"invalid IP {name!r}")
+    return name
+
+
+def valid_port(p: str) -> int:
+    try:
+        port = int(p)
+    except ValueError:
+        fail(f"invalid port {p!r}")
+    if not 1 <= port <= 65535:
+        fail(f"port out of range: {p}")
+    return port
+
+
+def valid_uid(u: str) -> int:
+    try:
+        uid = int(u)
+    except ValueError:
+        fail(f"invalid uid {u!r}")
+    if not 0 <= uid < 2**31:
+        fail("uid out of range")
+    return uid
+
+
+def valid_proto(p: str) -> str:
+    if p not in ("udp", "tcp"):
+        fail(f"protocol must be udp or tcp, got {p!r}")
+    return p
+
+
+def cache_roots() -> list:
+    roots = [os.path.expanduser("~/.cache/proto-clean"), "/tmp/protoclean-"]
+    if DARWIN:
+        roots.append(os.path.expanduser("~/Library/Caches/Proto Clean"))
+    return roots
+
+
+# ----------------------------------------------------------------- verbs
+
+
+def verb_install_config(src: str) -> None:
+    if not any(src.startswith(r) for r in cache_roots()):
+        fail("source path not allowed")
+    if not PATH_RE.match(src) or not os.path.isfile(src):
+        fail("bad source path")
+    text = open(src, encoding="utf-8").read()
+    if not validate_wg_conf(text):
+        fail("file is not a valid WireGuard config")
+    dests = ["/etc/wireguard"]
+    if DARWIN:
+        # brew's wireguard-tools looks in its own prefix first
+        dests += [d for d in ("/opt/homebrew/etc/wireguard",
+                              "/usr/local/etc/wireguard") if os.path.isdir(d)]
+    for dest in dests:
+        os.makedirs(dest, exist_ok=True)
+        tmp = os.path.join(dest, f"{WG_IFACE}.conf.tmp")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, os.path.join(dest, f"{WG_IFACE}.conf"))
+    ok(installed=os.path.join(dests[0], f"{WG_IFACE}.conf"))
+
+
+def validate_wg_conf(text: str) -> bool:
+    section = None
+    saw_key = {"Interface": set(), "Peer": set()}
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if line in ("[Interface]", "[Peer]"):
+            section = line[1:-1]
+            continue
+        if section is None or "=" not in line:
+            return False
+        key = line.split("=", 1)[0].strip()
+        if key not in {
+            "PrivateKey", "Address", "DNS", "MTU", "Table", "PreUp", "PostUp",
+            "PublicKey", "PresharedKey", "AllowedIPs", "Endpoint",
+            "PersistentKeepalive", "PreDown", "PostDown", "SaveConfig",
+        }:
+            return False
+        saw_key[section].add(key)
+    if "PrivateKey" not in saw_key["Interface"]:
+        return False
+    if "PublicKey" not in saw_key["Peer"] or "AllowedIPs" not in saw_key["Peer"]:
+        return False
+    if "PreUp" in saw_key["Interface"] or "PostUp" in saw_key["Interface"]:
+        return False   # refuse to run surprise shell hooks as root
+    return True
+
+
+# OpenVPN directives that run commands or hijack our routing tooling — the
+# .ovpn equivalent of refusing PreUp/PostUp in wg-quick configs.
+OVPN_FORBIDDEN = {
+    "up", "down", "script-security", "iproute", "iproute6", "route-up",
+    "down-pre", "tls-verify", "tls-export-cert",
+}
+
+
+def validate_ovpn_conf(text: str) -> bool:
+    remote = False
+    in_block = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith(("#", ";")):
+            continue
+        if line.startswith("</"):
+            in_block = False
+            continue
+        if line.startswith("<"):
+            in_block = True
+            continue
+        if in_block:
+            continue
+        key = line.split()[0].lower()
+        if key == "remote":
+            remote = True
+        if key in OVPN_FORBIDDEN:
+            return False
+    return remote
+
+
+def conf_peer_public_key() -> str:
+    try:
+        text = open(WG_CONF, encoding="utf-8").read()
+    except OSError:
+        return ""
+    m = PEER_KEY_RE.search(text)
+    return m.group(1) if m else ""
+
+
+def conf_tunnel_ip() -> str:
+    try:
+        for line in open(WG_CONF, encoding="utf-8"):
+            if line.strip().startswith("Address"):
+                return line.split("=", 1)[1].split(",")[0].split("/")[0].strip()
+    except OSError:
+        pass
+    return ""
+
+
+def find_wg_iface() -> str:
+    """macOS: wg-quick maps the tunnel name to a dynamic utunN; find it by
+    matching the installed config's peer public key against `wg show all`."""
+    want = conf_peer_public_key()
+    if not want:
+        return ""
+    p = run(["wg", "show", "all", "dump"], check=False)
+    if p.returncode != 0:
+        return ""
+    for line in p.stdout.splitlines():
+        f = line.split("\t")
+        if len(f) >= 2 and f[1] == want:      # peer line: iface, peer-key, …
+            return f[0]
+    return ""
+
+
+def verb_tunnel_up() -> None:
+    run(["wg-quick", "up", WG_IFACE])
+    ok(state="up")
+
+
+def verb_tunnel_down() -> None:
+    run(["wg-quick", "down", WG_IFACE], check=False)
+    ok(state="down")
+
+
+# ---- OpenVPN tunnel -------------------------------------------------------
+
+
+def verb_ovpn_install_config(src: str) -> None:
+    if not any(src.startswith(r) for r in cache_roots()):
+        fail("source path not allowed")
+    if not PATH_RE.match(src) or not os.path.isfile(src):
+        fail("bad source path")
+    text = open(src, encoding="utf-8").read()
+    if not validate_ovpn_conf(text):
+        fail("file is not a valid OpenVPN config (or uses forbidden directives)")
+    os.makedirs(OVPN_CONF_DIR, mode=0o700, exist_ok=True)
+    tmp = os.path.join(OVPN_CONF_DIR, "proto_clean.ovpn.tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, OVPN_CONF)
+    ok(installed=OVPN_CONF)
+
+
+def _ovpn_pid() -> int:
+    try:
+        return int(open(OVPN_PID_FILE).read().strip())
+    except (OSError, ValueError):
+        return 0
+
+
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def verb_ovpn_up(driver: str) -> None:
+    if driver not in ("tun", "tap"):
+        fail(f"driver must be tun or tap, got {driver!r}")
+    if not os.path.isfile(OVPN_CONF):
+        fail(f"no OpenVPN config installed at {OVPN_CONF}")
+    pid = _ovpn_pid()
+    if _pid_alive(pid):
+        ok(state="up", pid=pid, note="already running")
+        return
+    binary = openvpn_binary()
+    run([binary, "--config", OVPN_CONF,
+         "--dev", OVPN_IFACE, "--dev-type", driver,
+         "--daemon", "proto_clean-ovpn",
+         "--writepid", OVPN_PID_FILE,
+         "--log-append", OVPN_LOG])
+    # wait briefly for the daemon to write its pid and create the interface
+    for _ in range(20):
+        time.sleep(0.5)
+        pid = _ovpn_pid()
+        if pid and _pid_alive(pid):
+            ok(state="up", pid=pid, driver=driver, iface=OVPN_IFACE)
+            return
+    verb_ovpn_down()
+    fail("openvpn daemon did not start (see " + OVPN_LOG + ")")
+
+
+def verb_ovpn_down() -> None:
+    pid = _ovpn_pid()
+    if _pid_alive(pid):
+        try:
+            os.kill(pid, 15)
+        except OSError:
+            pass
+        for _ in range(20):
+            if not _pid_alive(pid):
+                break
+            time.sleep(0.25)
+        if _pid_alive(pid):
+            try:
+                os.kill(pid, 9)
+            except OSError:
+                pass
+    else:
+        # stale/missing pidfile: target our exact config path only
+        run(["pkill", "-f", OVPN_CONF], check=False)
+    try:
+        os.unlink(OVPN_PID_FILE)
+    except OSError:
+        pass
+    run(["ip", "link", "del", OVPN_IFACE], check=False)
+    ok(state="down")
+
+
+def _ovpn_iface_stats() -> dict:
+    """Stats for the OpenVPN tun/tap interface (Linux sysfs / macOS ifconfig)."""
+    info = {"up": False, "wg_up": False, "latest_handshake": 0,
+            "rx": 0, "tx": 0, "endpoint": "", "tunnel_ip": ""}
+    if DARWIN:
+        p = run(["ifconfig", OVPN_IFACE], check=False)
+        if p.returncode != 0:
+            return info
+        m = re.search(r"inet (\d+\.\d+\.\d+\.\d+)", p.stdout)
+        if not m:
+            return info            # no address yet — still connecting
+        info["tunnel_ip"] = m.group(1)
+    else:
+        if not os.path.exists(f"/sys/class/net/{OVPN_IFACE}"):
+            return info           # interface not created yet
+        p = run(["ip", "-4", "-o", "addr", "show", "dev", OVPN_IFACE],
+                check=False)
+        if p.returncode != 0 or not p.stdout.strip():
+            return info
+        m = re.search(r"inet (\d+\.\d+\.\d+\.\d+)", p.stdout)
+        info["tunnel_ip"] = m.group(1) if m else ""
+        for key in ("rx", "tx"):
+            try:
+                info[key] = int(open(
+                    f"/sys/class/net/{OVPN_IFACE}/statistics/{key}_bytes").read())
+            except (OSError, ValueError):
+                pass
+    # report "handshake = now" while the daemon is alive and addressed, so
+    # the app's liveness check treats it like a completed WG handshake
+    info["up"] = True
+    info["wg_up"] = True
+    info["latest_handshake"] = int(time.time())
+    info["endpoint"] = _ovpn_remote()
+    return info
+
+
+def _ovpn_remote() -> str:
+    try:
+        for line in open(OVPN_CONF, encoding="utf-8"):
+            if line.strip().startswith("remote "):
+                parts = line.split()
+                if len(parts) >= 3:
+                    return f"{parts[1]}:{parts[2]}"
+                return parts[1] if len(parts) > 1 else ""
+    except OSError:
+        pass
+    return ""
+
+
+def _ovpn_status() -> dict:
+    """OpenVPN daemon status; empty dict when it is not running."""
+    if not _pid_alive(_ovpn_pid()):
+        return {}
+    return _ovpn_iface_stats()
+
+
+def verb_status() -> None:
+    if DARWIN:
+        info: dict = {"up": False, "wg_up": False}
+        iface = find_wg_iface()
+        if iface:
+            p = run(["wg", "show", iface, "dump"], check=False)
+            if p.returncode == 0 and p.stdout.strip():
+                lines = p.stdout.strip().splitlines()
+                fields = lines[0].split("\t")
+                info.update(
+                    private_key_present=bool(fields[0]),
+                    public_key=fields[1] if len(fields) > 1 else "",
+                    listen_port=fields[2] if len(fields) > 2 else "",
+                )
+                if len(lines) > 1:
+                    pf = lines[1].split("\t")
+                    if len(pf) >= 8:
+                        info.update(
+                            peer_key=pf[0], endpoint=pf[2], allowed_ips=pf[3],
+                            latest_handshake=int(pf[4] or 0),
+                            rx=int(pf[5] or 0), tx=int(pf[6] or 0),
+                        )
+                info["up"] = True
+                info["wg_up"] = True
+                info["tunnel_ip"] = conf_tunnel_ip()
+                ok(**info)
+                return
+        ovpn = _ovpn_status()
+        if ovpn:
+            ok(**ovpn)
+            return
+        info["tunnel_ip"] = conf_tunnel_ip()
+        ok(**info)
+        return
+
+    p = run(["wg", "show", WG_IFACE, "dump"], check=False)
+    info: dict = {"up": False}
+    if p.returncode == 0 and p.stdout.strip():
+        lines = p.stdout.strip().splitlines()
+        fields = lines[0].split("\t")
+        info.update(
+            private_key_present=bool(fields[0]),
+            public_key=fields[1] if len(fields) > 1 else "",
+            listen_port=fields[2] if len(fields) > 2 else "",
+        )
+        if len(lines) > 1:
+            pf = lines[1].split("\t")
+            # peer: pk, psk, endpoint, allowed-ips, latest-handshake, rx, tx, keepalive
+            if len(pf) >= 8:
+                info.update(
+                    peer_key=pf[0],
+                    endpoint=pf[2],
+                    allowed_ips=pf[3],
+                    latest_handshake=int(pf[4] or 0),
+                    rx=int(pf[5] or 0),
+                    tx=int(pf[6] or 0),
+                )
+        info["up"] = True
+        info["wg_up"] = p.returncode == 0 and bool(p.stdout.strip())
+        info["tunnel_ip"] = conf_tunnel_ip()
+        ok(**info)
+        return
+    # WireGuard is down — maybe the OpenVPN daemon is the active tunnel
+    ovpn = _ovpn_status()
+    if ovpn:
+        ok(**ovpn)
+        return
+    ip_addr = run(["ip", "-4", "-o", "addr", "show", "dev", WG_IFACE], check=False)
+    info["has_addresses"] = bool(ip_addr.stdout.strip())
+    info["wg_up"] = False
+    info["tunnel_ip"] = conf_tunnel_ip()
+    ok(**info)
+
+
+# ---- kill switch ---------------------------------------------------------
+
+
+def verb_ks_on(iface: str, endpoint_ip: str, port: int, allow_lan: bool,
+               proto: str = "udp") -> None:
+    valid_iface(iface)
+    valid_ip(endpoint_ip)
+    if DARWIN:
+        _ks_on_darwin(endpoint_ip, port, allow_lan, proto)
+        return
+    verb_ks_off()
+    for t in (ipt, ip6t):
+        t("-N", CHAIN_KS, check=False)
+        t("-F", CHAIN_KS)
+        t("-A", CHAIN_KS, "-o", "lo", "-j", "ACCEPT")
+        t("-A", CHAIN_KS, "-m", "mark", "--mark", MARK, "-j", "ACCEPT")
+        t("-A", CHAIN_KS, "-o", WG_IFACE, "-j", "ACCEPT")
+        t("-A", CHAIN_KS, "-o", OVPN_IFACE, "-j", "ACCEPT")
+    ipt("-A", CHAIN_KS, "-o", iface, "-p", proto, "-d", endpoint_ip,
+        "--dport", str(port), "-j", "ACCEPT")
+    if allow_lan:
+        for cidr in ("192.168.0.0/16", "172.16.0.0/12"):
+            ipt("-A", CHAIN_KS, "-d", cidr, "-j", "ACCEPT")
+    for t in (ipt, ip6t):
+        t("-A", CHAIN_KS, "-j", "DROP")
+        t("-I", "OUTPUT", "1", "-j", CHAIN_KS)
+    ok(chain=CHAIN_KS, proto=proto)
+
+
+def _ks_on_darwin(endpoint_ip: str, port: int, allow_lan: bool,
+                  proto: str = "udp") -> None:
+    _ks_off_darwin()
+    utun = find_wg_iface()
+    rules = [
+        "pass out quick on lo0 all",
+        f"pass out quick proto {proto} from any to {endpoint_ip} port {port}",
+    ]
+    if utun:
+        rules.insert(1, f"pass out quick on {utun} all")
+    rules.append(f"pass out quick on {OVPN_IFACE} all")
+    if allow_lan:
+        rules += ["pass out quick to 192.168.0.0/16",
+                  "pass out quick to 172.16.0.0/12"]
+    rules.append("block drop out quick all")
+    with open(PF_ANCHOR_FILE, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(rules) + "\n")
+    _ensure_pf_anchor_call()
+    run(["pfctl", "-f", PF_CONF])
+    run(["pfctl", "-a", PF_ANCHOR, "-f", PF_ANCHOR_FILE])
+    info = run(["pfctl", "-s", "info"], check=False)
+    if "Status: Disabled" in info.stdout:
+        run(["pfctl", "-E"], check=False)
+        open(PF_ENABLED_FLAG, "w").write("enabled-by-proto_clean\n")
+    ok(anchor=PF_ANCHOR, iface=utun, proto=proto)
+
+
+def _ensure_pf_anchor_call() -> None:
+    """Insert the Proto Clean anchors into /etc/pf.conf once (marker-guarded).
+
+    pf anchors only evaluate traffic that the main ruleset hands to them, so
+    without this call our rules would never run. The edit is idempotent and
+    fully reverted by ks-off (the original file is backed up first).
+    """
+    text = open(PF_CONF, encoding="utf-8").read() if os.path.exists(PF_CONF) else ""
+    if 'anchor "proto_clean"' in text:
+        return
+    if not os.path.exists(PF_CONF + ".proto_clean-bak"):
+        shutil.copy2(PF_CONF, PF_CONF + ".proto_clean-bak")
+    text = text.rstrip("\n") + (
+        "\n# BEGIN Proto Clean\nanchor \"proto_clean\"\n"
+        "anchor \"proto_clean.v6\"\n# END Proto Clean\n")
+    with open(PF_CONF, "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+
+def verb_ks_off() -> None:
+    if DARWIN:
+        _ks_off_darwin()
+        return
+    for t in (ipt, ip6t):
+        while t("-D", "OUTPUT", "-j", CHAIN_KS, check=False).returncode == 0:
+            pass
+        t("-F", CHAIN_KS, check=False)
+        t("-X", CHAIN_KS, check=False)
+    ok(chain=CHAIN_KS, state="off")
+
+
+def _ks_off_darwin() -> None:
+    run(["pfctl", "-a", PF_ANCHOR, "-F", "all"], check=False)
+    if os.path.exists(PF_CONF):
+        text = open(PF_CONF, encoding="utf-8").read()
+        if "# BEGIN Proto Clean" in text:
+            text = re.sub(r"\n?# BEGIN Proto Clean\n.*?\n# END Proto Clean\n?",
+                          "\n", text, flags=re.S)
+            with open(PF_CONF, "w", encoding="utf-8") as fh:
+                fh.write(text)
+            run(["pfctl", "-f", PF_CONF], check=False)
+    if os.path.exists(PF_ENABLED_FLAG):
+        run(["pfctl", "-d"], check=False)
+        os.unlink(PF_ENABLED_FLAG)
+    ok(anchor=PF_ANCHOR, state="off")
+
+
+# ---- DNS redirect to local blocker ---------------------------------------
+
+
+def verb_dns_on(uid: int) -> None:
+    valid_uid(str(uid))
+    if DARWIN:
+        _dns_on_darwin(uid)
+        return
+    verb_dns_off()
+    for t in (ipt, ip6t):
+        t("-t", "nat", "-N", CHAIN_DNS, check=False)
+        t("-t", "nat", "-F", CHAIN_DNS)
+        t("-t", "nat", "-A", CHAIN_DNS, "-m", "owner",
+          "--uid-owner", str(uid), "-j", "RETURN")
+        t("-t", "nat", "-A", CHAIN_DNS, "-p", "udp", "--dport", "53",
+          "-j", "REDIRECT", "--to-ports", "5353")
+        t("-t", "nat", "-A", CHAIN_DNS, "-p", "tcp", "--dport", "53",
+          "-j", "REDIRECT", "--to-ports", "5353")
+        t("-t", "nat", "-I", "OUTPUT", "1", "-j", CHAIN_DNS)
+    ok(chain=CHAIN_DNS, port=5353)
+
+
+def _primary_service() -> str:
+    """networksetup service name of the default-route interface."""
+    p = run(["route", "-n", "get", "default"], check=False)
+    iface = ""
+    for line in p.stdout.splitlines():
+        f = line.split()
+        if len(f) >= 2 and f[0] == "interface:":
+            iface = f[1]
+    if not iface:
+        return ""
+    out = run(["networksetup", "-listnetworkserviceorder"],
+              check=False).stdout
+    blocks = out.split("\n\n")
+    for block in blocks:
+        if f"Device: {iface}" in block:
+            m = re.search(r"\(\d+\)\s+(.+)", block)
+            if m:
+                return m.group(1).strip()
+    return ""
+
+
+def _detach_stdio() -> None:
+    """Redirect stdio to /dev/null so forked daemons do not hold the pipe
+    open — otherwise the caller's subprocess.run(capture_output=True) blocks
+    until the daemon exits."""
+    devnull = os.open(os.devnull, os.O_RDWR)
+    for fd in (0, 1, 2):
+        os.dup2(devnull, fd)
+    if devnull > 2:
+        os.close(devnull)
+
+
+def _dns_on_darwin(uid: int) -> None:
+    verb_dns_off()
+    service = _primary_service()
+    pid = os.fork()
+    if pid == 0:  # relay child: bind :53 as root, then drop to the app user
+        try:
+            os.setsid()
+            _detach_stdio()
+            udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            udp.bind(DNS_RELAY_FROM)
+            tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            tcp.bind(DNS_RELAY_FROM)
+            tcp.listen(8)
+            os.setgroups([])
+            os.setgid(uid)
+            os.setuid(uid)
+            _relay_serve(udp, tcp)
+        except Exception:  # noqa: BLE001
+            os._exit(1)
+        os._exit(0)
+    with open(DNS_RELAY_PID, "w") as fh:
+        fh.write(str(pid))
+    if service:
+        with open(DNS_SERVICE_FILE, "w") as fh:
+            fh.write(service)
+        run(["networksetup", "-setdnsservers", service, "127.0.0.1"])
+    ok(relay_pid=pid, service=service or "unknown")
+
+
+def _relay_serve(udp: socket.socket, tcp: socket.socket) -> None:
+    """Tiny root-started relay 127.0.0.1:53 -> 127.0.0.1:5353 (UDP + TCP)."""
+    import threading
+
+    def udp_loop():
+        while True:
+            try:
+                wire, addr = udp.recvfrom(4096)
+                fwd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                fwd.settimeout(5)
+                fwd.sendto(wire, DNS_RELAY_TO)
+                reply, _ = fwd.recvfrom(4096)
+                udp.sendto(reply, addr)
+                fwd.close()
+            except OSError:
+                continue
+
+    def pipe(a: socket.socket, b: socket.socket):
+        try:
+            while True:
+                data = a.recv(4096)
+                if not data:
+                    break
+                b.sendall(data)
+        except OSError:
+            pass
+        finally:
+            try:
+                a.close()
+                b.close()
+            except OSError:
+                pass
+
+    def tcp_loop():
+        while True:
+            try:
+                conn, _ = tcp.accept()
+            except OSError:
+                continue
+            upstream = socket.create_connection(DNS_RELAY_TO, timeout=5)
+            threading.Thread(target=pipe, args=(conn, upstream), daemon=True).start()
+            threading.Thread(target=pipe, args=(upstream, conn), daemon=True).start()
+
+    threading.Thread(target=tcp_loop, daemon=True).start()
+    udp_loop()
+
+
+def verb_dns_off() -> None:
+    if DARWIN:
+        if os.path.exists(DNS_RELAY_PID):
+            try:
+                pid = int(open(DNS_RELAY_PID).read().strip())
+                os.kill(pid, 15)
+            except (OSError, ValueError):
+                pass
+            os.unlink(DNS_RELAY_PID)
+        if os.path.exists(DNS_SERVICE_FILE):
+            service = open(DNS_SERVICE_FILE).read().strip()
+            if service:
+                run(["networksetup", "-setdnsservers", service, "Empty"],
+                    check=False)
+            os.unlink(DNS_SERVICE_FILE)
+        ok(state="off")
+        return
+    for t in (ipt, ip6t):
+        while t("-t", "nat", "-D", "OUTPUT", "-j", CHAIN_DNS, check=False).returncode == 0:
+            pass
+        t("-t", "nat", "-F", CHAIN_DNS, check=False)
+        t("-t", "nat", "-X", CHAIN_DNS, check=False)
+    ok(chain=CHAIN_DNS, state="off")
+
+
+# ---- IPv6 leak protection ------------------------------------------------
+
+
+def verb_v6_on() -> None:
+    """Block IPv6 that would bypass the tunnel (works with or without the
+    kill switch). IPv6 inside the tunnel (WireGuard's proto_clean iface or the
+    OpenVPN tun/tap) and split-tunnel bypass traffic stay allowed."""
+    if DARWIN:
+        _v6_on_darwin()
+        return
+    verb_v6_off()
+    ip6t("-N", CHAIN_V6, check=False)
+    ip6t("-F", CHAIN_V6)
+    ip6t("-A", CHAIN_V6, "-o", "lo", "-j", "ACCEPT")
+    ip6t("-A", CHAIN_V6, "-m", "mark", "--mark", MARK, "-j", "ACCEPT")
+    ip6t("-A", CHAIN_V6, "-o", WG_IFACE, "-j", "ACCEPT")
+    ip6t("-A", CHAIN_V6, "-o", OVPN_IFACE, "-j", "ACCEPT")
+    ip6t("-A", CHAIN_V6, "-j", "DROP")
+    ip6t("-I", "OUTPUT", "1", "-j", CHAIN_V6)
+    ok(chain=CHAIN_V6)
+
+
+def _v6_on_darwin() -> None:
+    rules = [
+        "pass out quick on lo0 inet6 all",
+        f"pass out quick on {OVPN_IFACE} inet6 all",
+        "block drop out quick inet6 all",
+    ]
+    with open(PF_V6_ANCHOR_FILE, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(rules) + "\n")
+    _ensure_pf_anchor_call()
+    run(["pfctl", "-f", PF_CONF], check=False)
+    run(["pfctl", "-a", PF_V6_ANCHOR, "-f", PF_V6_ANCHOR_FILE])
+    info = run(["pfctl", "-s", "info"], check=False)
+    if "Status: Disabled" in info.stdout:
+        run(["pfctl", "-E"], check=False)
+        open(PF_ENABLED_FLAG, "w").write("enabled-by-proto_clean\n")
+    ok(anchor=PF_V6_ANCHOR)
+
+
+def verb_v6_off() -> None:
+    if DARWIN:
+        run(["pfctl", "-a", PF_V6_ANCHOR, "-F", "all"], check=False)
+        ok(anchor=PF_V6_ANCHOR, state="off")
+        return
+    while ip6t("-D", "OUTPUT", "-j", CHAIN_V6, check=False).returncode == 0:
+        pass
+    ip6t("-F", CHAIN_V6, check=False)
+    ip6t("-X", CHAIN_V6, check=False)
+    ok(chain=CHAIN_V6, state="off")
+
+
+# ---- split tunnel (exclude apps) -----------------------------------------
+
+
+def verb_split_on(iface: str, gw: str) -> None:
+    if DARWIN:
+        # Per-app routing needs kernel support macOS does not give user
+        # space; destination exclusions are portable and live in the config.
+        valid_iface(iface)
+        ok(state="config-based", note="excluded CIDRs are removed from "
+                                      "AllowedIPs in the tunnel config")
+        return
+    valid_iface(iface)
+    valid_ip(gw)
+    verb_split_off()
+    cgroup_ensure()
+    # Mark packets originating from the split cgroup.
+    ipt("-t", "mangle", "-N", CHAIN_ST, check=False)
+    ipt("-t", "mangle", "-F", CHAIN_ST)
+    ipt("-t", "mangle", "-A", CHAIN_ST, "-m", "cgroup", "--path", "proto_clean_split",
+        "-j", "MARK", "--set-mark", MARK)
+    ipt("-t", "mangle", "-I", "OUTPUT", "1", "-j", CHAIN_ST)
+    # Route marked packets via a table that keeps the original gateway.
+    subnet = link_subnet(iface)
+    run(["ip", "route", "replace", subnet, "dev", iface, "table", TABLE]) if subnet else None
+    run(["ip", "route", "replace", "default", "via", gw, "dev", iface, "table", TABLE])
+    run(["ip", "rule", "del", "fwmark", MARK, "table", TABLE], check=False)
+    run(["ip", "rule", "add", "fwmark", MARK, "table", TABLE, "priority", "100"])
+    ok(table=TABLE, mark=MARK)
+
+
+def verb_split_off() -> None:
+    if DARWIN:
+        ok(state="off")
+        return
+    while ipt("-t", "mangle", "-D", "OUTPUT", "-j", CHAIN_ST, check=False).returncode == 0:
+        pass
+    ipt("-t", "mangle", "-F", CHAIN_ST, check=False)
+    ipt("-t", "mangle", "-X", CHAIN_ST, check=False)
+    run(["ip", "rule", "del", "fwmark", MARK, "table", TABLE], check=False)
+    run(["ip", "route", "flush", "table", TABLE], check=False)
+    ok(state="off")
+
+
+def link_subnet(iface: str) -> str | None:
+    p = run(["ip", "-4", "-o", "route", "show", "dev", iface, "scope", "link"], check=False)
+    for line in p.stdout.splitlines():
+        parts = line.split()
+        if parts and "/" in parts[0]:
+            return parts[0]
+    return None
+
+
+def cgroup_ensure() -> str:
+    if DARWIN:
+        ok(cgroup="n/a")
+        return ""
+    if not os.path.isdir("/sys/fs/cgroup/cgroup.controllers"):
+        fail("cgroup v2 unified hierarchy not mounted at /sys/fs/cgroup")
+    os.makedirs(CGROUP, exist_ok=True)
+    return CGROUP
+
+
+def verb_split_add_pid(pid: str) -> None:
+    if DARWIN:
+        fail("per-app split tunneling is not supported on macOS — exclude "
+             "destination ranges instead")
+    try:
+        pid_i = int(pid)
+    except ValueError:
+        fail("invalid pid")
+    if pid_i <= 1:
+        fail("refusing to move pid <= 1")
+    cgroup_ensure()
+    try:
+        with open(os.path.join(CGROUP, "cgroup.procs"), "w") as fh:
+            fh.write(pid)
+    except OSError as e:
+        fail(f"could not move pid into cgroup: {e}")
+    ok(moved=pid_i)
+
+
+def verb_split_launch(uid: int, gid: int, cmd: list) -> None:
+    if DARWIN:
+        fail("per-app split tunneling is not supported on macOS — exclude "
+             "destination ranges instead")
+    valid_uid(str(uid))
+    valid_uid(str(gid))
+    if not cmd or not cmd[0].startswith("/"):
+        fail("command must be an absolute path")
+    cgroup_ensure()
+    for part in cmd:
+        if not PATH_RE.match(part):
+            fail(f"bad command token {part!r}")
+    pid = os.fork()
+    if pid == 0:  # child
+        try:
+            _detach_stdio()
+            with open(os.path.join(CGROUP, "cgroup.procs"), "w") as fh:
+                fh.write(str(os.getpid()))
+            os.setgroups([])
+            os.setgid(gid)
+            os.setuid(uid)
+            os.execv(cmd[0], cmd)
+        except Exception:
+            os._exit(127)
+    ok(launched=pid)
+
+
+def main() -> None:
+    args = sys.argv[1:]
+    if not args:
+        fail("no verb given")
+    verb, rest = args[0], args[1:]
+    try:
+        if verb == "install-config" and len(rest) == 1:
+            verb_install_config(rest[0])
+        elif verb == "tunnel-up" and not rest:
+            verb_tunnel_up()
+        elif verb == "tunnel-down" and not rest:
+            verb_tunnel_down()
+        elif verb == "ovpn-install-config" and len(rest) == 1:
+            verb_ovpn_install_config(rest[0])
+        elif verb == "ovpn-up" and len(rest) == 1:
+            verb_ovpn_up(rest[0])
+        elif verb == "ovpn-down" and not rest:
+            verb_ovpn_down()
+        elif verb == "status" and not rest:
+            verb_status()
+        elif verb == "ks-on" and len(rest) in (4, 5):
+            proto = valid_proto(rest[4]) if len(rest) == 5 else "udp"
+            verb_ks_on(valid_iface(rest[0]), valid_ip(rest[1]),
+                       valid_port(rest[2]), rest[3] == "1", proto)
+        elif verb == "ks-off" and not rest:
+            verb_ks_off()
+        elif verb == "v6-on" and not rest:
+            verb_v6_on()
+        elif verb == "v6-off" and not rest:
+            verb_v6_off()
+        elif verb == "dns-on" and len(rest) == 1:
+            verb_dns_on(valid_uid(rest[0]))
+        elif verb == "dns-off" and not rest:
+            verb_dns_off()
+        elif verb == "split-on" and len(rest) == 2:
+            verb_split_on(rest[0], rest[1])
+        elif verb == "split-off" and not rest:
+            verb_split_off()
+        elif verb == "split-add-pid" and len(rest) == 1:
+            verb_split_add_pid(rest[0])
+        elif verb == "split-launch" and len(rest) >= 3 and rest[2] == "--":
+            # wire format: split-launch UID GID -- CMD… (see usage above)
+            verb_split_launch(valid_uid(rest[0]), valid_uid(rest[1]), rest[3:])
+        elif verb == "cgroup-ensure" and not rest:
+            cgroup_ensure()
+        else:
+            fail(f"unknown verb or bad arguments: {verb}")
+    except RuntimeError as e:
+        fail(str(e))
+    except Exception as e:  # noqa: BLE001
+        fail(f"unexpected error: {e}")
+
+
+if __name__ == "__main__":
+    main()

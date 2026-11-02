@@ -2,7 +2,7 @@
 
 import pytest
 
-from proton_clean.helper_win import WinHelperError, validate_call, execute
+from proto_clean.helper_win import WinHelperError, validate_call, execute
 
 
 def _args(verb, *args):
@@ -31,7 +31,7 @@ def test_v6_verbs_in_whitelist():
 def test_ovpn_verbs_validate_but_refuse_to_execute():
     _args("ovpn-up", "tun")
     _args("ovpn-up", "tap")
-    _args("ovpn-install-config", "C:/somewhere/proton_clean.ovpn")
+    _args("ovpn-install-config", "C:/somewhere/proto_clean.ovpn")
     _args("ovpn-down")
     with pytest.raises(WinHelperError):
         _args("ovpn-up", "vEthernet")

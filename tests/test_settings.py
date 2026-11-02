@@ -1,6 +1,6 @@
 import json
 
-from proton_clean import settings as S
+from proto_clean import settings as S
 
 
 def test_defaults_roundtrip(tmp_path, monkeypatch):

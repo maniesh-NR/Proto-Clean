@@ -1,11 +1,11 @@
 """Generate the deliverable preview images for the new settings UI.
 
 Produces (into download/):
-  proton_clean-settings-protocol-wireguard.png  Protocol tab, WireGuard selected
-  proton_clean-settings-protocol-openvpn.png    Protocol tab, OpenVPN selected
-  proton_clean-settings-advanced.png            Advanced tab (defaults)
-  proton_clean-settings-appearance.png          Appearance tab (theme options)
-  proton_clean-settings-preview.png             Advanced tab (legacy name kept)
+  proto_clean-settings-protocol-wireguard.png  Protocol tab, WireGuard selected
+  proto_clean-settings-protocol-openvpn.png    Protocol tab, OpenVPN selected
+  proto_clean-settings-advanced.png            Advanced tab (defaults)
+  proto_clean-settings-appearance.png          Appearance tab (theme options)
+  proto_clean-settings-preview.png             Advanced tab (legacy name kept)
 
 QT_QPA_PLATFORM=offscreen python scripts/make_deliverable_previews.py
 """
@@ -18,10 +18,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QTabWidget  # noqa: E402
 
-from proton_clean.controller import Controller  # noqa: E402
-from proton_clean.settings import update, load_settings  # noqa: E402
-from proton_clean.ui.settings_dialog import SettingsDialog  # noqa: E402
-from proton_clean.ui.theme import apply_theme  # noqa: E402
+from proto_clean.controller import Controller  # noqa: E402
+from proto_clean.settings import update, load_settings  # noqa: E402
+from proto_clean.ui.settings_dialog import SettingsDialog  # noqa: E402
+from proto_clean.ui.theme import apply_theme  # noqa: E402
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(__file__), "..", "..", "download")
@@ -63,14 +63,14 @@ update(**{
 })
 assert load_settings().protocol.protocol == "wireguard"
 
-snapshot("wireguard", "Protocol", "proton_clean-settings-protocol-wireguard.png")
-snapshot("openvpn", "Protocol", "proton_clean-settings-protocol-openvpn.png")
-snapshot("wireguard", "Advanced", "proton_clean-settings-advanced.png")
-snapshot("wireguard", "Appearance", "proton_clean-settings-appearance.png")
+snapshot("wireguard", "Protocol", "proto_clean-settings-protocol-wireguard.png")
+snapshot("openvpn", "Protocol", "proto_clean-settings-protocol-openvpn.png")
+snapshot("wireguard", "Advanced", "proto_clean-settings-advanced.png")
+snapshot("wireguard", "Appearance", "proto_clean-settings-appearance.png")
 
 import shutil  # noqa: E402
-shutil.copy(os.path.join(OUT, "proton_clean-settings-advanced.png"),
-            os.path.join(OUT, "proton_clean-settings-preview.png"))
+shutil.copy(os.path.join(OUT, "proto_clean-settings-advanced.png"),
+            os.path.join(OUT, "proto_clean-settings-preview.png"))
 print("legacy preview refreshed")
 
 controller.shutdown()

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Proton Clean installer — run:  bash scripts/install.sh
+# Proto Clean installer — run:  bash scripts/install.sh
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HELPER_SRC="$HERE/helper/proton-clean-helper"
-HELPER_DST="/usr/local/bin/proton-clean-helper"
+HELPER_SRC="$HERE/helper/proto-clean-helper"
+HELPER_DST="/usr/local/bin/proto-clean-helper"
 
 log()  { printf '\033[1;32m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m ->\033[0m %s\n' "$*"; }
@@ -57,7 +57,7 @@ log "Installing the privileged helper…"
 sudo install -m 0755 "$HELPER_SRC" "$HELPER_DST"
 
 log "Creating the sudoers entry (passwordless, limited to the helper)…"
-SUDOERS_FILE="/etc/sudoers.d/proton-clean"
+SUDOERS_FILE="/etc/sudoers.d/proto-clean"
 echo "$USER ALL=(root) NOPASSWD: $HELPER_DST" | sudo tee "$SUDOERS_FILE" >/dev/null
 sudo chmod 0440 "$SUDOERS_FILE"
 sudo visudo -cf "$SUDOERS_FILE" >/dev/null || {
@@ -67,24 +67,24 @@ sudo visudo -cf "$SUDOERS_FILE" >/dev/null || {
 # ---------------------------------------------------------------- desktop entry
 log "Installing desktop entry + app icon…"
 mkdir -p "$HOME/.local/share/applications" "$HOME/.local/share/icons/hicolor/512x512/apps"
-if [ -f "$ROOT/packaging/linux/proton-clean.png" ]; then
-    cp "$ROOT/packaging/linux/proton-clean.png" \
-       "$HOME/.local/share/icons/hicolor/512x512/apps/proton-clean.png"
+if [ -f "$ROOT/packaging/linux/proto-clean.png" ]; then
+    cp "$ROOT/packaging/linux/proto-clean.png" \
+       "$HOME/.local/share/icons/hicolor/512x512/apps/proto-clean.png"
 else
-    warn "packaging/linux/proton-clean.png missing — desktop entry falls back to a generic icon"
+    warn "packaging/linux/proto-clean.png missing — desktop entry falls back to a generic icon"
 fi
-cat > "$HOME/.local/share/applications/proton-clean.desktop" <<EOF
+cat > "$HOME/.local/share/applications/proto-clean.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Proton Clean
+Name=Proto Clean
 Comment=Independent VPN client for Proton accounts (WireGuard / OpenVPN)
-Exec=python3 -m proton_clean
-Icon=proton-clean
+Exec=python3 -m proto_clean
+Icon=proto-clean
 Categories=Network;
 StartupNotify=true
 EOF
 
-log "Done. Start with:  python3 -m proton_clean"
+log "Done. Start with:  python3 -m proto_clean"
 warn "First launch: Settings → Account → enter your Proton credentials."
 warn "The sudoers entry grants your user passwordless access to the helper"
 warn "binary ONLY — review $SUDOERS_FILE any time."
