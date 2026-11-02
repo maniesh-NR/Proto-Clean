@@ -74,7 +74,7 @@ jobs:
       - name: Build the Flatpak bundle
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
           # vendor wheels for the runtime's Python (24.08 = py3.12) so the
           # flatpak build sandbox needs no network; the runner's default
           # python (3.13) would vendor cp313-only deps like greenlet
