@@ -6,6 +6,7 @@
 # for distribution: codesign --deep --options runtime --sign "Developer ID
 # Application: …" dist/Proto Clean.app)
 
+import os
 import sys
 from PyInstaller.utils.hooks import collect_submodules
 
@@ -39,6 +40,9 @@ exe = EXE(
     upx=False,
     console=False,                 # .app bundle, GUI only
     icon=None,
+    # cross-arch slice for the Catalina build (x86_64 from a universal2
+    # Python on an arm64 runner); empty = native
+    target_arch=os.environ.get("PROTO_TARGET_ARCH") or None,
 )
 
 coll = COLLECT(

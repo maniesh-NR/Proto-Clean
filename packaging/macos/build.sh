@@ -21,13 +21,10 @@ command -v python3 >/dev/null || { echo "python3 required"; exit 1; }
 python3 -m pip install --user -q -r requirements.txt pyinstaller 2>/dev/null \
   || python3 -m pip install -q -r requirements.txt pyinstaller
 
-if [ -n "${PROTO_TARGET_ARCH:-}" ]; then
-  export ARCH_FLAG="--target-arch=${PROTO_TARGET_ARCH}"
-else
-  export ARCH_FLAG=""
-fi
-python3 -m PyInstaller --noconfirm --clean $ARCH_FLAG \
-  packaging/macos/proto-clean.spec
+# PROTO_TARGET_ARCH is read by the spec (PyInstaller rejects
+# --target-arch on the command line when a .spec file is given)
+export PROTO_TARGET_ARCH
+python3 -m PyInstaller --noconfirm --clean packaging/macos/proto-clean.spec
 
 # Wrap the onedir build into a proper .app bundle
 APP="dist/Proto Clean.app"

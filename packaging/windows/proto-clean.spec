@@ -37,13 +37,22 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
-    name="ProtoClean",
+    exclude_binaries=True,          # onedir: COLLECT below assembles
+    name="ProtoClean",              # dist/ProtoClean/ProtoClean.exe
     debug=False,
     strip=False,
     upx=False,
-    console=False,                 # GUI app (PySide6)
-    icon=os.path.join(SPECPATH, "proto-clean.ico"),  # teal-free emblem .ico
+    console=False,                  # GUI app (PySide6)
+    icon=os.path.join(SPECPATH, "proto-clean.ico"),
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name="ProtoClean",
 )

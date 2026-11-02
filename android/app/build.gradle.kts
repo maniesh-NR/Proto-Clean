@@ -18,10 +18,10 @@ android {
     // Per-ABI APKs (armv7 + arm64) as requested for the release matrix.
     splits {
         abi {
-            enable = true
+            isEnable = true
             reset()
             include("armeabi-v7a", "arm64-v8a")
-            universalApk = false
+            isUniversalApk = false
         }
     }
 
