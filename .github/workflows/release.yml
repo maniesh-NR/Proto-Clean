@@ -88,9 +88,10 @@ jobs:
           flatpak-builder --user --install-deps-from=flathub \
             --force-clean --repo=/tmp/pc-repo /tmp/pc-build \
             app.protoclean.ProtoClean.json
+          # flatpak-builder commits to the "master" branch by default
           flatpak build-bundle /tmp/pc-repo \
             "../../dist/Proto-Clean-${VERSION}-x86_64.flatpak" \
-            app.protoclean.ProtoClean stable
+            app.protoclean.ProtoClean master
 
       - uses: actions/upload-artifact@v4
         with:
