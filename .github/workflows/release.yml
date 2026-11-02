@@ -8,48 +8,97 @@ on:
 permissions:
   contents: write
 
+env:
+  VERSION: 0.2.0
+
 jobs:
   # ------------------------------------------------------------- Linux
+  # Built on Ubuntu 22.04 (glibc 2.35) so the binaries run on every
+  # current Linux Mint base: 21.x (jammy), 22.x (noble) and LMDE 6.
   linux:
-    name: Linux (tar.gz + deb)
+    name: Linux (portable + debs + flatpak)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install build deps
+      - name: Build onedir in Ubuntu 22.04 (oldest current Mint base)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
-
-      - name: Build onedir bundle
-        run: bash packaging/linux/build.sh
-
-      - name: Build Debian package
-        run: bash packaging/linux/makedeb.sh
-
-      - name: Tar the portable bundle
+          docker run --rm -v "$PWD":/src -w /src ubuntu:22.04 bash -exc '
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -y --no-install-recommends \
+              python3 python3-pip libegl1 libgl1 libxkbcommon0
+            python3 -m pip install -q -U pip
+            python3 -m pip install -q -r requirements.txt pyinstaller
+            python3 -m PyInstaller --noconfirm --clean \
+              --name proto-clean --windowed --onedir \
+              --paths . \
+              --hidden-import proto_clean.platforms.linux \
+              --hidden-import dnslib \
+              proto_clean/__main__.py
+            dist/proto-clean/proto-clean --version'
+      - name: Smoke-test the onedir on Mint 21 base (jammy)
         run: |
-          tar czf "dist/Proto-Clean-${VERSION}-linux-x86_64.tar.gz" -C dist proto-clean
-        env:
-          VERSION: 0.1.0
+          docker run --rm -v "$PWD":/src -w /src ubuntu:22.04 bash -exc '
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -y --no-install-recommends libegl1 libgl1 libxkbcommon0
+            dist/proto-clean/proto-clean --version'
+
+      - name: Portable tar.gz
+        run: |
+          tar czf "Proto-Clean-${VERSION}-linux-x86_64-portable.tar.gz" -C dist proto-clean
+
+      - name: Build a deb for every current Mint base
+        run: |
+          for base in ubuntu:22.04 ubuntu:24.04 debian:bookworm; do
+            case "$base" in
+              ubuntu:22.04)      short="mint21-ubuntu22.04" ;;
+              ubuntu:24.04)      short="mint22-ubuntu24.04" ;;
+              debian:bookworm)   short="debian12" ;;
+            esac
+            # build the package *inside* each base so its toolchain,
+            # dependencies and metadata come from that distro
+            docker run --rm -v "$PWD":/src -w /src \
+              -e PROTO_CLEAN_VERSION="$VERSION" "$base" bash -exc '
+                export DEBIAN_FRONTEND=noninteractive
+                apt-get update -qq
+                bash packaging/linux/makedeb.sh'
+            mv "dist/proto-clean_${VERSION}-1_amd64.deb" \
+               "dist/proto-clean_${VERSION}-${short}_amd64.deb"
+          done
+          ls -la dist/*.deb
+
+      - name: Build the Flatpak bundle
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+          # vendor wheels so the flatpak build sandbox needs no network;
+          # they land in ./wheels which the manifest's dir-source copies in
+          pip download --dest wheels PySide6 shiboken6 playwright dnslib httpx keyring
+          pip wheel --no-deps -w wheels .
+          cd packaging/flatpak
+          flatpak --user remote-add --if-not-exists flathub \
+            https://flathub.org/repo/flathub.flatpakrepo || true
+          flatpak-builder --user --install-deps-from=flathub \
+            --force-clean --repo=/tmp/pc-repo /tmp/pc-build \
+            app.protoclean.ProtoClean.json
+          flatpak build-bundle /tmp/pc-repo \
+            "../../dist/Proto-Clean-${VERSION}-x86_64.flatpak" \
+            app.protoclean.ProtoClean stable
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-installers
           path: |
+            dist/*.tar.gz
             dist/*.deb
-            dist/Proto-Clean-*-linux-x86_64.tar.gz
+            dist/*.flatpak
           if-no-files-found: error
 
-  # ------------------------------------------------------------- Windows
-  windows:
-    name: Windows 10/11 (zip)
+  # ------------------------------------------------------------ Windows
+  windows-modern:
+    name: Windows 10/11 x64 (portable + setup)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,79 +112,179 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
 
-      - name: Build exe
+      - name: Build exe (portable)
         run: python -m PyInstaller --noconfirm --clean packaging/windows/proto-clean.spec
 
-      - name: Package zip
+      - name: Zip the portable build
         shell: pwsh
         run: |
           Copy-Item packaging/windows/proto-clean.ico dist/
           @'
-          Proto Clean 0.1.0 — Windows 10/11 (64-bit)
-          ========================================
+          Proto Clean 0.2.0 — Windows 10/11 (64-bit, portable)
+          =====================================================
 
-          Install
-          -------
-          1. Copy ProtoClean.exe anywhere you like (e.g. C:\Program Files\Proto Clean\)
-             and run it (right-click -> Run as administrator is NOT required;
+          1. Extract anywhere and run ProtoClean.exe
+             (right-click -> Run as administrator is NOT required;
              privileged verbs elevate one batch at a time via UAC).
           2. Install WireGuard for Windows:  https://download.wireguard.com/windows/
-             (wg.exe / wireguard.exe must be on PATH or in C:\Program Files\WireGuard)
-          3. First launch downloads a Playwright Chromium for the backend-browser
-             login. Pre-seed it with:  python -m playwright install chromium
+          3. Optional Xray proxy (VLESS REALITY / Trojan):
+             install Xray-core and put xray.exe on PATH — see README.
+          4. First launch downloads a Playwright Chromium for the
+             backend-browser login.
 
-          Notes
-          -----
-          * OpenVPN is WireGuard-only on Windows by design (no bundled TAP
-            driver); Settings -> Protocol shows WireGuard.
-          * Split tunneling on Windows uses IP-range exclusions (per-app
-            exclusion would need a WFP driver).
-          * The exe is not code-signed (self-published project) — SmartScreen
-            may ask for confirmation on first run (More info -> Run anyway).
+          For Windows 7/8 or 32-bit Windows use the -win7- builds instead.
           '@ | Set-Content dist/README-WINDOWS.txt
-          Compress-Archive -Path dist/ProtoClean.exe, dist/README-WINDOWS.txt, `
-            dist/proto-clean.ico -DestinationPath dist/Proto-Clean-0.1.0-win64.zip -Force
+          Compress-Archive -Path dist/ProtoClean, dist/README-WINDOWS.txt, `
+            dist/proto-clean.ico -DestinationPath `
+            "dist/Proto-Clean-0.2.0-win-x64-portable.zip" -Force
+
+      - name: Build the Inno Setup installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            packaging/windows/installer.iss
 
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-installer
-          path: dist/Proto-Clean-*-win64.zip
+          name: windows-modern
+          path: |
+            dist/*-portable.zip
+            dist/*-setup.exe
           if-no-files-found: error
 
-  # ------------------------------------------------------------- macOS
-  macos:
-    name: macOS (.app zip)
-    runs-on: macos-latest
+  windows-legacy:
+    name: Windows 7+ ${{ matrix.arch }} (portable, Qt5)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86,  installer: python-3.8.10.exe,       bindir: "py38-x86" }
+          - { arch: x64,  installer: python-3.8.10-amd64.exe, bindir: "py38-x64" }
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install build deps
+      - name: Install Python 3.8 (last line with Windows 7 support)
+        shell: pwsh
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          $url = "https://www.python.org/ftp/python/3.8.10/${{ matrix.installer }}"
+          Invoke-WebRequest -Uri $url -OutFile py38.exe
+          Start-Process -Wait -FilePath .\py38.exe -ArgumentList `
+            "/quiet InstallAllUsers=1 TargetDir=C:\${{ matrix.bindir }}"
+          C:\${{ matrix.bindir }}\python.exe --version
+          C:\${{ matrix.bindir }}\python.exe -m pip install --upgrade pip
 
-      - name: Build .app bundle
-        run: bash packaging/macos/build.sh
-
-      - name: Zip the bundle
+      - name: Install build deps (PySide2 / Qt 5.15)
+        shell: pwsh
         run: |
-          cd dist
-          zip -qry "Proto-Clean-0.1.0-macos.zip" "Proto Clean.app"
-          cd ..
+          C:\${{ matrix.bindir }}\python.exe -m pip install `
+            -r packaging/windows/requirements-legacy.txt `
+            PyInstaller==5.13.2
+
+      - name: Build exe
+        shell: pwsh
+        run: |
+          C:\${{ matrix.bindir }}\python.exe -m PyInstaller --noconfirm `
+            --clean packaging/windows/proto-clean-legacy.spec
+
+      - name: Zip the portable build
+        shell: pwsh
+        run: |
+          Copy-Item packaging/windows/proto-clean.ico dist/
+          @'
+          Proto Clean 0.2.0 — Windows 7 and up (${{ matrix.arch }}, portable)
+          ===================================================================
+
+          1. Extract anywhere and run ProtoClean.exe
+          2. Install WireGuard for Windows:  https://download.wireguard.com/windows/
+          3. Optional Xray proxy (VLESS REALITY / Trojan):
+             install Xray-core and put xray.exe on PATH — see README.
+
+          Legacy build: Python 3.8 + Qt 5.15 (PySide2) — the last Qt line
+          supporting Windows 7 and 32-bit Windows. The modern Windows 10/11
+          x64 build uses Qt 6.
+          '@ | Set-Content dist/README-WINDOWS.txt
+          Compress-Archive -Path dist/ProtoClean, dist/README-WINDOWS.txt, `
+            dist/proto-clean.ico -DestinationPath `
+            "dist/Proto-Clean-0.2.0-win7-${{ matrix.arch }}-portable.zip" -Force
 
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-installer
-          path: dist/Proto-Clean-*-macos.zip
+          name: windows-legacy-${{ matrix.arch }}
+          path: dist/*-portable.zip
+          if-no-files-found: error
+
+  # --------------------------------------------------------------- macOS
+  macos:
+    name: macOS ${{ matrix.variant }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Catalina (10.15) build: universal2 Python 3.10 + Qt 6.2
+          # (last Qt 6 line that runs on 10.14+), sliced to x86_64.
+          - variant: "10.15-catalina-x86_64"
+            target_arch: x86_64
+            min_ver: "10.15"
+          # Apple Silicon build (macOS 11+): native arm64, modern Qt 6.
+          - variant: "11.0-arm64"
+            target_arch: ""
+            min_ver: "11.0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: matrix.target_arch == ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install universal2 Python 3.10 (Catalina build)
+        if: matrix.target_arch == 'x86_64'
+        run: |
+          curl -fsSLO https://www.python.org/ftp/python/3.10.11/python-3.10.11-macos11.pkg
+          sudo installer -pkg python-3.10.11-macos11.pkg -target /
+          /Library/Frameworks/Python.framework/Versions/3.10/bin/python3.10 --version
+          /Library/Frameworks/Python.framework/Versions/3.10/bin/python3.10 -m pip install --upgrade pip
+
+      - name: Install build deps
+        run: |
+          if [ -n "${{ matrix.target_arch }}" ]; then
+            PYBIN=/Library/Frameworks/Python.framework/Versions/3.10/bin
+            "$PYBIN/python3.10" -m pip install \
+              -r packaging/macos/requirements-legacy.txt PyInstaller==5.13.2
+            # the Catalina build swaps the app requirements to the legacy
+            # stack (PySide6 6.2.4, universal2) for packaging/macos/build.sh
+            cp packaging/macos/requirements-legacy.txt requirements.txt
+          else
+            python3 -m pip install -r requirements.txt pyinstaller
+          fi
+
+      - name: Build .app
+        run: |
+          export MACOS_MIN_SYSTEM_VERSION="${{ matrix.min_ver }}"
+          export PROTO_TARGET_ARCH="${{ matrix.target_arch }}"
+          if [ -n "$PROTO_TARGET_ARCH" ]; then
+            export PATH="/Library/Frameworks/Python.framework/Versions/3.10/bin:$PATH"
+          fi
+          bash packaging/macos/build.sh
+
+      - name: Zip the .app (portable)
+        run: |
+          cd dist
+          zip -qry "Proto-Clean-0.2.0-macos-${{ matrix.variant }}-portable.zip" "Proto Clean.app"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.variant }}
+          path: dist/*-portable.zip
           if-no-files-found: error
 
   # ------------------------------------------------------------- Android
   android:
-    name: Android (APK)
+    name: Android 8.0+ (armv7 + arm64 APKs)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -152,24 +301,28 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Build debug APK (installable, debug-signed)
+      - name: Build debug APKs (installable, debug-signed)
         run: gradle assembleDebug --no-daemon
 
-      - name: Rename APK
+      - name: Rename APKs
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk \
-             "$GITHUB_WORKSPACE/Proto-Clean-0.1.0-android.apk"
+          cp app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk \
+             "$GITHUB_WORKSPACE/Proto-Clean-0.2.0-android-armeabi-v7a.apk"
+          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk \
+             "$GITHUB_WORKSPACE/Proto-Clean-0.2.0-android-arm64-v8a.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: Proto-Clean-0.1.0-android.apk
+          name: android-apks
+          path: |
+            Proto-Clean-0.2.0-android-armeabi-v7a.apk
+            Proto-Clean-0.2.0-android-arm64-v8a.apk
           if-no-files-found: error
 
   # ------------------------------------------------------------- Publish
   publish:
     name: Publish GitHub Release
-    needs: [linux, windows, macos, android]
+    needs: [linux, windows-modern, windows-legacy, macos, android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -185,20 +338,43 @@ jobs:
       - name: Create / update release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.0
-          name: Proto Clean v0.1.0
+          tag_name: v0.2.0
+          name: Proto Clean v0.2.0
           body: |
-            First public release — independent clean-room VPN client for
-            Proton accounts.
+            Xray (v2ray) proxy support — VLESS + REALITY with SNI masking
+            and uTLS fingerprint mimicry, plus Trojan — and a much wider
+            platform matrix. Independent clean-room client for Proton
+            accounts.
 
             ## Downloads
             | Platform | File | Notes |
             |---|---|---|
-            | **Linux Mint / Ubuntu / Debian** | `proto-clean_0.1.0-1_amd64.deb` | `sudo apt install ./proto-clean_0.1.0-1_amd64.deb` |
-            | **Linux (portable)** | `Proto-Clean-0.1.0-linux-x86_64.tar.gz` | untar, run `proto-clean/proto-clean` |
-            | **Windows 10 / 11** | `Proto-Clean-0.1.0-win64.zip` | unzip, run `ProtoClean.exe`; needs [WireGuard for Windows](https://download.wireguard.com/windows/) |
-            | **macOS 12+** | `Proto-Clean-0.1.0-macos.zip` | unzip, move to /Applications; ad-hoc signed |
-            | **Android 10+** | `Proto-Clean-0.1.0-android.apk` | debug-signed APK — allow "install unknown apps" |
+            | **Windows 7+ x64** | `Proto-Clean-0.2.0-win7-x64-portable.zip` | Python 3.8 + Qt 5.15 legacy stack |
+            | **Windows 7+ x86 (32-bit)** | `Proto-Clean-0.2.0-win7-x86-portable.zip` | 32-bit Qt 5.15 legacy stack |
+            | **Windows 10/11 x64 (portable)** | `Proto-Clean-0.2.0-win-x64-portable.zip` | Qt 6 modern stack |
+            | **Windows 10/11 x64 (setup)** | `Proto-Clean-0.2.0-win-x64-setup.exe` | Inno Setup installer |
+            | **macOS 10.15 Catalina+ (Intel)** | `Proto-Clean-0.2.0-macos-10.15-catalina-x86_64-portable.zip` | Qt 6.2, runs on 10.14+ |
+            | **macOS 11+ (Apple Silicon)** | `Proto-Clean-0.2.0-macos-11.0-arm64-portable.zip` | native arm64, Qt 6 |
+            | **Linux Mint 21 / Ubuntu 22.04** | `proto-clean_0.2.0-mint21-ubuntu22.04_amd64.deb` | also LMDE-era compatible glibc |
+            | **Linux Mint 22 / Ubuntu 24.04** | `proto-clean_0.2.0-mint22-ubuntu24.04_amd64.deb` | |
+            | **LMDE 6 / Debian 12** | `proto-clean_0.2.0-debian12_amd64.deb` | |
+            | **Linux (portable)** | `Proto-Clean-0.2.0-linux-x86_64-portable.tar.gz` | built on Ubuntu 22.04; runs on Mint 21/22, LMDE 6 |
+            | **Linux (Flatpak)** | `Proto-Clean-0.2.0-x86_64.flatpak` | `flatpak install --user Proto-Clean-0.2.0-x86_64.flatpak` |
+            | **Android 8.0+ (armv7)** | `Proto-Clean-0.2.0-android-armeabi-v7a.apk` | debug-signed APK |
+            | **Android 8.0+ (arm64)** | `Proto-Clean-0.2.0-android-arm64-v8a.apk` | debug-signed APK |
+
+            Every platform ships a **portable** build (extract & run — no
+            installation).
+
+            ## Xray (v2ray) proxy — new
+            * Import a `vless://…?security=reality&pbk=…&sni=…` or
+              `trojan://…` share URL in Settings → Xray proxy.
+            * REALITY **masks the connection as ordinary HTTPS to the
+              configured decoy SNI** with a uTLS browser fingerprint.
+            * Local SOCKS (127.0.0.1:10808) + HTTP (10809) inbounds;
+              optional automatic system-proxy switch (Linux gsettings /
+              Windows WinINET / macOS networksetup via the helper).
+            * Requires the separate Xray-core binary — see README.
 
             ## After install
             * Log in with your own Proton account (credentials stay in your
@@ -206,15 +382,22 @@ jobs:
             * Linux/macOS: enable passwordless privileged verbs via the
               helper + sudoers line (printed by the deb postinst / see
               `scripts/install.sh`, `scripts/install_macos.sh`).
-            * First launch downloads a Playwright Chromium for the
-              backend-browser login.
+            * Flatpak note: the sandbox cannot run the privileged
+              WireGuard/OpenVPN helper — use the Xray proxy (host binary)
+              and the DNS ad-blocker mode there.
+
+            ## Attribution
+            Built with **GLM**, an LLM by **Z.ai**. Uses PySide6/Qt,
+            Playwright, dnslib, httpx, keyring, PyInstaller, Inno Setup and
+            (optionally) Xray-core — see README for the full attribution.
 
             Not affiliated with or endorsed by Proton AG — see README.
           files: |
+            dist/*.tar.gz
             dist/*.deb
-            dist/Proto-Clean-*-linux-x86_64.tar.gz
-            dist/Proto-Clean-*-win64.zip
-            dist/Proto-Clean-*-macos.zip
-            dist/Proto-Clean-*-android.apk
+            dist/*.flatpak
+            dist/*.zip
+            dist/*-setup.exe
+            dist/*.apk
           fail_on_unmatched_files: true
           generate_release_notes: true

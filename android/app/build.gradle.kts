@@ -9,10 +9,20 @@ android {
 
     defaultConfig {
         applicationId = "app.protoclean"
-        minSdk = 29            // Android 10
+        minSdk = 26            // Android 8.0 Oreo
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+    }
+
+    // Per-ABI APKs (armv7 + arm64) as requested for the release matrix.
+    splits {
+        abi {
+            enable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a")
+            universalApk = false
+        }
     }
 
     buildTypes {

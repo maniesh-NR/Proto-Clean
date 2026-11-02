@@ -38,6 +38,8 @@ Verbs:
     split-launch UID GID -- CMD…  run a command as UID/GID inside the split
                                   cgroup (Linux)
     cgroup-ensure                 create /sys/fs/cgroup/proto_clean_split
+    proxy-on SERVICE HOST PORT    set the macOS SOCKS proxy (Xray feature)
+    proxy-off SERVICE             clear it again
 """
 
 from __future__ import annotations
@@ -151,6 +153,41 @@ def valid_port(p: str) -> int:
     if not 1 <= port <= 65535:
         fail(f"port out of range: {p}")
     return port
+
+
+def valid_service(name: str) -> str:
+    """A macOS network service name for `networksetup` (display name)."""
+    n = name.strip()
+    if not n or len(n) > 64 or n.startswith("*") or n.startswith("-"):
+        fail(f"invalid network service name {name!r}")
+    if any(c in n for c in "\n\r\x00"):
+        fail("invalid characters in network service name")
+    return n
+
+
+def valid_proxy_host(h: str) -> str:
+    import re as _re
+    if not _re.match(r"^[0-9A-Za-z.:_-]+$", h or ""):
+        fail(f"invalid proxy host {h!r}")
+    return h
+
+
+def verb_proxy_on(service: str, host: str, port: int) -> None:
+    """Point a macOS network service's SOCKS proxy at the local Xray inbound
+    (used by the app's Xray/v2ray feature; macOS only)."""
+    if not DARWIN:
+        fail("proxy-on is macOS-only (Linux uses per-user gsettings in the app)")
+    run(["networksetup", "-setsocksfirewallproxy", service, host, str(port)])
+    run(["networksetup", "-setsocksfirewallproxystate", service, "on"])
+    ok({"proxy": "on", "service": service, "host": host, "port": port})
+
+
+def verb_proxy_off(service: str) -> None:
+    """Disable a service's SOCKS proxy (undo of proxy-on)."""
+    if not DARWIN:
+        fail("proxy-off is macOS-only (Linux uses per-user gsettings in the app)")
+    run(["networksetup", "-setsocksfirewallproxystate", service, "off"])
+    ok({"proxy": "off", "service": service})
 
 
 def valid_uid(u: str) -> int:
@@ -991,6 +1028,11 @@ def main() -> None:
             verb_split_launch(valid_uid(rest[0]), valid_uid(rest[1]), rest[3:])
         elif verb == "cgroup-ensure" and not rest:
             cgroup_ensure()
+        elif verb == "proxy-on" and len(rest) == 3:
+            verb_proxy_on(valid_service(rest[0]), valid_proxy_host(rest[1]),
+                          valid_port(rest[2]))
+        elif verb == "proxy-off" and len(rest) == 1:
+            verb_proxy_off(valid_service(rest[0]))
         else:
             fail(f"unknown verb or bad arguments: {verb}")
     except RuntimeError as e:

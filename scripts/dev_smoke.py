@@ -97,7 +97,7 @@ def smoke_blocklist() -> int:
 
 def smoke_qt() -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtWidgets import QApplication
+    from proto_clean.qtcompat import QApplication
 
     from proto_clean.controller import Controller
     from proto_clean.ui.main_window import MainWindow

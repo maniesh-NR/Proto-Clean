@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from proto_clean.qtcompat import QApplication
 
 from proto_clean.controller import Controller, State
 from proto_clean.netshield.blocklists import BlocklistEntry

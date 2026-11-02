@@ -14,7 +14,7 @@ bars) can pick theme-matching colors via is_dark().
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from proto_clean.qtcompat import Qt
 
 DARK_QSS = """
 * { font-family: 'Inter', 'Segoe UI', 'Noto Sans', sans-serif; }
@@ -255,7 +255,7 @@ _scheme_connected = False
 
 def system_prefers_dark() -> bool:
     """Best-effort desktop color-scheme detection."""
-    from PySide6.QtGui import QGuiApplication
+    from proto_clean.qtcompat import QGuiApplication
 
     app = QGuiApplication.instance()
     if app is not None:
@@ -330,48 +330,48 @@ def apply_theme(app, mode: str = "dark") -> str:
 def _apply_palette(app, effective: str) -> None:
     """Keep the base palette in sync so native bits (menus, popups, edits)
     that the stylesheet does not cover still match the theme."""
-    from PySide6.QtGui import QColor, QPalette
+    from proto_clean.qtcompat import QColor, QPalette
 
     p = QPalette()
     if effective == "dark":
         roles = {
-            QPalette.ColorRole.Window: "#16181d",
-            QPalette.ColorRole.WindowText: "#e6e9ef",
-            QPalette.ColorRole.Base: "#1b1d23",
-            QPalette.ColorRole.AlternateBase: "#1e2128",
-            QPalette.ColorRole.Text: "#e6e9ef",
-            QPalette.ColorRole.Button: "#23262e",
-            QPalette.ColorRole.ButtonText: "#e6e9ef",
-            QPalette.ColorRole.Highlight: "#2f6d3f",
-            QPalette.ColorRole.HighlightedText: "#ffffff",
-            QPalette.ColorRole.ToolTipBase: "#23262e",
-            QPalette.ColorRole.ToolTipText: "#e6e9ef",
-            QPalette.ColorRole.PlaceholderText: "#6b7280",
-            QPalette.ColorRole.Link: "#8ec59a",
+            QPalette.Window: "#16181d",
+            QPalette.WindowText: "#e6e9ef",
+            QPalette.Base: "#1b1d23",
+            QPalette.AlternateBase: "#1e2128",
+            QPalette.Text: "#e6e9ef",
+            QPalette.Button: "#23262e",
+            QPalette.ButtonText: "#e6e9ef",
+            QPalette.Highlight: "#2f6d3f",
+            QPalette.HighlightedText: "#ffffff",
+            QPalette.ToolTipBase: "#23262e",
+            QPalette.ToolTipText: "#e6e9ef",
+            QPalette.PlaceholderText: "#6b7280",
+            QPalette.Link: "#8ec59a",
         }
         disabled = "#5c6370"
     else:
         roles = {
-            QPalette.ColorRole.Window: "#f4f5f7",
-            QPalette.ColorRole.WindowText: "#20242c",
-            QPalette.ColorRole.Base: "#ffffff",
-            QPalette.ColorRole.AlternateBase: "#f2f4f7",
-            QPalette.ColorRole.Text: "#20242c",
-            QPalette.ColorRole.Button: "#ffffff",
-            QPalette.ColorRole.ButtonText: "#20242c",
-            QPalette.ColorRole.Highlight: "#60aa6b",
-            QPalette.ColorRole.HighlightedText: "#ffffff",
-            QPalette.ColorRole.ToolTipBase: "#ffffff",
-            QPalette.ColorRole.ToolTipText: "#20242c",
-            QPalette.ColorRole.PlaceholderText: "#8a92a3",
-            QPalette.ColorRole.Link: "#60aa6b",
+            QPalette.Window: "#f4f5f7",
+            QPalette.WindowText: "#20242c",
+            QPalette.Base: "#ffffff",
+            QPalette.AlternateBase: "#f2f4f7",
+            QPalette.Text: "#20242c",
+            QPalette.Button: "#ffffff",
+            QPalette.ButtonText: "#20242c",
+            QPalette.Highlight: "#60aa6b",
+            QPalette.HighlightedText: "#ffffff",
+            QPalette.ToolTipBase: "#ffffff",
+            QPalette.ToolTipText: "#20242c",
+            QPalette.PlaceholderText: "#8a92a3",
+            QPalette.Link: "#60aa6b",
         }
         disabled = "#9aa3b2"
     for role, color in roles.items():
         p.setColor(role, QColor(color))
-    for role in (QPalette.ColorRole.WindowText, QPalette.ColorRole.Text,
-                 QPalette.ColorRole.ButtonText):
-        p.setColor(QPalette.ColorGroup.Disabled, role, QColor(disabled))
+    for role in (QPalette.WindowText, QPalette.Text,
+                 QPalette.ButtonText):
+        p.setColor(QPalette.Disabled, role, QColor(disabled))
     app.setPalette(p)
 
 
@@ -394,7 +394,7 @@ def _update_scheme_listener(app) -> None:
 
 def _on_scheme_changed(_scheme=None) -> None:
     """The desktop switched light/dark — re-resolve in system mode."""
-    from PySide6.QtWidgets import QApplication
+    from proto_clean.qtcompat import QApplication
 
     app = QApplication.instance()
     if app is not None and _requested == "system":

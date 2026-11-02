@@ -3,8 +3,8 @@ in a visible browser window (CAPTCHA-friendly)."""
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
+from proto_clean.qtcompat import Qt
+from proto_clean.qtcompat import (
     QCheckBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QVBoxLayout,
 )
@@ -43,7 +43,7 @@ class LoginDialog(QDialog):
         self.user_edit = QLineEdit(prefill_username)
         self.user_edit.setPlaceholderText("Proton account name (or email)")
         self.pass_edit = QLineEdit()
-        self.pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.pass_edit.setEchoMode(QLineEdit.Password)
         self.pass_edit.setPlaceholderText("Proton password")
         self.totp_edit = QLineEdit()
         self.totp_edit.setPlaceholderText(

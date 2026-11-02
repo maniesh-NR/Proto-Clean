@@ -96,14 +96,18 @@ step fails). Check Proton's terms of service before relying on it.
 
 - Linux: `wg`, `wg-quick` (wireguard-tools), `ip`, `iptables`, cgroup v2
   (only for app-based split tunneling) — any modern distro works.
-  Optional: `openvpn` for the OpenVPN protocol (`sudo apt install openvpn`).
+  Optional: `openvpn` for the OpenVPN protocol (`sudo apt install openvpn`)
+  and `xray` (Xray-core) for the v2ray proxy feature.
 - macOS: `brew install wireguard-tools` (`pfctl`/`networksetup` are built
-  in). Optional: `brew install openvpn` for the OpenVPN protocol.
-- Windows: [WireGuard for Windows](https://download.wireguard.com/windows/)
-  (`wireguard.exe` + `wg.exe`) — WireGuard protocol only
-- Python ≥ 3.10
+  in). Optional: `brew install openvpn`, `brew install xray`.
+- Windows 7+ (use the `-win7-` legacy builds) / Windows 10+ (modern
+  builds): [WireGuard for Windows](https://download.wireguard.com/windows/)
+  (`wireguard.exe` + `wg.exe`) — WireGuard protocol only. Optional:
+  Xray-core for the proxy feature.
+- Python ≥ 3.8 from source (the packaged builds bundle their own Python)
 - A Proton account (free plan works: free servers, VPN Accelerator and
   local ad-blocking; port forwarding / NetShield / Moderate NAT need paid)
+- An Xray (v2ray) server of your own for the proxy feature — see below
 
 ## Install
 
@@ -202,6 +206,48 @@ in browser…**.
 | Theme | `ui/theme.py` ships two full stylesheets (`DARK_QSS`, `LIGHT_QSS`) + matching `QPalette`s; `apply_theme(app, mode)` resolves `system` via Qt's `colorScheme` hint (Qt ≥ 6.5), the GNOME `color-scheme` gsettings key, or palette lightness; in system mode `colorSchemeChanged` re-applies live. Persisted as `settings.theme`; legacy `prefer_dark_theme: false` migrates to `light`. Runtime painters ask `theme.is_dark()` (load-bar tracks, icons) |
 | Login events | the backend browser relays `captcha` / `interactive_open` / `interactive_done` / `totp_needed` / `bad_credentials` / `credentials_needed` through the controller → bridge → banner + tray notification; wrong or missing credentials re-open the login dialog pre-filled |
 
+## Xray / v2ray proxy (VLESS REALITY + Trojan)
+
+Besides WireGuard/OpenVPN tunnels, Proto Clean can run an
+[Xray-core](https://github.com/XTLS/Xray-core) proxy locally and route
+apps through it — useful on networks where VPN protocols are blocked:
+
+- **VLESS + REALITY with SNI masking** — the connection is disguised as
+  ordinary HTTPS to a decoy site you choose (the *masked SNI*), complete
+  with a uTLS browser fingerprint (`chrome`, `firefox`, …). Deep packet
+  inspection sees a normal TLS handshake to that site, not a proxy.
+- **Trojan** — the classic password-authenticated TLS proxy protocol,
+  also with configurable SNI.
+
+How to use it:
+
+1. Install the Xray-core binary (not bundled) and put `xray` on `PATH`
+   (or point `PROTO_CLEAN_XRAY_BIN` at it):
+   ```bash
+   # Linux (deb/rpm releases at github.com/XTLS/Xray-core/releases)
+   sudo install -m755 xray /usr/local/bin/xray
+   # macOS
+   brew install xray
+   # Windows: unzip the release next to ProtoClean.exe or anywhere on PATH
+   ```
+2. Open **Settings → Xray proxy** and paste your share URL with
+   **Import share URL…** —
+   `vless://<uuid>@host:443?security=reality&sni=…&pbk=…&sid=…&fp=chrome`
+   or `trojan://<password>@host:8443?sni=…`, or fill the fields by hand.
+3. Pick a mode: **automatic** (the system proxy is switched to the local
+   inbounds while the proxy runs and restored on stop) or **manual**
+   ( SOCKS `127.0.0.1:10808` / HTTP `127.0.0.1:10809` for you to point
+   apps at).
+4. Start/stop from the settings tab or the tray's **Xray proxy** item.
+
+Platform notes: the system-proxy switch uses per-user `gsettings` on
+Linux (GNOME/Cinnamon/MATE — what Linux Mint ships), the WinINET registry
+on Windows (no elevation) and `networksetup` through the privileged
+helper on macOS. The generated Xray config (which contains your
+credentials) is stored `chmod 600` in `~/.cache/proto-clean/xray/` and
+never leaves the machine. The proxy is independent of the WireGuard/
+OpenVPN Connect button — you can run either, or both.
+
 ## Security notes
 
 - Credentials: system keyring preferred; the fallback file is `~/.config/proto-clean/credentials.json`, `chmod 600`, and never logged. (Windows: DPAPI-backed keyring / protected file. Android: EncryptedSharedPreferences.)
@@ -284,7 +330,13 @@ verified against a real dump (Nov 2026).
   driver is WireGuard only) — selecting OpenVPN there shows a clear error
   at connect; keep WireGuard. **Android**: same — the tunnel runs
   WireGuard (GoBackend), so OpenVPN is shown disabled in the app's
-  settings.
+  settings. The Xray proxy is desktop-only for now (Android needs the
+  libxray Go core — on the roadmap).
+- The Xray proxy routes apps that honor the system proxy (or that you
+  point at the SOCKS/HTTP inbounds); it is not a system-wide TUN device.
+- Flatpak build: the sandbox cannot run the privileged helper, so
+  WireGuard/OpenVPN tunnels are unavailable there (Xray proxy + DNS
+  ad-blocker work).
 - Windows/macOS: per-**app** split tunneling needs kernel support that is
   not available to user space — use IP-range exclusions there (the
   settings UI explains this). Linux and Android support apps fully.
@@ -301,19 +353,64 @@ verified against a real dump (Nov 2026).
 
 Ready-made installers are on the
 [Releases page](https://github.com/maniesh-NR/Proto-Clean/releases)
-(built by the `Release` workflow on every tag):
+(built by the `Release` workflow on every tag). Every platform has a
+**portable** build (extract & run, no installation):
 
-| Platform | File | Install |
+| Platform | File | Install / run |
 |---|---|---|
-| Linux Mint / Ubuntu / Debian | `proto-clean_0.1.0-1_amd64.deb` | `sudo apt install ./proto-clean_0.1.0-1_amd64.deb` |
-| Linux (portable) | `Proto-Clean-0.1.0-linux-x86_64.tar.gz` | untar, run `proto-clean/proto-clean` |
-| Windows 10 / 11 | `Proto-Clean-0.1.0-win64.zip` | unzip, run `ProtoClean.exe` (+ [WireGuard for Windows](https://download.wireguard.com/windows/)) |
-| macOS 12+ | `Proto-Clean-0.1.0-macos.zip` | unzip → /Applications (ad-hoc signed) |
-| Android 10+ | `Proto-Clean-0.1.0-android.apk` | debug-signed APK; allow "install unknown apps" |
+| Windows 7+ x64 (portable) | `Proto-Clean-…-win7-x64-portable.zip` | unzip, run `ProtoClean.exe` — Qt 5.15 legacy stack |
+| Windows 7+ x86 / 32-bit (portable) | `Proto-Clean-…-win7-x86-portable.zip` | same, 32-bit |
+| Windows 10/11 x64 (portable) | `Proto-Clean-…-win-x64-portable.zip` | modern Qt 6 build |
+| Windows 10/11 x64 (setup) | `Proto-Clean-…-win-x64-setup.exe` | Inno Setup installer |
+| macOS 10.15 Catalina+ (Intel) | `Proto-Clean-…-macos-10.15-catalina-x86_64-portable.zip` | unzip → /Applications |
+| macOS 11+ (Apple Silicon) | `Proto-Clean-…-macos-11.0-arm64-portable.zip` | unzip → /Applications |
+| Linux Mint 21 / Ubuntu 22.04 | `proto-clean_…-mint21-ubuntu22.04_amd64.deb` | `sudo apt install ./proto-clean_….deb` |
+| Linux Mint 22 / Ubuntu 24.04 | `proto-clean_…-mint22-ubuntu24.04_amd64.deb` | same |
+| LMDE 6 / Debian 12 | `proto-clean_…-debian12_amd64.deb` | same |
+| Linux (portable) | `Proto-Clean-…-linux-x86_64-portable.tar.gz` | untar, run `proto-clean/proto-clean` |
+| Linux (Flatpak) | `Proto-Clean-…-x86_64.flatpak` | `flatpak install --user Proto-Clean-….flatpak` |
+| Android 8.0+ (armv7) | `Proto-Clean-…-android-armeabi-v7a.apk` | debug-signed APK; allow "install unknown apps" |
+| Android 8.0+ (arm64) | `Proto-Clean-…-android-arm64-v8a.apk` | same |
+
+The Linux portable/deb binaries are built on Ubuntu 22.04 so they run
+on every current Mint base (21/22/LMDE 6) and newer. The Windows 7
+legacy builds use Python 3.8 + Qt 5.15 — the last toolchains supporting
+Windows 7 and 32-bit Windows; the modern builds use Qt 6. **Flatpak
+note:** the sandbox cannot run the privileged WireGuard/OpenVPN helper —
+use the Xray proxy and the ad-blocker DNS-filter mode there.
 
 Or from source: `pip install -e .` and `python3 -m proto_clean` (plus
 `bash scripts/install.sh` on Linux / `scripts/install_macos.sh` on macOS
 for the privileged helper).
+
+## Attribution
+
+This project was developed with the assistance of **[GLM](https://z.ai),
+a large language model by Z.ai** — the code, tests, packaging and CI in
+this repository were generated and iterated with the model under human
+direction. All AI-generated content is MIT-licensed like the rest of the
+project.
+
+Proto Clean builds on outstanding open-source work:
+
+- [Qt](https://www.qt.io) via [PySide6](https://pypi.org/project/PySide6/)
+  (and [PySide2](https://pypi.org/project/PySide2/) for the legacy
+  Windows 7 / 32-bit builds) — © The Qt Company, LGPL/GPL
+- [Playwright](https://playwright.dev) — browser automation for the
+  backend-browser login (© Microsoft)
+- [dnslib](https://pypi.org/project/dnslib/) — DNS wire format for the
+  ad-blocker; [httpx](https://www.python-httpx.org) — HTTP client;
+  [keyring](https://github.com/jaraco/keyring) — system keyring access
+- [PyInstaller](https://pyinstaller.org) — the packaged builds;
+  [Inno Setup](https://jrsoftware.org/isinfo.php) — the Windows installer
+- [Xray-core](https://github.com/XTLS/Xray-core) (© XTLS project) — the
+  optional proxy engine for the VLESS REALITY / Trojan feature (not
+  bundled; install it separately)
+- [WireGuard](https://www.wireguard.com) by Jason A. Donenfeld — "WireGuard"
+  and the WireGuard logo are registered trademarks; Proto Clean is not
+  affiliated with the WireGuard project and simply drives its tools
+- "WireGuard" and the "WireGuard" logo are trademarks of Jason A.
+  Donenfeld.
 
 ## Trademarks & legal
 

@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "proto-clean"
-version = "0.1.0"
-description = "Clean-room client for ProtonVPN on Windows, macOS, Linux and Android: backend-browser login, server-load selection, WireGuard, local blocklist ad-blocking, split tunneling, NAT-PMP port forwarding"
+version = "0.2.0"
+description = "Clean-room client for ProtonVPN on Windows 7+, macOS 10.15+, Linux and Android 8+: backend-browser login, server-load selection, WireGuard, OpenVPN, Xray (VLESS REALITY / Trojan) with SNI masking, local blocklist ad-blocking, split tunneling, NAT-PMP port forwarding"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.8"
 license = { text = "MIT" }
 dependencies = [
     "PySide6>=6.6",

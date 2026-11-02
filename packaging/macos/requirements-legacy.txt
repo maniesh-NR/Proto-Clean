@@ -1,0 +1,9 @@
+# macOS 10.15 Catalina legacy stack (Python 3.10).
+# PySide6 6.2.4 ships a macosx_10_14_universal2 wheel — the last Qt 6 line
+# that runs on Catalina. The universal2 wheel also provides the arm64
+# slice for the Apple Silicon build.
+PySide6==6.2.4
+playwright==1.42.0
+dnslib>=0.9.25
+httpx==0.27.2
+keyring==24.3.0

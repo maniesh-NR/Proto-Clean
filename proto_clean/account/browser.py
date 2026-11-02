@@ -189,12 +189,20 @@ class AccountSession:
             log.exception("on_event callback failed")
 
     # ------------------------------------------------------- small helpers
+    @staticmethod
+    def _in_flatpak() -> bool:
+        """Chromium's sandbox cannot create user namespaces inside the
+        Flatpak sandbox — detect it (flag or /.flatpak-info) so we pass
+        --no-sandbox there."""
+        return os.environ.get("PROTO_CLEAN_FLATPAK") == "1" or \
+            os.path.exists("/.flatpak-info")
+
     def _launch(self, pw, headless: bool):
         args = ["--disable-blink-features=AutomationControlled",
                 "--disable-dev-shm-usage"]
         # os.geteuid does not exist on Windows — Chromium refuses --no-sandbox
         # there anyway, and elevation is handled by UAC instead.
-        if hasattr(os, "geteuid") and os.geteuid() == 0:
+        if hasattr(os, "geteuid") and (os.geteuid() == 0 or self._in_flatpak()):
             args.append("--no-sandbox")
         browser = pw.chromium.launch(headless=headless, args=args)
         ua = None

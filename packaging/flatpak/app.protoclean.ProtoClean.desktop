@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Proto Clean
+Comment=Independent VPN client for Proton accounts (WireGuard / OpenVPN / Xray)
+Exec=proto-clean
+Icon=app.protoclean.ProtoClean
+Categories=Network;
+StartupNotify=true
+X-Flatpak-Tags=Network;

@@ -26,6 +26,8 @@ from .vpn.helper import Helper, HelperError, helper_installed
 from .vpn.monitor import TunnelMonitor
 from .vpn.portforward import PortForwarder
 from .vpn.tunnel import TunnelManager
+from .vpn.xray import PROXY_ERROR, PROXY_OFF, PROXY_ON, PROXY_STARTING, XrayError, XrayManager
+from .vpn.xrayconf import XrayProfile, XrayConfigError
 
 log = get("controller")
 
@@ -66,6 +68,7 @@ class Controller:
         self.on_message: Callable = lambda text, level: None
         self.on_blocklists: Callable = lambda entries: None
         self.on_login_event: Callable = lambda kind, detail: None
+        self._proxy_listeners: List[Callable] = []
         self.totp_provider: Callable[[], Optional[str]] = lambda: None
 
         # pending login request: {mode: stored|once|interactive, username,
@@ -78,6 +81,11 @@ class Controller:
         self.port_forwarder: Optional[PortForwarder] = None
         self.current_server: Optional[LogicalServer] = None
         self.connected_via: dict = {}
+
+        # Xray / v2ray proxy (VLESS REALITY / Trojan)
+        self.xray = XrayManager()
+        self.proxy_state: str = PROXY_OFF
+        self._proxy_lock = threading.Lock()
 
     # ------------------------------------------------------------- plumbing
     def _set_state(self, state: State, detail: str = "") -> None:
@@ -710,6 +718,101 @@ class Controller:
         self.settings = load_settings()
         self.blocklists.set_sources(self.settings.netshield.blocklists)
 
+    # --------------------------------------------------- Xray / v2ray proxy
+    def _set_proxy(self, state: str, detail: str = "") -> None:
+        self.proxy_state = state
+        log.info("proxy -> %s (%s)", state, detail)
+        for fn in list(self._proxy_listeners):
+            try:
+                fn(state, detail)
+            except Exception:  # noqa: BLE001
+                pass
+
+    def add_proxy_listener(self, fn: Callable) -> None:
+        """Subscribe to proxy state changes (multiple listeners allowed)."""
+        if fn not in self._proxy_listeners:
+            self._proxy_listeners.append(fn)
+
+    def save_xray_settings(self, xray) -> None:
+        """Persist an XraySettings (already normalized by the caller)."""
+        from .settings import update
+        update(**{"xray": xray})
+        self.settings = load_settings()
+
+    def start_proxy_async(self) -> None:
+        """Start the Xray proxy with the saved profile (system or manual)."""
+        self._spawn(self._proxy_start_worker, "proto_clean-proxy")
+
+    def stop_proxy_async(self) -> None:
+        self._spawn(self._proxy_stop_worker, "proto_clean-proxy")
+
+    def _profile_from_settings(self) -> XrayProfile:
+        x = self.settings.xray.normalized()
+        return XrayProfile(
+            protocol=x.protocol, address=x.address, port=x.port, name=x.name,
+            uuid=x.uuid, public_key=x.public_key, short_id=x.short_id,
+            flow=x.flow, password=x.password, sni=x.sni,
+            fingerprint=x.fingerprint, allow_insecure=x.allow_insecure,
+            spider_x=x.spider_x,
+        )
+
+    def _proxy_start_worker(self) -> None:
+        if not self._proxy_lock.acquire(blocking=False):
+            self.on_message("a proxy operation is already running", "warn")
+            return
+        try:
+            if self.xray.running:
+                self.on_message("the Xray proxy is already running", "warn")
+                return
+            self._set_proxy(PROXY_STARTING)
+            x = self.settings.xray.normalized()
+            try:
+                profile = self._profile_from_settings()
+                self.xray.start(profile, socks_port=x.socks_port,
+                                http_port=x.http_port)
+            except (XrayError, XrayConfigError) as e:
+                self._set_proxy(PROXY_ERROR, str(e))
+                self.on_message(f"Xray proxy: {e}", "error")
+                return
+            if x.mode == "system":
+                try:
+                    self.xray.apply_system_proxy()
+                except Exception as e:  # noqa: BLE001
+                    # proxy process is up; only the system switch failed
+                    self.on_message(
+                        f"Xray is running but the system proxy could not be "
+                        f"set ({e}). Manual: SOCKS 127.0.0.1:{x.socks_port} "
+                        f"/ HTTP 127.0.0.1:{x.http_port}", "warn")
+            label = x.sni or x.address
+            self._set_proxy(PROXY_ON, f"{profile.protocol} → {label}")
+            self.on_message(
+                f"Xray proxy on ({profile.protocol}, SNI {label}) — "
+                f"SOCKS 127.0.0.1:{x.socks_port}, HTTP 127.0.0.1:{x.http_port}",
+                "info")
+        finally:
+            self._proxy_lock.release()
+
+    def _proxy_stop_worker(self) -> None:
+        if not self._proxy_lock.acquire(blocking=False):
+            self.on_message("a proxy operation is already running", "warn")
+            return
+        try:
+            if not self.xray.running and not self.xray._proxy_applied:
+                self._set_proxy(PROXY_OFF)
+                return
+            try:
+                self.xray.stop()
+            except Exception as e:  # noqa: BLE001
+                self.on_message(f"Xray stop failed: {e}", "warn")
+            self._set_proxy(PROXY_OFF)
+            self.on_message("Xray proxy off", "info")
+        finally:
+            self._proxy_lock.release()
+
+    def proxy_status(self) -> dict:
+        """Synchronous snapshot for UI (tray / settings)."""
+        return self.xray.status()
+
     # ----------------------------------------------------------- split apps
     def move_pid_to_split(self, pid: int) -> bool:
         if not self.tunnel or not self.tunnel.split.active:
@@ -738,6 +841,10 @@ class Controller:
 
     def shutdown(self) -> None:
         try:
+            try:
+                self.xray.stop()
+            except Exception:  # noqa: BLE001
+                pass
             self._teardown_partial()
         finally:
             self.session.worker.stop()

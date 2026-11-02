@@ -11,6 +11,7 @@
 # * Playwright's Chromium is NOT bundled; the backend browser is installed
 #   per-user on first run (ms-playwright cache). See packaging/windows/README.
 
+import os
 import sys
 from PyInstaller.utils.hooks import collect_submodules
 
@@ -44,5 +45,5 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,                 # GUI app (PySide6)
-    icon="proto-clean.ico",       # Proto Clean emblem, multi-resolution .ico
+    icon=os.path.join(SPECPATH, "proto-clean.ico"),  # teal-free emblem .ico
 )

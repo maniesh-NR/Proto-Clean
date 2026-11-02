@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>app.protoclean.ProtoClean</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Proto Clean</name>
+  <summary>Independent clean-room VPN client for Proton accounts</summary>
+  <description>
+    <p>
+      Proto Clean is an independent (clean-room) desktop client for Proton
+      VPN accounts: backend-browser login with saved credentials and TOTP
+      auto-fill, a free-server list with live loads, fastest-server
+      auto-connect, WireGuard and OpenVPN tunnels, local blocklist
+      ad-blocking, split tunneling, NAT-PMP port forwarding, IPv6 leak
+      protection and an Xray proxy (VLESS REALITY with SNI masking and
+      Trojan).
+    </p>
+    <p>
+      Not affiliated with or endorsed by Proton AG.
+    </p>
+  </description>
+  <launchable type="desktop-id">app.protoclean.ProtoClean.desktop</launchable>
+  <releases>
+    <release version="0.2.0" date="2026-11-02">
+      <description>
+        <p>Xray proxy support (VLESS REALITY / Trojan), wider platform
+        matrix (Windows 7+, macOS 10.15+, Android 8.0+), Flatpak.</p>
+      </description>
+    </release>
+  </releases>
+  <developer_name>Proto Clean contributors</developer_name>
+  <url type="homepage">https://github.com/maniesh-NR/Proto-Clean</url>
+</component>

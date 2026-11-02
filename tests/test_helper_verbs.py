@@ -114,3 +114,67 @@ def test_split_launch_dispatch_matches_documented_format(monkeypatch):
         sys.argv = old
     assert captured == {"uid": 1000, "gid": 1000,
                         "cmd": ["/usr/bin/firefox", "--new-window"]}
+
+
+# ------------------------------------------------------- Xray proxy verbs
+
+def test_proxy_on_rejects_bad_service_name():
+    out = _err(_run("proxy-on", "*all", "127.0.0.1", "10808"))
+    assert out.get("ok") is False
+    assert "invalid network service name" in out.get("error", "")
+
+
+def test_proxy_on_rejects_bad_host():
+    out = _err(_run("proxy-on", "Wi-Fi", "127.0.0.1 ; rm -rf /", "10808"))
+    assert out.get("ok") is False
+    assert "invalid proxy host" in out.get("error", "")
+
+
+def test_proxy_on_rejects_bad_port():
+    out = _err(_run("proxy-on", "Wi-Fi", "127.0.0.1", "99999"))
+    assert out.get("ok") is False
+    assert "port out of range" in out.get("error", "")
+    out = _err(_run("proxy-on", "Wi-Fi", "127.0.0.1", "0"))
+    assert out.get("ok") is False
+    assert "port out of range" in out.get("error", "")
+
+
+def test_proxy_off_rejects_bad_service_name():
+    out = _err(_run("proxy-off", "-h"))
+    assert out.get("ok") is False
+    assert "invalid network service name" in out.get("error", "")
+
+
+def test_proxy_verbs_are_macos_only_on_linux():
+    import sys as _sys
+    if not _sys.platform.startswith("linux"):
+        return  # macOS CI: covered by validation tests above
+    out = _err(_run("proxy-on", "Wi-Fi", "127.0.0.1", "10808"))
+    assert out.get("ok") is False
+    assert "macOS-only" in out.get("error", "")
+    out = _err(_run("proxy-off", "Wi-Fi"))
+    assert out.get("ok") is False
+    assert "macOS-only" in out.get("error", "")
+
+
+def test_proxy_verb_dispatch_calls_implementation(monkeypatch):
+    helper = _load_helper()
+    captured = {}
+    monkeypatch.setattr(helper, "DARWIN", True)
+    monkeypatch.setattr(helper, "verb_proxy_on",
+                        lambda svc, host, port: captured.update(
+                            svc=svc, host=host, port=port))
+    monkeypatch.setattr(helper, "verb_proxy_off",
+                        lambda svc: captured.update(off=svc))
+    old = sys.argv
+    try:
+        sys.argv = ["h", "proxy-on", "Wi-Fi", "127.0.0.1", "10808"]
+        helper.main()
+        sys.argv = ["h", "proxy-off", "Wi-Fi"]
+        helper.main()
+    except SystemExit:
+        pass
+    finally:
+        sys.argv = old
+    assert captured == {"svc": "Wi-Fi", "host": "127.0.0.1", "port": 10808,
+                        "off": "Wi-Fi"}

@@ -10,7 +10,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication, QTabWidget, QRadioButton  # noqa: E402
+from proto_clean.qtcompat import QApplication, QTabWidget, QRadioButton  # noqa: E402
 
 from proto_clean.controller import Controller  # noqa: E402
 from proto_clean.settings import update  # noqa: E402

@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import base64
 
-from PySide6.QtCore import QPoint, QRectF, Qt
-from PySide6.QtGui import QBrush, QColor, QIcon, QPainter, QPainterPath, QPixmap, QPen
+from proto_clean.qtcompat import QPoint, QRectF, Qt
+from proto_clean.qtcompat import QBrush, QColor, QIcon, QPainter, QPainterPath, QPixmap, QPen
 
 from .theme import is_dark
 

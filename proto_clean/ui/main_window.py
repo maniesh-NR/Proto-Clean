@@ -5,8 +5,8 @@ from __future__ import annotations
 import time
 from typing import Optional
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import (
+from proto_clean.qtcompat import Qt, QTimer
+from proto_clean.qtcompat import (
     QAbstractItemView, QApplication, QCheckBox, QHBoxLayout, QHeaderView,
     QInputDialog, QLabel, QLineEdit, QMenu, QMainWindow, QPushButton,
     QStatusBar, QSystemTrayIcon, QTableWidget, QTableWidgetItem,
@@ -268,7 +268,7 @@ class MainWindow(QMainWindow):
             self, "Two-factor authentication",
             "Proton is asking for your 2FA code.\n"
             "Tip: store your TOTP secret in Settings for automatic login.",
-            QLineEdit.EchoMode.Normal)
+            QLineEdit.Normal)
         self.bridge.provide_totp(code.strip().replace(" ", "") if ok else None)
 
     def _on_fastest_toggled(self, checked: bool) -> None:
@@ -347,8 +347,8 @@ class MainWindow(QMainWindow):
         """Desktop notification via the tray icon (when available)."""
         tray = getattr(self, "tray", None)
         if tray is not None and tray.isVisible():
-            icon = (QSystemTrayIcon.MessageIcon.Warning if warning
-                    else QSystemTrayIcon.MessageIcon.Information)
+            icon = (QSystemTrayIcon.Warning if warning
+                    else QSystemTrayIcon.Information)
             try:
                 tray.showMessage(title, body, icon, 10000)
             except Exception:  # noqa: BLE001
@@ -418,7 +418,7 @@ class MainWindow(QMainWindow):
     # ---------------------------------------------------------------- theme
     def _rebuild_theme_menu(self) -> None:
         """(Re)build the Theme ▾ menu right before it opens."""
-        from PySide6.QtGui import QActionGroup
+        from proto_clean.qtcompat import QActionGroup
 
         m = self.theme_menu
         m.clear()
@@ -452,7 +452,7 @@ class MainWindow(QMainWindow):
             6000)
 
     def _remove_blocklist(self, name: str) -> None:
-        from PySide6.QtWidgets import QMessageBox
+        from proto_clean.qtcompat import QMessageBox
 
         if QMessageBox.question(
                 self, "Remove blocklist",

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import threading
 
-from PySide6.QtCore import QObject, Signal
+from proto_clean.qtcompat import QObject, Signal
 
 from ..controller import Controller, State
 

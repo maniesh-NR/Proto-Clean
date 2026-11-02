@@ -117,6 +117,9 @@ PROTOCOLS = ("wireguard", "openvpn")
 OPENVPN_TRANSPORTS = ("udp", "tcp")
 OPENVPN_DRIVERS = ("tun", "tap")
 
+# Xray / v2ray proxy protocols (see vpn/xrayconf.py).
+XRAY_PROTOCOLS = ("vless-reality", "trojan")
+
 # UI themes: "system" follows the desktop color scheme (and live-switches
 # when the desktop changes), "light" and "dark" force a fixed look.
 THEMES = ("system", "light", "dark")
@@ -193,6 +196,63 @@ class VpnOptions:
 
 
 @dataclass
+class XraySettings:
+    """Xray-core proxy profile (VLESS + REALITY or Trojan).
+
+    ``sni`` is the SNI-masking target (REALITY ``serverName`` / TLS SNI):
+    the connection is made to look like ordinary HTTPS to that site.
+    ``mode`` selects whether the OS proxy is switched automatically
+    ("system") or the inbounds stay manual ("manual").
+    """
+    protocol: str = "vless-reality"          # "vless-reality" | "trojan"
+    address: str = ""
+    port: int = 443
+    name: str = ""
+    uuid: str = ""                           # VLESS user id
+    public_key: str = ""                     # REALITY pbk
+    short_id: str = ""                       # REALITY sid
+    flow: str = "xtls-rprx-vision"
+    password: str = ""                       # trojan
+    sni: str = ""                            # masked SNI (serverName)
+    fingerprint: str = "chrome"              # uTLS fingerprint
+    allow_insecure: bool = False
+    spider_x: str = "/"
+    mode: str = "system"                     # "system" | "manual"
+    socks_port: int = 10808
+    http_port: int = 10809
+
+    def normalized(self) -> "XraySettings":
+        from .vpn.xrayconf import FINGERPRINTS, FLOWS
+        proto = self.protocol if self.protocol in XRAY_PROTOCOLS else "vless-reality"
+        fp = self.fingerprint if self.fingerprint in FINGERPRINTS else "chrome"
+        flow = self.flow if self.flow in FLOWS else (
+            "xtls-rprx-vision" if proto == "vless-reality" else "")
+        mode = self.mode if self.mode in ("system", "manual") else "system"
+        try:
+            port = int(self.port)
+        except (TypeError, ValueError):
+            port = 443
+        try:
+            socks = int(self.socks_port)
+        except (TypeError, ValueError):
+            socks = 10808
+        try:
+            http = int(self.http_port)
+        except (TypeError, ValueError):
+            http = 10809
+        return XraySettings(
+            protocol=proto, address=self.address.strip(), port=port,
+            name=self.name.strip(), uuid=self.uuid.strip(),
+            public_key=self.public_key.strip(), short_id=self.short_id.strip(),
+            flow=flow, password=self.password, sni=self.sni.strip(),
+            fingerprint=fp, allow_insecure=bool(self.allow_insecure),
+            spider_x=self.spider_x or "/", mode=mode,
+            socks_port=socks if 1 <= socks <= 65535 else 10808,
+            http_port=http if 1 <= http <= 65535 else 10809,
+        )
+
+
+@dataclass
 class KillSwitchSettings:
     enabled: bool = True
     allow_lan: bool = False
@@ -215,6 +275,7 @@ class Settings:
     kill_switch: KillSwitchSettings = field(default_factory=KillSwitchSettings)
     protocol: ProtocolSettings = field(default_factory=ProtocolSettings)
     advanced: AdvancedSettings = field(default_factory=AdvancedSettings)
+    xray: XraySettings = field(default_factory=XraySettings)
     # UI
     theme: str = "dark"                    # "system" | "light" | "dark"
     prefer_dark_theme: bool = True         # legacy (superseded by `theme`)
@@ -253,10 +314,17 @@ def load_settings() -> Settings:
                 kill_switch=KillSwitchSettings(**{**asdict(KillSwitchSettings()), **_sub(raw, "kill_switch")}),
                 protocol=_protocol_from_json(_sub(raw, "protocol")),
                 advanced=AdvancedSettings(**{**asdict(AdvancedSettings()), **_sub(raw, "advanced")}),
+                xray=_xray_from_json(_sub(raw, "xray")),
             )
             return s
         except TypeError:
             return Settings()
+
+
+def _xray_from_json(raw: dict) -> XraySettings:
+    """XraySettings with unknown/legacy values coerced back to defaults."""
+    base = {**asdict(XraySettings()), **raw}
+    return XraySettings(**base).normalized()
 
 
 def _protocol_from_json(raw: dict) -> ProtocolSettings:

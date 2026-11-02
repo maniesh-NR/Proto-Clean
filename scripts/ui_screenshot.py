@@ -12,7 +12,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from proto_clean.qtcompat import QApplication  # noqa: E402
 
 from proto_clean.controller import Controller  # noqa: E402
 from proto_clean.netshield.blocklists import BlocklistEntry  # noqa: E402
@@ -84,8 +84,8 @@ def _save_with_popup(window, popup, out_path) -> None:
     separate top-level windows, so window.grab() alone misses them).
     The canvas is extended so a menu hanging over the window's bottom
     edge stays fully visible."""
-    from PySide6.QtGui import QImage, QPainter
-    from PySide6.QtCore import QPoint
+    from proto_clean.qtcompat import QImage, QPainter
+    from proto_clean.qtcompat import QPoint
 
     base = window.grab().toImage()
     popup_img = popup.grab().toImage()

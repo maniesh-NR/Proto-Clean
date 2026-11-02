@@ -48,7 +48,7 @@ def _env_check() -> int:
         ("playwright", "playwright (backend browser)"),
         ("dnslib", "dnslib (DNS blocker)"),
         ("httpx", "httpx (blocklist downloads)"),
-        ("PySide6", "PySide6 (GUI)"),
+        ("proto_clean.qtcompat", "Qt GUI bindings (PySide6/PySide2)"),
     ):
         try:
             __import__(mod)
@@ -69,10 +69,10 @@ def _env_check() -> int:
 
 def _run_gui() -> int:
     try:
-        from PySide6.QtWidgets import QApplication
+        from proto_clean.qtcompat import QApplication
     except ImportError:
-        print("PySide6 is required for the GUI: pip install PySide6",
-              file=sys.stderr)
+        print("PySide6 (or PySide2 on legacy builds) is required for the GUI:\n"
+              "  pip install PySide6", file=sys.stderr)
         return 1
 
     from . import APP_NAME

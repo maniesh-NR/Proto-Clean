@@ -1,0 +1,42 @@
+{
+  "app-id": "app.protoclean.ProtoClean",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "24.08",
+  "sdk": "org.freedesktop.Sdk",
+  "command": "proto-clean",
+  "finish-args": [
+    "--share=network",
+    "--share=ipc",
+    "--socket=fallback-x11",
+    "--socket=wayland",
+    "--device=dri",
+    "--talk-name=org.freedesktop.secrets",
+    "--talk-name=org.kde.StatusNotifierWatcher",
+    "--own-name=org.kde.StatusNotifierItem-*",
+    "--env=PROTO_CLEAN_FLATPAK=1"
+  ],
+  "modules": [
+    {
+      "name": "proto-clean",
+      "buildsystem": "simple",
+      "sources": [
+        {
+          "type": "dir",
+          "path": "../../",
+          "skip": [
+            ".git", "android", "build", "dist", ".pytest_cache",
+            "docs/brand", "packaging/windows", "scripts"
+          ]
+        }
+      ],
+      "build-commands": [
+        "pip3 install --no-index --find-links=\"${FLATPAK_BUILDER_BUILDDIR}/wheels\" PySide6 shiboken6 playwright dnslib httpx keyring",
+        "pip3 install --no-index --find-links=\"${FLATPAK_BUILDER_BUILDDIR}/wheels\" --no-deps wheels/proto_clean-*.whl",
+        "install -Dm755 packaging/flatpak/proto-clean.sh /app/bin/proto-clean",
+        "install -Dm644 packaging/flatpak/app.protoclean.ProtoClean.desktop /app/share/applications/app.protoclean.ProtoClean.desktop",
+        "install -Dm644 packaging/linux/proto-clean.png /app/share/icons/hicolor/512x512/apps/app.protoclean.ProtoClean.png",
+        "install -Dm644 packaging/flatpak/app.protoclean.ProtoClean.metainfo.xml /app/share/metainfo/app.protoclean.ProtoClean.metainfo.xml"
+      ]
+    }
+  ]
+}

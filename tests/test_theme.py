@@ -102,7 +102,7 @@ def test_state_colors_shared_between_themes():
 # ------------------------------------------------------------------ runtime
 @pytest.fixture(scope="module")
 def qapp():
-    from PySide6.QtWidgets import QApplication
+    from proto_clean.qtcompat import QApplication
 
     app = QApplication.instance() or QApplication([])
     yield app
