@@ -50,7 +50,7 @@ jobs:
 
       - name: Portable tar.gz
         run: |
-          tar czf "Proto-Clean-${VERSION}-linux-x86_64-portable.tar.gz" -C dist proto-clean
+          tar czf "dist/Proto-Clean-${VERSION}-linux-x86_64-portable.tar.gz" -C dist proto-clean
 
       - name: Build a deb for every current Mint base
         run: |
