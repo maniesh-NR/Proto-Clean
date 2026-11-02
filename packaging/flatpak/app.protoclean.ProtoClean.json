@@ -30,8 +30,8 @@
         }
       ],
       "build-commands": [
-        "pip3 install --no-index --find-links=\"${FLATPAK_BUILDER_BUILDDIR}/wheels\" PySide6 shiboken6 playwright dnslib httpx keyring",
-        "pip3 install --no-index --find-links=\"${FLATPAK_BUILDER_BUILDDIR}/wheels\" --no-deps wheels/proto_clean-*.whl",
+        "pip3 install --no-index --find-links=\"${FLATPAK_BUILDER_BUILDDIR}/wheels\" --prefix=/app PySide6 shiboken6 playwright dnslib httpx keyring",
+        "pip3 install --no-index --find-links=\"${FLATPAK_BUILDER_BUILDDIR}/wheels\" --no-deps --prefix=/app wheels/proto_clean-*.whl",
         "install -Dm755 packaging/flatpak/proto-clean.sh /app/bin/proto-clean",
         "install -Dm644 packaging/flatpak/app.protoclean.ProtoClean.desktop /app/share/applications/app.protoclean.ProtoClean.desktop",
         "install -Dm644 packaging/linux/proto-clean.png /app/share/icons/hicolor/512x512/apps/app.protoclean.ProtoClean.png",
