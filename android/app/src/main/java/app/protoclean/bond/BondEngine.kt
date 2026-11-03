@@ -131,7 +131,7 @@ class BondEngine(
 
         val liveMembers: List<Member> get() = members.filter { it.alive }
 
-        fun sendUp(data: ByteArray) {
+        override fun sendUp(data: ByteArray) {
             if (closed || liveMembers.isEmpty()) return
             for (chunk in BondProto.chunkData(data)) {
                 var sent = false
@@ -156,14 +156,14 @@ class BondEngine(
             }
         }
 
-        fun sendFin() {
+        override fun sendFin() {
             clientFinSent = true
             liveMembers.forEach {
                 it.send(BondProto.packFrame(BondProto.FRAME_FIN, 0))
             }
         }
 
-        fun close() {
+        override fun close() {
             if (closed) return
             closed = true
             members.forEach { it.shutdown() }
@@ -277,7 +277,7 @@ class BondEngine(
                 member.startReading(session)
             }
         }
-        if (session.liveMembers().isEmpty()) {
+        if (session.liveMembers.isEmpty()) {
             session.close()
             return null
         }

@@ -89,12 +89,16 @@ class TestBondServer:
         m1.sendall(pack_frame(FRAME_DATA, 3, payload[3]))
         m0.sendall(pack_frame(FRAME_DATA, 2, payload[2]))
 
-        # first reply is one small chunk: it lands on exactly one member
+        # first reply: the server may segment it into several down
+        # chunks (one per read from the echo destination), spread
+        # across both members — only the chunk *multiset* is fixed
         r0, r1 = FrameReader(), FrameReader()
         got0 = _drain_until(m0, r0, 32, timeout=2)
         got1 = _drain_until(m1, r1, 32, timeout=2)
-        joined = sorted([got0, got1], key=len, reverse=True)
-        assert b"".join(joined) == b"".join(payload)
+        pieces = [got0[i:i + 8] for i in range(0, len(got0), 8)] + \
+                 [got1[i:i + 8] for i in range(0, len(got1), 8)]
+        assert sorted(pieces) == sorted(payload)
+        assert len(got0) + len(got1) == 32
 
         # now a payload big enough that the *reply* spans several chunks
         # (16 KiB each), so both members must carry part of the download
@@ -104,13 +108,16 @@ class TestBondServer:
             (m0 if i % 2 == 0 else m1).sendall(
                 pack_frame(FRAME_DATA, seq, part))
 
-        # reassemble the down direction by frame sequence number,
-        # remembering which member carried which chunk
+        # reassemble the whole down-direction stream by sequence number
+        # (the first reply may itself be several chunks — segmentation
+        # is the server's business, not ours to pin down)
         r0, r1 = FrameReader(), FrameReader()
         got: dict = {}
         carriers: dict = {}
+        expected = b"".join(blob)   # the first reply was drained above
         deadline = time.time() + 15
-        while len(got) < 6 and time.time() < deadline:
+        while sum(len(v) for v in got.values()) < len(expected) \
+                and time.time() < deadline:
             for label, sock, fr in (("m0", m0, r0), ("m1", m1, r1)):
                 sock.settimeout(0.3)
                 try:
@@ -123,10 +130,10 @@ class TestBondServer:
                     if ftype == FRAME_DATA:
                         got[seq] = pay
                         carriers[seq] = label
-        # down-seq 0 was the first small reply; the blob is seqs 1..6
-        assert sorted(got) == list(range(1, 7)), f"seqs: {sorted(got)}"
-        assert b"".join(got[i] for i in range(1, 7)) == b"".join(blob)
-        # both members carried part of the blob reply
+        stream = b"".join(got[i] for i in sorted(got))
+        assert stream == expected, \
+            f"got {len(stream)} bytes, expected {len(expected)}"
+        # both members carried part of the reply
         assert set(carriers.values()) == {"m0", "m1"}
         m0.close(); m1.close()
 

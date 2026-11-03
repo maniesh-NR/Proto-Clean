@@ -449,7 +449,7 @@ class BondVpnService : VpnService() {
                     0x100000000L) % 0x100000000L).toInt()
                 val room = flow.clientWindow - unacked
                 if (room <= 0 || flow.pendingDown.isEmpty()) return
-                chunk = flow.pendingDown.copyOf(
+                chunk = flow.pendingDown.copyOfRange(
                     0, minOf(flow.pendingDown.size, room, 1400))
                 flow.pendingDown = flow.pendingDown.copyOfRange(
                     chunk.size, flow.pendingDown.size)
