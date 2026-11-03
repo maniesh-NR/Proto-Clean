@@ -2,7 +2,7 @@
 tab) and the tray offscreen; collect + persist bond settings."""
 import os, sys
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-sys.path.insert(0, "/home/z/my-project/cleanroom")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from proto_clean.qtcompat import QApplication
 from proto_clean.controller import Controller
