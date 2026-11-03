@@ -5,5 +5,7 @@
     <string name="notif_channel_dns">Ad-blocker</string>
     <string name="notif_vpn_title">Proto Clean VPN</string>
     <string name="notif_dns_title">Proto Clean ad-blocker</string>
+    <string name="notif_bond_title">Proto Clean link bonding</string>
+    <string name="notif_bond_text">Wi-Fi + mobile data combined</string>
     <string name="notif_dns_text">Filtering DNS system-wide (VPN off)</string>
 </resources>

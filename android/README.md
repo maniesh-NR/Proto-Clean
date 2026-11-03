@@ -83,3 +83,21 @@ app/src/main/java/app/protoclean/
 Proto Clean is an independent client; it is not affiliated with or endorsed
 by Proton AG. Automating the account web app is a convenience for *your
 own account* — check Proton's terms of service before relying on it.
+
+
+## Link bonding (Speedify-style, no root)
+
+Settings → **Link bonding**: the app runs a VPN that splits every TCP
+stream across **Wi-Fi and mobile data at the same time** and rejoins
+them at your bond server (run `python3 -m proto_clean.bondserver` —
+part of the desktop app — on any reachable host). Per-connection
+balancing spreads connections instead. Member sockets are protected
+and network-bound, so both radios stay active; DNS is answered through
+a protected socket. One VPN at a time (Android's rule): bonding
+replaces the WireGuard tunnel / ad-blocker while it runs.
+
+With **Upstream → Samizdat** the same VPN routes traffic through the
+**bundled lantern-box engine** (shipped inside the APK as
+`liblanternbox.so`, executed from the app's nativeLibraryDir — the
+samizdat protocol on Android with no root and no separate app). Enter
+the samizdat profile (server, pbk, sid, cover SNI) and start.

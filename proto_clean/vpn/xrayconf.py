@@ -221,8 +221,15 @@ def _outbounds(p: XrayProfile) -> list:
 
 def build_xray_config(profile: XrayProfile,
                       socks_port: int = DEFAULT_SOCKS_PORT,
-                      http_port: int = DEFAULT_HTTP_PORT) -> dict:
-    """Full Xray-core JSON config for the profile (as a plain dict)."""
+                      http_port: int = DEFAULT_HTTP_PORT,
+                      upstream_socks_port: int = 0) -> dict:
+    """Full Xray-core JSON config for the profile (as a plain dict).
+
+    ``upstream_socks_port`` (the bond engine's local SOCKS) chains the
+    proxy outbound through link bonding: the VLESS/Trojan connection
+    itself is split across every selected adapter and rejoined at the
+    bond server (Xray ``proxySettings`` outbound chaining).
+    """
     p = profile.normalized()
     if not p.address:
         raise XrayConfigError("server address is empty")
@@ -234,10 +241,21 @@ def build_xray_config(profile: XrayProfile,
             raise XrayConfigError("REALITY needs the masked SNI (serverName)")
     elif not p.password:
         raise XrayConfigError("trojan needs the password")
+    outbounds = _outbounds(p)
+    if upstream_socks_port:
+        for ob in outbounds:
+            if ob.get("tag") == "proxy":
+                ob["proxySettings"] = {"tag": "bond-out"}
+        outbounds.insert(1, {
+            "tag": "bond-out", "protocol": "socks",
+            "settings": {"servers": [{
+                "address": "127.0.0.1", "port": int(upstream_socks_port),
+            }]},
+        })
     return {
         "log": {"loglevel": "warning"},
         "inbounds": _inbounds(int(socks_port), int(http_port)),
-        "outbounds": _outbounds(p),
+        "outbounds": outbounds,
         "routing": {
             "domainStrategy": "IPIfNonMatch",
             "rules": [
@@ -252,11 +270,13 @@ def build_xray_config(profile: XrayProfile,
 
 def write_xray_config(profile: XrayProfile, path,
                       socks_port: int = DEFAULT_SOCKS_PORT,
-                      http_port: int = DEFAULT_HTTP_PORT) -> str:
+                      http_port: int = DEFAULT_HTTP_PORT,
+                      upstream_socks_port: int = 0) -> str:
     """Write the config to *path* (chmod 600 — it holds credentials)."""
     import tempfile
     path = str(path)
-    cfg = build_xray_config(profile, socks_port, http_port)
+    cfg = build_xray_config(profile, socks_port, http_port,
+                            upstream_socks_port)
     d = os.path.dirname(os.path.abspath(path))
     os.makedirs(d, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=d, prefix=".xray-", suffix=".json")

@@ -88,6 +88,20 @@ data class AppSettings(
     val excludedApps: Set<String> = emptySet(),
     // DNS-filter (ad-blocker) mode runs when the VPN is down
     val dnsFilterEnabled: Boolean = false,
+    // link bonding (Speedify-style multi-adapter VPN)
+    val bondServer: String = "",
+    val bondPort: Int = 10820,
+    val bondToken: String = "",
+    val bondMode: String = "bond",        // bond | balance
+    // bonding-VPN upstream: the bond server, or the bundled
+    // lantern-box (samizdat) engine
+    val bondUpstream: String = "bond",    // bond | samizdat
+    // samizdat profile (Lantern) — mirrors the desktop tab
+    val samAddress: String = "",
+    val samPort: Int = 443,
+    val samPublicKey: String = "",
+    val samShortId: String = "",
+    val samServerName: String = "",
 )
 
 /**
@@ -120,6 +134,16 @@ class SettingsStore(private val context: Context) {
         val excludedApps = stringSetPreferencesKey("excluded_apps")
         val dnsFilterEnabled = booleanPreferencesKey("dns_filter_enabled")
         val blocklists = stringPreferencesKey("blocklists_json")
+        val bondServer = stringPreferencesKey("bond_server")
+        val bondPort = intPreferencesKey("bond_port")
+        val bondToken = stringPreferencesKey("bond_token")
+        val bondMode = stringPreferencesKey("bond_mode")
+        val bondUpstream = stringPreferencesKey("bond_upstream")
+        val samAddress = stringPreferencesKey("sam_address")
+        val samPort = intPreferencesKey("sam_port")
+        val samPublicKey = stringPreferencesKey("sam_public_key")
+        val samShortId = stringPreferencesKey("sam_short_id")
+        val samServerName = stringPreferencesKey("sam_server_name")
     }
 
     /** Normalized protocol value (unknown → wireguard). */
@@ -131,6 +155,12 @@ class SettingsStore(private val context: Context) {
 
     private fun String.asDriver(): String =
         if (this == "tap") "tap" else "tun"
+
+    private fun String.asBondMode(): String =
+        if (this == "balance") "balance" else "bond"
+
+    private fun String.asUpstream(): String =
+        if (this == "samizdat") "samizdat" else "bond"
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
         AppSettings(
@@ -156,6 +186,16 @@ class SettingsStore(private val context: Context) {
             splitEnabled = p[Keys.splitEnabled] ?: false,
             excludedApps = p[Keys.excludedApps] ?: emptySet(),
             dnsFilterEnabled = p[Keys.dnsFilterEnabled] ?: false,
+            bondServer = p[Keys.bondServer] ?: "",
+            bondPort = p[Keys.bondPort] ?: 10820,
+            bondToken = p[Keys.bondToken] ?: "",
+            bondMode = (p[Keys.bondMode] ?: "bond").asBondMode(),
+            bondUpstream = (p[Keys.bondUpstream] ?: "bond").asUpstream(),
+            samAddress = p[Keys.samAddress] ?: "",
+            samPort = p[Keys.samPort] ?: 443,
+            samPublicKey = p[Keys.samPublicKey] ?: "",
+            samShortId = p[Keys.samShortId] ?: "",
+            samServerName = p[Keys.samServerName] ?: "",
         )
     }
 
@@ -204,6 +244,16 @@ class SettingsStore(private val context: Context) {
                 splitEnabled = p[Keys.splitEnabled] ?: false,
                 excludedApps = p[Keys.excludedApps] ?: emptySet(),
                 dnsFilterEnabled = p[Keys.dnsFilterEnabled] ?: false,
+                bondServer = p[Keys.bondServer] ?: "",
+                bondPort = p[Keys.bondPort] ?: 10820,
+                bondToken = p[Keys.bondToken] ?: "",
+                bondMode = (p[Keys.bondMode] ?: "bond").asBondMode(),
+                bondUpstream = (p[Keys.bondUpstream] ?: "bond").asUpstream(),
+                samAddress = p[Keys.samAddress] ?: "",
+                samPort = p[Keys.samPort] ?: 443,
+                samPublicKey = p[Keys.samPublicKey] ?: "",
+                samShortId = p[Keys.samShortId] ?: "",
+                samServerName = p[Keys.samServerName] ?: "",
             )
             val n = transform(s)
             p[Keys.username] = n.username
@@ -228,6 +278,16 @@ class SettingsStore(private val context: Context) {
             p[Keys.splitEnabled] = n.splitEnabled
             p[Keys.excludedApps] = n.excludedApps
             p[Keys.dnsFilterEnabled] = n.dnsFilterEnabled
+            p[Keys.bondServer] = n.bondServer
+            p[Keys.bondPort] = n.bondPort
+            p[Keys.bondToken] = n.bondToken
+            p[Keys.bondMode] = n.bondMode.asBondMode()
+            p[Keys.bondUpstream] = n.bondUpstream.asUpstream()
+            p[Keys.samAddress] = n.samAddress
+            p[Keys.samPort] = n.samPort
+            p[Keys.samPublicKey] = n.samPublicKey
+            p[Keys.samShortId] = n.samShortId
+            p[Keys.samServerName] = n.samServerName
         }
     }
 

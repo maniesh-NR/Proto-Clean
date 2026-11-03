@@ -30,6 +30,7 @@ from .vpn.xray import PROXY_ERROR, PROXY_OFF, PROXY_ON, PROXY_STARTING, XrayErro
 from .vpn.xrayconf import XrayProfile, XrayConfigError
 from .vpn.samizdat import SamizdatManager
 from .vpn.samizdatconf import SamizdatProfile, SamizdatConfigError
+from .vpn.bond import BondManager
 
 log = get("controller")
 
@@ -101,10 +102,15 @@ class Controller:
         self.connected_via: dict = {}
 
         # Xray / v2ray proxy (VLESS REALITY / Trojan) + samizdat (Lantern)
+        # + link bonding (multi-adapter)
         self.xray = XrayManager()
         self.samizdat = SamizdatManager()
+        self.bond = BondManager()
         self.proxy_state: str = PROXY_OFF
         self._proxy_lock = threading.Lock()
+        self.bond_state: str = PROXY_OFF
+        self._bond_listeners: List[Callable] = []
+        self._bond_lock = threading.Lock()
 
     # ------------------------------------------------------------- plumbing
     def _set_state(self, state: State, detail: str = "") -> None:
@@ -796,6 +802,8 @@ class Controller:
             for mgr in (self.samizdat, self.xray):
                 if mgr.running:
                     return {"server": f"socks5://127.0.0.1:{mgr.socks_port}"}
+            if self.bond.running:      # nothing else up: ride the bond
+                return {"server": f"socks5://127.0.0.1:{self.bond.socks_port}"}
         return None
 
     def _apply_browser_proxy(self) -> None:
@@ -858,10 +866,21 @@ class Controller:
                                 "warn")
                 return
             self._set_proxy(PROXY_STARTING)
+            # interop: when the bond is up and the engine's ride_bond
+            # toggle is on, the proxy outbound dials through the bond's
+            # local SOCKS — the tunnel rides every selected adapter
+            upstream = 0
+            if self.bond.running:
+                ride = getattr(
+                    self.settings.xray if provider != "samizdat"
+                    else self.settings.samizdat, "ride_bond", True)
+                if ride:
+                    upstream = self.bond.socks_port
             if provider == "samizdat":
                 s = self.settings.samizdat.normalized()
                 try:
                     profile = self._samizdat_profile_from_settings()
+                    mgr.upstream_socks_port = upstream
                     mgr.start(profile, socks_port=s.mixed_port)
                 except (XrayError, SamizdatConfigError) as e:
                     self._set_proxy(PROXY_ERROR, str(e))
@@ -874,6 +893,7 @@ class Controller:
                 x = self.settings.xray.normalized()
                 try:
                     profile = self._profile_from_settings()
+                    self.xray.upstream_socks_port = upstream
                     self.xray.start(profile, socks_port=x.socks_port,
                                     http_port=x.http_port)
                 except (XrayError, XrayConfigError) as e:
@@ -932,6 +952,101 @@ class Controller:
         st["provider"] = self._proxy_provider()
         return st
 
+    # ------------------------------------------------------- link bonding
+    def _set_bond(self, state: str, detail: str = "") -> None:
+        self.bond_state = state
+        log.info("bond -> %s (%s)", state, detail)
+        for fn in list(self._bond_listeners):
+            try:
+                fn(state, detail)
+            except Exception:  # noqa: BLE001
+                pass
+
+    def add_bond_listener(self, fn: Callable) -> None:
+        """Subscribe to bond state changes (multiple listeners allowed)."""
+        if fn not in self._bond_listeners:
+            self._bond_listeners.append(fn)
+
+    def save_bond_settings(self, bond) -> None:
+        """Persist a BondSettings (already normalized by the caller)."""
+        from .settings import update
+        update(**{"bond": bond})
+        self.settings = load_settings()
+
+    def start_bond_async(self) -> None:
+        """Start link bonding with the saved settings."""
+        self._spawn(self._bond_start_worker, "proto_clean-bond")
+
+    def stop_bond_async(self) -> None:
+        self._spawn(self._bond_stop_worker, "proto_clean-bond")
+
+    def _bond_start_worker(self) -> None:
+        if not self._bond_lock.acquire(blocking=False):
+            self.on_message("a bonding operation is already running", "warn")
+            return
+        try:
+            if self.bond.running:
+                self.on_message("link bonding is already running", "warn")
+                return
+            s = self.settings.bond.normalized()
+            if not s.server:
+                self._set_bond(PROXY_ERROR, "no server")
+                self.on_message(
+                    "Link bonding needs a bond server — run "
+                    "`python3 -m proto_clean.bondserver` on a VPS and "
+                    "enter its address in Settings → Link bonding", "error")
+                return
+            self._set_bond(PROXY_STARTING)
+            try:
+                self.bond.start(s)
+            except XrayError as e:
+                self._set_bond(PROXY_ERROR, str(e))
+                self.on_message(f"link bonding: {e}", "error")
+                return
+            if s.mode_proxy == "system":
+                try:
+                    self.bond.apply_system_proxy()
+                except Exception as e:  # noqa: BLE001
+                    self.on_message(
+                        f"Bonding is running but the system proxy could not "
+                        f"be set ({e}). Manual: SOCKS 127.0.0.1:"
+                        f"{self.bond.socks_port}", "warn")
+            n = len(self.bond.settings_snapshot.get("bind_ips", []))
+            self._set_bond(PROXY_ON, f"{s.mode} → {s.server}:{s.port}")
+            self.on_message(
+                f"Link bonding on ({s.mode}, {n or 1} adapter(s), server "
+                f"{s.server}:{s.port}) — SOCKS 127.0.0.1:{self.bond.socks_port}",
+                "info")
+            self._apply_browser_proxy()
+        finally:
+            self._bond_lock.release()
+
+    def _bond_stop_worker(self) -> None:
+        if not self._bond_lock.acquire(blocking=False):
+            self.on_message("a bonding operation is already running", "warn")
+            return
+        try:
+            if not self.bond.running and not self.bond._proxy_applied:
+                self._set_bond(PROXY_OFF)
+                return
+            try:
+                self.bond.stop()
+            except Exception as e:  # noqa: BLE001
+                self.on_message(f"bond stop failed: {e}", "warn")
+            self._set_bond(PROXY_OFF)
+            self.on_message("Link bonding off", "info")
+            self._apply_browser_proxy()
+        finally:
+            self._bond_lock.release()
+
+    def bond_status(self) -> dict:
+        """Synchronous bond snapshot for UI (tray / settings)."""
+        return self.bond.status()
+
+    def bond_upstream(self) -> int:
+        """The bond's local SOCKS port when it is running (else 0)."""
+        return self.bond.socks_port if self.bond.running else 0
+
     # ----------------------------------------------------------- split apps
     def move_pid_to_split(self, pid: int) -> bool:
         if not self.tunnel or not self.tunnel.split.active:
@@ -966,6 +1081,10 @@ class Controller:
                 pass
             try:
                 self.samizdat.stop()
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                self.bond.stop()
             except Exception:  # noqa: BLE001
                 pass
             self._teardown_partial()

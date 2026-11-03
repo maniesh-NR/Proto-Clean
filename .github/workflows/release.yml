@@ -9,17 +9,89 @@ permissions:
   contents: write
 
 env:
-  VERSION: 0.3.0
+  VERSION: 0.4.0
+  # lantern-box (Lantern's GPL-3 sing-box fork) — the samizdat engine we
+  # bundle. Pinned tag; the port job builds it from source for every
+  # target platform (official releases only publish linux binaries).
+  LANTERN_BOX_VERSION: v0.0.189
 
 jobs:
+  # -------------------------------------------------------- lantern-box port
+  # Proto Clean is GPL-3.0-or-later, so we may ship Lantern's engine.
+  # Cross-compiled from the pinned source with the tags lantern-box's
+  # own Makefile uses (all pure Go — CGO off works on every target).
+  lantern-box:
+    name: Port lantern-box (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux,   goarch: amd64, out: lantern-box-linux-amd64 }
+          - { goos: linux,   goarch: arm64, out: lantern-box-linux-arm64 }
+          - { goos: windows, goarch: amd64, out: lantern-box-windows-amd64.exe }
+          - { goos: windows, goarch: "386", out: lantern-box-windows-386.exe }
+          - { goos: darwin,  goarch: amd64, out: lantern-box-darwin-amd64 }
+          - { goos: darwin,  goarch: arm64, out: lantern-box-darwin-arm64 }
+          # android builds are packaged as liblanternbox.so for the
+          # jniLibs trick (executables may only run from nativeLibraryDir)
+          - { goos: android, goarch: arm64, out: "android-arm64/liblanternbox.so" }
+          - { goos: android, goarch: arm,   out: "android-arm/liblanternbox.so",
+              goarm: "7" }
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          check-latest: true
+
+      - name: Fetch lantern-box source (${{ env.LANTERN_BOX_VERSION }})
+        run: |
+          curl -fsSL \
+            "https://github.com/getlantern/lantern-box/archive/refs/tags/${LANTERN_BOX_VERSION}.tar.gz" \
+            | tar xz
+          mv lantern-box-* lantern-box-src
+
+      - name: Cross-compile
+        run: |
+          cd lantern-box-src/cmd
+          TAGS="with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale"
+          mkdir -p "../out/$(dirname '${{ matrix.out }}')"
+          if [ -n "${{ matrix.goarm }}" ]; then
+            export GOARM=${{ matrix.goarm }}
+          fi
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+            go build -trimpath -ldflags "-s -w" -tags "$TAGS" \
+            -o "../out/${{ matrix.out }}" .
+          "../out/${{ matrix.out }}" version 2>/dev/null || true
+          ls -la "../out/${{ matrix.out }}"
+
+      - name: License compliance note
+        run: |
+          # ship the GPL-3 offer: the source for this exact tag is public
+          cp lantern-box-src/LICENSE out/lantern-box-LICENSE.GPL-3.0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lantern-box-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: lantern-box-src/out/
+          if-no-files-found: error
+
   # ------------------------------------------------------------- Linux
   # Built on Ubuntu 22.04 (glibc 2.35) so the binaries run on every
   # current Linux Mint base: 21.x (jammy), 22.x (noble) and LMDE 6.
   linux:
     name: Linux (portable + debs + flatpak)
     runs-on: ubuntu-latest
+    needs: [lantern-box]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download the ported lantern-box
+        uses: actions/download-artifact@v4
+        with:
+          name: lantern-box-linux-amd64
+          path: lantern-box-bin
 
       - name: Build onedir in Ubuntu 22.04 (oldest current Mint base)
         run: |
@@ -40,6 +112,13 @@ jobs:
             dist/proto-clean/proto-clean --version'
           # docker ran as root: hand dist/ and build/ back to the runner
           sudo chown -R "$(id -u):$(id -g)" dist build 2>/dev/null || true
+
+      - name: Bundle lantern-box (samizdat engine) into the app dir
+        run: |
+          install -m 0755 lantern-box-bin/lantern-box-linux-amd64 \
+            dist/proto-clean/lantern-box
+          dist/proto-clean/lantern-box version || true
+
       - name: Smoke-test the onedir on Mint 21 base (jammy)
         run: |
           docker run --rm -v "$PWD":/src -w /src ubuntu:22.04 bash -exc '
@@ -68,6 +147,11 @@ jobs:
                 bash packaging/linux/makedeb.sh'
             mv "dist/proto-clean_${VERSION}-1_amd64.deb" \
                "dist/proto-clean_${VERSION}-${short}_amd64.deb"
+            # deb smoke test: the launcher target must exist in the pkg
+            dpkg-deb -x "dist/proto-clean_${VERSION}-${short}_amd64.deb" /tmp/debchk
+            test -x /tmp/debchk/opt/proto-clean/proto-clean
+            test -x /tmp/debchk/opt/proto-clean/lantern-box
+            rm -rf /tmp/debchk
           done
           ls -la dist/*.deb
 
@@ -82,6 +166,9 @@ jobs:
             --dest wheels PySide6 shiboken6 playwright dnslib httpx keyring \
             greenlet
           pip wheel --no-deps -w wheels .
+          # the samizdat engine ships inside the sandbox at /app/bin
+          install -m 0755 lantern-box-bin/lantern-box-linux-amd64 \
+            packaging/flatpak/lantern-box
           cd packaging/flatpak
           flatpak --user remote-add --if-not-exists flathub \
             https://flathub.org/repo/flathub.flatpakrepo || true
@@ -106,8 +193,15 @@ jobs:
   windows-modern:
     name: Windows 10/11 x64 (portable + setup)
     runs-on: windows-latest
+    needs: [lantern-box]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download the ported lantern-box
+        uses: actions/download-artifact@v4
+        with:
+          name: lantern-box-windows-amd64
+          path: lantern-box-bin
 
       - uses: actions/setup-python@v5
         with:
@@ -125,24 +219,28 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item packaging/windows/proto-clean.ico dist/
+          Copy-Item lantern-box-bin/lantern-box-windows-amd64.exe dist/ProtoClean/lantern-box.exe
+          & dist/ProtoClean/lantern-box.exe version; if ($LASTEXITCODE -gt 1) { exit 1 }
           @'
-          Proto Clean ${VERSION} — Windows 10/11 (64-bit, portable)
+          Proto Clean ${env:VERSION} — Windows 10/11 (64-bit, portable)
           =====================================================
 
           1. Extract anywhere and run ProtoClean.exe
              (right-click -> Run as administrator is NOT required;
              privileged verbs elevate one batch at a time via UAC).
           2. Install WireGuard for Windows:  https://download.wireguard.com/windows/
-          3. Optional Xray proxy (VLESS REALITY / Trojan):
+          3. Samizdat (Lantern) support is BUNDLED: lantern-box.exe sits
+             next to ProtoClean.exe — just import a samizdat:// URL.
+          4. Optional Xray proxy (VLESS REALITY / Trojan):
              install Xray-core and put xray.exe on PATH — see README.
-          4. First launch downloads a Playwright Chromium for the
+          5. First launch downloads a Playwright Chromium for the
              backend-browser login.
 
           For Windows 7/8 or 32-bit Windows use the -win7- builds instead.
           '@ | Set-Content dist/README-WINDOWS.txt
           Compress-Archive -Path dist/ProtoClean, dist/README-WINDOWS.txt, `
             dist/proto-clean.ico -DestinationPath `
-            "dist/Proto-Clean-0.3.0-win-x64-portable.zip" -Force
+            "dist/Proto-Clean-${env:VERSION}-win-x64-portable.zip" -Force
 
       - name: Build the Inno Setup installer
         shell: pwsh
@@ -162,14 +260,21 @@ jobs:
   windows-legacy:
     name: Windows 7+ ${{ matrix.arch }} (portable, Qt5)
     runs-on: windows-latest
+    needs: [lantern-box]
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { arch: x86,  installer: python-3.8.10.exe,       bindir: "py38-x86" }
-          - { arch: x64,  installer: python-3.8.10-amd64.exe, bindir: "py38-x64" }
+          - { arch: x86,  installer: python-3.8.10.exe,       bindir: "py38-x86",  boxarch: "386" }
+          - { arch: x64,  installer: python-3.8.10-amd64.exe, bindir: "py38-x64",  boxarch: "amd64" }
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download the ported lantern-box
+        uses: actions/download-artifact@v4
+        with:
+          name: lantern-box-windows-${{ matrix.boxarch }}
+          path: lantern-box-bin
 
       - name: Install Python 3.8 (last line with Windows 7 support)
         shell: pwsh
@@ -198,13 +303,16 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item packaging/windows/proto-clean.ico dist/
+          Copy-Item "lantern-box-bin/lantern-box-windows-${{ matrix.boxarch }}.exe" dist/ProtoClean/lantern-box.exe
           @'
-          Proto Clean ${VERSION} — Windows 7 and up (${{ matrix.arch }}, portable)
+          Proto Clean ${env:VERSION} — Windows 7 and up (${{ matrix.arch }}, portable)
           ===================================================================
 
           1. Extract anywhere and run ProtoClean.exe
           2. Install WireGuard for Windows:  https://download.wireguard.com/windows/
-          3. Optional Xray proxy (VLESS REALITY / Trojan):
+          3. Samizdat (Lantern) support is BUNDLED: lantern-box.exe sits
+             next to ProtoClean.exe — just import a samizdat:// URL.
+          4. Optional Xray proxy (VLESS REALITY / Trojan):
              install Xray-core and put xray.exe on PATH — see README.
 
           Legacy build: Python 3.8 + Qt 5.15 (PySide2) — the last Qt line
@@ -213,7 +321,7 @@ jobs:
           '@ | Set-Content dist/README-WINDOWS.txt
           Compress-Archive -Path dist/ProtoClean, dist/README-WINDOWS.txt, `
             dist/proto-clean.ico -DestinationPath `
-            "dist/Proto-Clean-0.3.0-win7-${{ matrix.arch }}-portable.zip" -Force
+            "dist/Proto-Clean-${env:VERSION}-win7-${{ matrix.arch }}-portable.zip" -Force
 
       - uses: actions/upload-artifact@v4
         with:
@@ -225,6 +333,7 @@ jobs:
   macos:
     name: macOS ${{ matrix.variant }}
     runs-on: macos-latest
+    needs: [lantern-box]
     strategy:
       fail-fast: false
       matrix:
@@ -234,12 +343,20 @@ jobs:
           - variant: "10.15-catalina-x86_64"
             target_arch: x86_64
             min_ver: "10.15"
+            box: lantern-box-darwin-amd64
           # Apple Silicon build (macOS 11+): native arm64, modern Qt 6.
           - variant: "11.0-arm64"
             target_arch: ""
             min_ver: "11.0"
+            box: lantern-box-darwin-arm64
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download the ported lantern-box
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.box }}
+          path: lantern-box-bin
 
       - name: Set up Python
         if: matrix.target_arch == ''
@@ -277,10 +394,16 @@ jobs:
           fi
           bash packaging/macos/build.sh
 
+      - name: Bundle lantern-box into the .app
+        run: |
+          install -m 0755 "lantern-box-bin/${{ matrix.box }}" \
+            "dist/Proto Clean.app/Contents/MacOS/lantern-box"
+          "dist/Proto Clean.app/Contents/MacOS/lantern-box" version || true
+
       - name: Zip the .app (portable)
         run: |
           cd dist
-          zip -qry "Proto-Clean-0.3.0-macos-${{ matrix.variant }}-portable.zip" "Proto Clean.app"
+          zip -qry "Proto-Clean-${VERSION}-macos-${{ matrix.variant }}-portable.zip" "Proto Clean.app"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -292,11 +415,18 @@ jobs:
   android:
     name: Android 8.0+ (armv7 + arm64 APKs)
     runs-on: ubuntu-latest
+    needs: [lantern-box]
     defaults:
       run:
         working-directory: android
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download the ported lantern-box (Android)
+        uses: actions/download-artifact@v4
+        with:
+          path: lantern-box-bin
+          pattern: lantern-box-android-*
 
       - uses: actions/setup-java@v4
         with:
@@ -307,22 +437,32 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Place lantern-box into jniLibs (nativeLibraryDir exec trick)
+        run: |
+          mkdir -p app/src/main/jniLibs/arm64-v8a \
+                   app/src/main/jniLibs/armeabi-v7a
+          install -m 0755 ../lantern-box-bin/lantern-box-android-arm64/android-arm64/liblanternbox.so \
+            app/src/main/jniLibs/arm64-v8a/liblanternbox.so
+          install -m 0755 ../lantern-box-bin/lantern-box-android-arm/android-arm/liblanternbox.so \
+            app/src/main/jniLibs/armeabi-v7a/liblanternbox.so
+          ls -la app/src/main/jniLibs/*/
+
       - name: Build debug APKs (installable, debug-signed)
         run: gradle assembleDebug --no-daemon
 
       - name: Rename APKs
         run: |
           cp app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk \
-             "$GITHUB_WORKSPACE/Proto-Clean-0.3.0-android-armeabi-v7a.apk"
+             "$GITHUB_WORKSPACE/Proto-Clean-${VERSION}-android-armeabi-v7a.apk"
           cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk \
-             "$GITHUB_WORKSPACE/Proto-Clean-0.3.0-android-arm64-v8a.apk"
+             "$GITHUB_WORKSPACE/Proto-Clean-${VERSION}-android-arm64-v8a.apk"
 
       - uses: actions/upload-artifact@v4
         with:
           name: android-apks
           path: |
-            Proto-Clean-0.3.0-android-armeabi-v7a.apk
-            Proto-Clean-0.3.0-android-arm64-v8a.apk
+            Proto-Clean-*-android-armeabi-v7a.apk
+            Proto-Clean-*-android-arm64-v8a.apk
           if-no-files-found: error
 
   # ------------------------------------------------------------- Publish
@@ -344,47 +484,66 @@ jobs:
       - name: Create / update release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.3.0
-          name: Proto Clean v0.3.0
+          tag_name: v0.4.0
+          name: Proto Clean v0.4.0
           body: |
-            New: the **samizdat protocol** (Lantern's DPI-buster —
-            HTTP/2 masquerade, uTLS fingerprints, Geneva fragmentation)
-            alongside Xray (VLESS + REALITY SNI masking / Trojan), plus
-            proxy-aware Proton access: logins, config downloads and
-            blocklist updates can ride the running proxy or an external
-            Lantern. Independent clean-room client for Proton accounts.
+            New in v0.4.0: **link bonding** — use two or more network
+            adapters as one pipe (Speedify-style stream bonding and
+            net-merge-style per-connection balancing, on every platform
+            including Android), and **bundled lantern-box** — the
+            samizdat engine now ships inside every package (the project
+            relicensed to **GPL-3.0-or-later** to comply with Lantern's
+            GPL-3).
 
             ## Downloads
             | Platform | File | Notes |
             |---|---|---|
-            | **Windows 7+ x64** | `Proto-Clean-0.3.0-win7-x64-portable.zip` | Python 3.8 + Qt 5.15 legacy stack |
-            | **Windows 7+ x86 (32-bit)** | `Proto-Clean-0.3.0-win7-x86-portable.zip` | 32-bit Qt 5.15 legacy stack |
-            | **Windows 10/11 x64 (portable)** | `Proto-Clean-0.3.0-win-x64-portable.zip` | Qt 6 modern stack |
-            | **Windows 10/11 x64 (setup)** | `Proto-Clean-0.3.0-win-x64-setup.exe` | Inno Setup installer |
-            | **macOS 10.15 Catalina+ (Intel)** | `Proto-Clean-0.3.0-macos-10.15-catalina-x86_64-portable.zip` | Qt 6.2, runs on 10.14+ |
-            | **macOS 11+ (Apple Silicon)** | `Proto-Clean-0.3.0-macos-11.0-arm64-portable.zip` | native arm64, Qt 6 |
-            | **Linux Mint 21 / Ubuntu 22.04** | `proto-clean_0.3.0-mint21-ubuntu22.04_amd64.deb` | also LMDE-era compatible glibc |
-            | **Linux Mint 22 / Ubuntu 24.04** | `proto-clean_0.3.0-mint22-ubuntu24.04_amd64.deb` | |
-            | **LMDE 6 / Debian 12** | `proto-clean_0.3.0-debian12_amd64.deb` | |
-            | **Linux (portable)** | `Proto-Clean-0.3.0-linux-x86_64-portable.tar.gz` | built on Ubuntu 22.04; runs on Mint 21/22, LMDE 6 |
-            | **Linux (Flatpak)** | `Proto-Clean-0.3.0-x86_64.flatpak` | `flatpak install --user Proto-Clean-0.3.0-x86_64.flatpak` |
-            | **Android 8.0+ (armv7)** | `Proto-Clean-0.3.0-android-armeabi-v7a.apk` | debug-signed APK |
-            | **Android 8.0+ (arm64)** | `Proto-Clean-0.3.0-android-arm64-v8a.apk` | debug-signed APK |
+            | **Windows 7+ x64** | `Proto-Clean-0.4.0-win7-x64-portable.zip` | Python 3.8 + Qt 5.15 legacy stack |
+            | **Windows 7+ x86 (32-bit)** | `Proto-Clean-0.4.0-win7-x86-portable.zip` | 32-bit Qt 5.15 legacy stack |
+            | **Windows 10/11 x64 (portable)** | `Proto-Clean-0.4.0-win-x64-portable.zip` | Qt 6 modern stack |
+            | **Windows 10/11 x64 (setup)** | `Proto-Clean-0.4.0-win-x64-setup.exe` | Inno Setup installer |
+            | **macOS 10.15 Catalina+ (Intel)** | `Proto-Clean-0.4.0-macos-10.15-catalina-x86_64-portable.zip` | Qt 6.2, runs on 10.14+ |
+            | **macOS 11+ (Apple Silicon)** | `Proto-Clean-0.4.0-macos-11.0-arm64-portable.zip` | native arm64, Qt 6 |
+            | **Linux Mint 21 / Ubuntu 22.04** | `proto-clean_0.4.0-mint21-ubuntu22.04_amd64.deb` | also LMDE-era compatible glibc |
+            | **Linux Mint 22 / Ubuntu 24.04** | `proto-clean_0.4.0-mint22-ubuntu24.04_amd64.deb` | |
+            | **LMDE 6 / Debian 12** | `proto-clean_0.4.0-debian12_amd64.deb` | |
+            | **Linux (portable)** | `Proto-Clean-0.4.0-linux-x86_64-portable.tar.gz` | built on Ubuntu 22.04; runs on Mint 21/22, LMDE 6 |
+            | **Linux (Flatpak)** | `Proto-Clean-0.4.0-x86_64.flatpak` | `flatpak install --user Proto-Clean-0.4.0-x86_64.flatpak` |
+            | **Android 8.0+ (armv7)** | `Proto-Clean-0.4.0-android-armeabi-v7a.apk` | debug-signed APK |
+            | **Android 8.0+ (arm64)** | `Proto-Clean-0.4.0-android-arm64-v8a.apk` | debug-signed APK |
 
             Every platform ships a **portable** build (extract & run — no
-            installation).
+            installation) and now **bundles lantern-box** (Lantern's
+            GPL-3 sing-box fork, built from
+            [getlantern/lantern-box](https://github.com/getlantern/lantern-box)
+            v0.0.189 — samizdat works out of the box).
 
-            ## Xray (v2ray) + samizdat (Lantern) proxies — new
-            * Import a `samizdat://…?pbk=…&sid=…&sni=…` URL for Lantern's
-              protocol (needs the separate lantern-box binary), or a
-              `vless://…?security=reality&pbk=…&sni=…` / `trojan://…` URL
-              for Xray (Settings → Proxy).
-            * REALITY **masks the connection as ordinary HTTPS to the
-              configured decoy SNI** with a uTLS browser fingerprint.
-            * Local SOCKS (127.0.0.1:10808) + HTTP (10809) inbounds;
-              optional automatic system-proxy switch (Linux gsettings /
-              Windows WinINET / macOS networksetup via the helper).
-            * Requires the separate Xray-core binary — see README.
+            ## Link bonding (new)
+            * **Stream bonding** — traffic to the same server is split
+              across Wi-Fi + Ethernet + tethering and **rejoined at your
+              bond server**, so one connection gets the combined
+              bandwidth of every adapter (Settings → Link bonding).
+            * **Per-connection balancing** — net-merge-style: each new
+              connection picks an adapter; many downloads spread across
+              links.
+            * Run the rejoin server on any host:
+              `python3 -m proto_clean.bondserver --listen 0.0.0.0:10820 --token s3cret`
+            * **Android**: the bonding VPN uses Wi-Fi + mobile data at the
+              same time (no root) — the Speedify feature set.
+            * **Interoperability**: leave "Ride the bond" on and Xray /
+              samizdat dial through the bond automatically; the browser
+              "auto" proxy mode rides it too. A dead adapter drops out of
+              the schedule and the survivors take over seamlessly.
+
+            ## Samizdat (Lantern) — now bundled
+            * The lantern-box engine ships with every package (desktop:
+              next to the app binary; Android: inside the APK).
+            * Import `samizdat://server:443?pbk=…&sid=…&sni=…` in
+              Settings → Proxy to use Lantern's HTTP/2 masquerade with
+              uTLS fingerprints, Geneva fragmentation and active-probe
+              resistance.
+            * Proto Clean is now **GPL-3.0-or-later** to comply with
+              Lantern's license.
 
             ## After install
             * Log in with your own Proton account (credentials stay in your
@@ -393,13 +552,14 @@ jobs:
               helper + sudoers line (printed by the deb postinst / see
               `scripts/install.sh`, `scripts/install_macos.sh`).
             * Flatpak note: the sandbox cannot run the privileged
-              WireGuard/OpenVPN helper — use the Xray proxy (host binary)
+              WireGuard/OpenVPN helper — use the bundled samizdat proxy
               and the DNS ad-blocker mode there.
 
             ## Attribution
             Built with **GLM**, an LLM by **Z.ai**. Uses PySide6/Qt,
-            Playwright, dnslib, httpx, keyring, PyInstaller, Inno Setup and
-            (optionally) Xray-core — see README for the full attribution.
+            Playwright, dnslib, httpx, keyring, PyInstaller, Inno Setup,
+            Xray-core and lantern-box (getlantern, GPL-3) — see README
+            for the full attribution.
 
             Not affiliated with or endorsed by Proton AG — see README.
           files: |

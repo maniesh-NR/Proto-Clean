@@ -12,6 +12,7 @@ import java.net.InetAddress
 object PacketKit {
 
     const val PROTO_UDP = 17
+    const val PROTO_TCP = 6
 
     data class ParsedIp(
         val version: Int,
@@ -31,7 +32,12 @@ object PacketKit {
 
     // -------------------------------------------------------------- parsing
 
-    fun parseIp(packet: ByteArray, length: Int): ParsedIp? {
+    fun parseIp(packet: ByteArray, length: Int): ParsedIp? =
+        parseIp(packet, length, PROTO_UDP)
+
+    /** Parse an IPv4/IPv6 header for a specific transport protocol
+     *  (TCP for the bonding VPN, UDP for DNS). */
+    fun parseIp(packet: ByteArray, length: Int, want: Int): ParsedIp? {
         if (length < 28) return null
         return when (packet[0].toInt() ushr 4) {
             4 -> {
@@ -40,7 +46,7 @@ object PacketKit {
                 val totalLen = ((packet[2].toInt() and 0xFF) shl 8) or
                     (packet[3].toInt() and 0xFF)
                 val proto = packet[9].toInt() and 0xFF
-                if (proto != PROTO_UDP) return null
+                if (proto != want) return null
                 ParsedIp(
                     version = 4,
                     src = packet.copyOfRange(12, 16),
@@ -53,7 +59,7 @@ object PacketKit {
             6 -> {
                 if (length < 48) return null
                 val next = packet[6].toInt() and 0xFF
-                if (next != PROTO_UDP) return null   // no extension headers expected for DNS
+                if (next != want) return null   // no extension headers expected
                 ParsedIp(
                     version = 6,
                     src = packet.copyOfRange(8, 24),
@@ -144,6 +150,112 @@ object PacketKit {
         out[46] = ((stored shr 8) and 0xFF).toByte()
         out[47] = (stored and 0xFF).toByte()
         return out
+    }
+
+
+    // ------------------------------------------------------------- TCP (bonding VPN)
+
+    data class ParsedTcp(
+        val srcPort: Int,
+        val dstPort: Int,
+        val seq: Long,          // unsigned 32-bit
+        val ack: Long,          // unsigned 32-bit
+        val dataOffset: Int,    // header length in bytes
+        val flags: Int,         // FIN=1 SYN=2 RST=4 PSH=8 ACK=16
+        val window: Int,
+        val dataOffsetInPacket: Int,   // absolute offset of the payload
+        val dataLength: Int,
+    )
+
+    fun parseTcp(packet: ByteArray, ip: ParsedIp): ParsedTcp? {
+        val off = ip.payloadOffset
+        if (ip.payloadLength < 20) return null
+        val sport = ((packet[off].toInt() and 0xFF) shl 8) or (packet[off + 1].toInt() and 0xFF)
+        val dport = ((packet[off + 2].toInt() and 0xFF) shl 8) or (packet[off + 3].toInt() and 0xFF)
+        val seq = readU32(packet, off + 4)
+        val ack = readU32(packet, off + 8)
+        val dataOffset = ((packet[off + 12].toInt() and 0xF0) ushr 4) * 4
+        if (dataOffset < 20 || off + dataOffset > packet.size) return null
+        val flags = packet[off + 13].toInt() and 0xFF
+        val window = ((packet[off + 14].toInt() and 0xFF) shl 8) or (packet[off + 15].toInt() and 0xFF)
+        val dataLen = maxOf(0, minOf(ip.payloadLength, packet.size - off) - dataOffset)
+        return ParsedTcp(sport, dport, seq, ack, dataOffset, flags, window,
+            off + dataOffset, dataLen)
+    }
+
+    private fun readU32(b: ByteArray, off: Int): Long =
+        ((b[off].toLong() and 0xFF) shl 24) or ((b[off + 1].toLong() and 0xFF) shl 16) or
+            ((b[off + 2].toLong() and 0xFF) shl 8) or (b[off + 3].toLong() and 0xFF)
+
+    const val TCP_FIN = 0x01
+    const val TCP_SYN = 0x02
+    const val TCP_RST = 0x04
+    const val TCP_PSH = 0x08
+    const val TCP_ACK = 0x10
+
+    /** IPv4 + TCP packet with a correct checksum (mandatory for TCP). */
+    fun buildIp4Tcp(
+        src: ByteArray, dst: ByteArray,
+        sport: Int, dport: Int,
+        seq: Long, ack: Long, flags: Int, window: Int,
+        payload: ByteArray = ByteArray(0),
+    ): ByteArray {
+        val tcpLen = 20 + payload.size
+        val total = 20 + tcpLen
+        val out = ByteArray(total)
+        // IPv4 header
+        out[0] = 0x45
+        out[2] = ((total shr 8) and 0xFF).toByte()
+        out[3] = (total and 0xFF).toByte()
+        out[6] = 0x40                                // don't fragment
+        out[8] = 64                                  // ttl
+        out[9] = PROTO_TCP.toByte()
+        System.arraycopy(src, 0, out, 12, 4)
+        System.arraycopy(dst, 0, out, 16, 4)
+        val ipCsum = headerChecksum(out, 0, 20)
+        out[10] = ((ipCsum shr 8) and 0xFF).toByte()
+        out[11] = (ipCsum and 0xFF).toByte()
+        // TCP header
+        out[20] = ((sport shr 8) and 0xFF).toByte()
+        out[21] = (sport and 0xFF).toByte()
+        out[22] = ((dport shr 8) and 0xFF).toByte()
+        out[23] = (dport and 0xFF).toByte()
+        writeU32(out, 24, seq)
+        writeU32(out, 28, ack)
+        out[32] = (5 shl 4).toByte()                 // data offset = 5 words
+        out[33] = flags.toByte()
+        out[34] = ((window shr 8) and 0xFF).toByte()
+        out[35] = (window and 0xFF).toByte()
+        // checksum 0 while computing
+        System.arraycopy(payload, 0, out, 40, payload.size)
+        var csum = pseudoHeaderChecksum4Tcp(src, dst, tcpLen) +
+            transportChecksum(out, 20, tcpLen)
+        csum = (csum and 0xFFFF) + (csum ushr 16)
+        csum = (csum and 0xFFFF) + (csum ushr 16)
+        val finalSum = (csum.inv()) and 0xFFFF
+        val stored = if (finalSum == 0) 0xFFFF else finalSum
+        out[36] = ((stored shr 8) and 0xFF).toByte()
+        out[37] = (stored and 0xFF).toByte()
+        return out
+    }
+
+    private fun writeU32(b: ByteArray, off: Int, v: Long) {
+        b[off] = ((v ushr 24) and 0xFF).toByte()
+        b[off + 1] = ((v ushr 16) and 0xFF).toByte()
+        b[off + 2] = ((v ushr 8) and 0xFF).toByte()
+        b[off + 3] = (v and 0xFF).toByte()
+    }
+
+    private fun pseudoHeaderChecksum4Tcp(src: ByteArray, dst: ByteArray, length: Int): Int {
+        var sum = 0
+        sum += ((src[0].toInt() and 0xFF) shl 8) or (src[1].toInt() and 0xFF)
+        sum += ((src[2].toInt() and 0xFF) shl 8) or (src[3].toInt() and 0xFF)
+        sum += ((dst[0].toInt() and 0xFF) shl 8) or (dst[1].toInt() and 0xFF)
+        sum += ((dst[2].toInt() and 0xFF) shl 8) or (dst[3].toInt() and 0xFF)
+        sum += (length shr 16) + (length and 0xFFFF)
+        sum += PROTO_TCP
+        sum = (sum and 0xFFFF) + (sum ushr 16)
+        return sum
     }
 
     // ------------------------------------------------------------ checksums

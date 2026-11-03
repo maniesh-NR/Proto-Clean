@@ -104,9 +104,35 @@ jobs:
       - name: Smoke-test wheel install
         run: |
           pip install dist/*.whl
-          python -c "import proto_clean, proto_clean.settings, proto_clean.vpn.wgconf, proto_clean.vpn.xrayconf; print('wheel OK:', proto_clean.__file__)"
+          python -c "import proto_clean, proto_clean.settings, proto_clean.vpn.wgconf, proto_clean.vpn.xrayconf, proto_clean.vpn.bondproto, proto_clean.vpn.bondserver; print('wheel OK:', proto_clean.__file__)"
 
       - uses: actions/upload-artifact@v4
         with:
           name: wheel
           path: dist/*.whl
+
+  # Kotlin compile check for the Android app (bonding VPN + WireGuard
+  # tunnel + DNS filter) — catches breakage before the release build.
+  android-compile:
+    name: Android compile check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Compile + assemble debug APK
+        working-directory: android
+        run: |
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties || true
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk

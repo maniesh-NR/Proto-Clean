@@ -19,8 +19,8 @@ from proto_clean.qtcompat import Qt
 from proto_clean.qtcompat import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog,
     QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-    QPushButton, QRadioButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
-    QMessageBox,
+    QListWidgetItem, QPushButton, QRadioButton, QSpinBox, QTabWidget,
+    QVBoxLayout, QWidget, QMessageBox,
 )
 
 from .. import credentials as creds
@@ -53,6 +53,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._split_tab(), "Split tunneling")
         tabs.addTab(self._portfwd_tab(), "Port forwarding")
         tabs.addTab(self._xray_tab(), "Proxy")
+        tabs.addTab(self._bond_tab(), "Link bonding")
 
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.reject)
@@ -232,11 +233,25 @@ class SettingsDialog(QDialog):
         self.xray_status = QLabel(self._xray_status_text())
         self.xray_status.setWordWrap(True)
         outer.addWidget(self.xray_status)
+
+        # ride-the-bond toggles (chain each engine through the bond's
+        # local SOCKS when bonding is running)
+        self.xray_ride = QCheckBox("Ride the bond: dial through link "
+                                   "bonding while it is running")
+        self.xray_ride.setChecked(
+            getattr(s, "ride_bond", True) and True)
+        self.xray_ride.toggled.connect(self._xray_persist)
+        self.sam_ride = QCheckBox("Samizdat: ride the bond as well")
+        self.sam_ride.setChecked(getattr(sam, "ride_bond", True) and True)
+        self.sam_ride.toggled.connect(self._samizdat_persist)
+        outer.addWidget(self.xray_ride)
+        outer.addWidget(self.sam_ride)
+
         outer.addWidget(QLabel(
-            "Engines are separate binaries (not bundled): Xray-core for "
-            "vless/trojan, lantern-box (Lantern's sing-box fork) for "
-            "samizdat — see the README. Profiles are stored locally with "
-            "your credentials and never uploaded."))
+            "Official builds bundle the engine binaries: Xray-core for "
+            "vless/trojan and lantern-box (Lantern's GPL-3 sing-box fork) "
+            "for samizdat — see the README. Profiles are stored locally "
+            "with your credentials and never uploaded."))
 
         # persist on every edit
         for wdg, sig in ((self.xray_proto, "currentIndexChanged"),
@@ -291,6 +306,7 @@ class SettingsDialog(QDialog):
             mode=self.xray_mode.currentData(),
             socks_port=self.xray_socks.value(),
             http_port=self.xray_http.value(),
+            ride_bond=self.xray_ride.isChecked(),
         ).normalized()
 
     def _xray_persist(self, *_) -> None:
@@ -309,6 +325,7 @@ class SettingsDialog(QDialog):
             padding_profile=self.sam_profile.currentData(),
             mode=self.sam_mode.currentData(),
             mixed_port=self.sam_mixed.value(),
+            ride_bond=self.sam_ride.isChecked(),
         ).normalized()
 
     def _samizdat_persist(self, *_) -> None:
@@ -406,6 +423,180 @@ class SettingsDialog(QDialog):
         return text
 
     # ------------------------------------------------------------- account
+    # ------------------------------------------------------ Link bonding
+    def _bond_tab(self) -> QWidget:
+        """Multi-adapter link bonding (Speedify-style stream bonding /
+        net-merge-style per-connection balancing)."""
+        w = QWidget()
+        outer = QVBoxLayout(w)
+        b = self.controller.settings.bond.normalized()
+
+        intro = QLabel(
+            "Use two or more network adapters at once. Traffic to the "
+            "same server is split across the selected adapters and "
+            "rejoined at your bond server, so one connection gets the "
+            "combined bandwidth of Wi-Fi + Ethernet + tethering. Run "
+            "<code>python3 -m proto_clean.bondserver</code> on any "
+            "reachable host (VPS) first.")
+        intro.setWordWrap(True)
+        outer.addWidget(intro)
+
+        form = QFormLayout()
+        self.bond_mode = QComboBox()
+        self.bond_mode.addItem("Stream bonding — every connection uses "
+                               "all adapters (max bandwidth)", "bond")
+        self.bond_mode.addItem("Per-connection balancing — spread "
+                               "connections across adapters (net-merge "
+                               "style)", "balance")
+        self.bond_mode.setCurrentIndex(
+            0 if b.mode == "bond" else 1)
+        self.bond_server = QLineEdit(b.server)
+        self.bond_server.setPlaceholderText("bond server host")
+        self.bond_port = QSpinBox()
+        self.bond_port.setRange(1, 65535)
+        self.bond_port.setValue(b.port)
+        self.bond_token = QLineEdit(b.token)
+        self.bond_token.setEchoMode(QLineEdit.Password)
+        self.bond_token.setPlaceholderText(
+            "shared secret (optional; must match the server --token)")
+        self.bond_socks = QSpinBox()
+        self.bond_socks.setRange(1024, 65535)
+        self.bond_socks.setValue(b.socks_port)
+        self.bond_proxy_mode = QComboBox()
+        self.bond_proxy_mode.addItem(
+            "Manual (apps point at the SOCKS port themselves)", "manual")
+        self.bond_proxy_mode.addItem(
+            "Set the system SOCKS proxy automatically (Linux desktops)",
+            "system")
+        self.bond_proxy_mode.setCurrentIndex(
+            1 if b.mode_proxy == "system" else 0)
+        form.addRow("Mode", self.bond_mode)
+        form.addRow("Bond server", self.bond_server)
+        form.addRow("Server port", self.bond_port)
+        form.addRow("Token", self.bond_token)
+        form.addRow("Local SOCKS port", self.bond_socks)
+        form.addRow("System proxy", self.bond_proxy_mode)
+        outer.addLayout(form)
+
+        # adapter selection: detected adapters (checkboxes) + manual extras
+        from ..vpn.bondnet import list_adapters
+        self.bond_if_list = QListWidget()
+        self._bond_fill_adapters()
+        refresh_btn = QPushButton("Refresh adapters")
+        refresh_btn.clicked.connect(self._bond_refresh_adapters)
+        self.bond_if_manual = QLineEdit(", ".join(
+            i for i in b.interfaces if "=" not in i and
+            not any(a.name == i for a in list_adapters())))
+        self.bond_if_manual.setPlaceholderText(
+            "extra adapters / IPs, comma separated "
+            "(e.g. usb0, 172.20.10.2)")
+        outer.addWidget(QLabel("Adapters to bond (detected):"))
+        outer.addWidget(self.bond_if_list)
+        outer.addWidget(refresh_btn)
+        outer.addWidget(QLabel("Manual entries (adapter names or IPs):"))
+        outer.addWidget(self.bond_if_manual)
+
+        btns = QHBoxLayout()
+        start_btn = QPushButton("Start bonding")
+        start_btn.clicked.connect(self.controller.start_bond_async)
+        stop_btn = QPushButton("Stop bonding")
+        stop_btn.clicked.connect(self.controller.stop_bond_async)
+        btns.addWidget(start_btn)
+        btns.addWidget(stop_btn)
+        btns.addWidget(refresh_btn)
+        outer.addLayout(btns)
+
+        self.bond_status = QLabel(self._bond_status_text())
+        self.bond_status.setWordWrap(True)
+        outer.addWidget(self.bond_status)
+        outer.addWidget(QLabel(
+            "Chain it up: leave \u201cRide the bond\u201d on in the Proxy "
+            "tab and Xray / samizdat dial through bonding automatically; "
+            "the browser-routing \u201cauto\u201d mode uses it too."))
+
+        for wdg, sig in ((self.bond_mode, "currentIndexChanged"),
+                         (self.bond_proxy_mode, "currentIndexChanged"),
+                         (self.bond_port, "valueChanged"),
+                         (self.bond_socks, "valueChanged"),
+                         (self.bond_server, "textChanged"),
+                         (self.bond_token, "textChanged"),
+                         (self.bond_if_manual, "textChanged")):
+            getattr(wdg, sig).connect(self._bond_persist)
+        self.bond_if_list.itemChanged.connect(self._bond_persist)
+        self.controller.add_bond_listener(self._bond_on_state)
+        return w
+
+    def _bond_fill_adapters(self, checked: "list" = None) -> None:
+        """(Re)populate the adapter checklist from the OS."""
+        from ..vpn.bondnet import list_adapters
+        selected = set(checked if checked is not None else
+                       self.controller.settings.bond.interfaces)
+        self.bond_if_list.blockSignals(True)
+        self.bond_if_list.clear()
+        for adapter in list_adapters():
+            item = QListWidgetItem(f"{adapter.name}  ({adapter.ipv4})")
+            item.setData(Qt.UserRole, adapter.name)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if adapter.name in selected
+                               else Qt.Unchecked)
+            self.bond_if_list.addItem(item)
+        self.bond_if_list.blockSignals(False)
+
+    def _bond_refresh_adapters(self) -> None:
+        self._bond_fill_adapters(
+            checked=self._bond_selected_from_list())
+
+    def _bond_selected_from_list(self) -> list:
+        out = []
+        for i in range(self.bond_if_list.count()):
+            item = self.bond_if_list.item(i)
+            if item.checkState() == Qt.Checked:
+                out.append(str(item.data(Qt.UserRole)))
+        return out
+
+    def _bond_collect(self):
+        from ..settings import BondSettings
+        manual = [t.strip() for t in
+                  self.bond_if_manual.text().split(",") if t.strip()]
+        return BondSettings(
+            server=self.bond_server.text(),
+            port=self.bond_port.value(),
+            token=self.bond_token.text(),
+            mode=self.bond_mode.currentData(),
+            interfaces=self._bond_selected_from_list() + manual,
+            socks_port=self.bond_socks.value(),
+            mode_proxy=self.bond_proxy_mode.currentData(),
+        ).normalized()
+
+    def _bond_persist(self, *_) -> None:
+        self.controller.save_bond_settings(self._bond_collect())
+
+    def _bond_on_state(self, state: str, detail: str = "") -> None:
+        self.bond_status.setText(self._bond_status_text(detail))
+        if hasattr(self, "bond_status"):
+            st = self.controller.bond_status()
+            if st.get("members"):
+                lines = [self.bond_status.text()]
+                for ip, m in sorted(st["members"].items()):
+                    lines.append(
+                        f"\u2022 {ip}: {'up' if m['alive'] else 'down'} — "
+                        f"\u2191 {m['up'] / 1024:.1f} KiB, "
+                        f"\u2193 {m['down'] / 1024:.1f} KiB")
+                self.bond_status.setText("\n".join(lines))
+
+    def _bond_status_text(self, detail: str = "") -> str:
+        st = getattr(self.controller, "bond_state", "off")
+        words = {"off": "Link bonding off", "starting": "Starting\u2026",
+                 "on": "Link bonding on", "error": "Bonding error"}
+        text = words.get(st, st)
+        if detail:
+            text += f" \u2014 {detail}"
+        if st == "on":
+            s = self.controller.bond_status()
+            text += (f" ({s.get('mode', '')}, {s.get('sessions', 0)} "
+                     f"session(s), server {s.get('server', '')})")
+        return text
+
     def _account_tab(self) -> QWidget:
         w = QWidget()
         form = QFormLayout(w)

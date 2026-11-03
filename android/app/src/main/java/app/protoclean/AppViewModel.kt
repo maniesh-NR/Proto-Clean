@@ -10,6 +10,8 @@ import app.protoclean.data.BlocklistEntry
 import app.protoclean.data.ConfigCache
 import app.protoclean.data.CredentialsStore
 import app.protoclean.data.SettingsStore
+import app.protoclean.bond.BondVpnService
+import app.protoclean.bond.SamizdatManager
 import app.protoclean.dns.DnsFilterVpnService
 import app.protoclean.proton.ConfigOptions
 import app.protoclean.proton.LogicalServer
@@ -362,6 +364,60 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 settings.update { it.copy(dnsFilterEnabled = false) }
                 DnsFilterVpnService.stop(appCtx)
                 say("Ad-blocker off")
+            }
+        }
+    }
+
+    // --------------------------------------------------------- link bonding
+
+    /** Toggle the Speedify-style bonding VPN (Wi-Fi + mobile data as one
+     *  pipe; needs a bond server — run the desktop app's
+     *  `python3 -m proto_clean.bondserver` on any reachable host). */
+    fun setBonding(enabled: Boolean) {
+        viewModelScope.launch {
+            if (enabled) {
+                if (_ui.value.vpnState == VpnState.CONNECTED ||
+                    _ui.value.vpnState == VpnState.CONNECTING) {
+                    say("disconnect the VPN first — Android allows one VPN at a time", "warn")
+                    return@launch
+                }
+                val cfg = s()
+                if (cfg.bondUpstream == "samizdat" &&
+                    (cfg.samAddress.isBlank() || cfg.samPublicKey.isBlank() ||
+                     cfg.samShortId.isBlank())) {
+                    say("set the samizdat profile in Settings first " +
+                        "(server, pbk, sid)", "error")
+                    return@launch
+                }
+                if (cfg.bondUpstream == "bond" && cfg.bondServer.isBlank()) {
+                    say("set the bond server in Settings first (run " +
+                        "proto_clean.bondserver on a VPS)", "error")
+                    return@launch
+                }
+                if (DnsFilterVpnService.running) {
+                    DnsFilterVpnService.stop(appCtx)
+                    settings.update { it.copy(dnsFilterEnabled = false) }
+                    delay(500)
+                }
+                BondVpnService.Config.server = cfg.bondServer
+                BondVpnService.Config.port = cfg.bondPort
+                BondVpnService.Config.token = cfg.bondToken
+                BondVpnService.Config.mode = cfg.bondMode
+                BondVpnService.Config.upstream = cfg.bondUpstream
+                SamizdatManager.Config.address = cfg.samAddress
+                SamizdatManager.Config.port = cfg.samPort
+                SamizdatManager.Config.publicKey = cfg.samPublicKey
+                SamizdatManager.Config.shortId = cfg.samShortId
+                SamizdatManager.Config.serverName = cfg.samServerName
+                BondVpnService.start(appCtx)
+                say(if (cfg.bondUpstream == "samizdat")
+                    "Samizdat on — traffic rides Lantern's masquerade"
+                else
+                    "Link bonding on — Wi-Fi + mobile data combined " +
+                    "(${cfg.bondMode})")
+            } else {
+                BondVpnService.stop(appCtx)
+                say("Link bonding off")
             }
         }
     }

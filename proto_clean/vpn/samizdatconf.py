@@ -16,8 +16,10 @@ website over HTTP/2:
 Lantern ships samizdat as inbound/outbound adapters in
 `lantern-box <https://github.com/getlantern/lantern-box>`_, a sing-box
 fork. This module generates the *documented client config format* and
-drives that binary — no Lantern code is included (Lantern and lantern-box
-are GPL-3; Proto Clean is MIT).
+drives that binary. Proto Clean is GPL-3.0-or-later, so the official
+releases also **bundle lantern-box binaries** built from the Lantern
+source (see ``find_box_binary`` in vpn/samizdat.py for the lookup
+order — PATH, bundle locations and ``PROTO_CLEAN_BOX_BIN``).
 
 Share URLs use the same parameter names as our VLESS/REALITY importer:
 ``samizdat://server:443?pbk=<64-hex>&sid=<16-hex>&sni=ok.ru&fp=chrome#label``
@@ -174,8 +176,14 @@ def parse_samizdat_url(url: str) -> SamizdatProfile:
 
 
 def build_samizdat_config(profile: SamizdatProfile,
-                          mixed_port: int = DEFAULT_MIXED_PORT) -> dict:
-    """The sing-box/lantern-box client config (as a plain dict)."""
+                          mixed_port: int = DEFAULT_MIXED_PORT,
+                          upstream_socks_port: int = 0) -> dict:
+    """The sing-box/lantern-box client config (as a plain dict).
+
+    ``upstream_socks_port`` chains the samizdat outbound through the
+    bond engine's local SOCKS (sing-box ``detour``), so the masqueraded
+    HTTP/2 stream itself rides every selected adapter.
+    """
     p = profile.normalized()
     if not p.address:
         raise SamizdatConfigError("server address is empty")
@@ -201,22 +209,31 @@ def build_samizdat_config(profile: SamizdatProfile,
     }
     if p.server_name:
         outbound["server_name"] = p.server_name
+    outbounds = [outbound, {"type": "direct", "tag": "direct"}]
+    if upstream_socks_port:
+        outbound["detour"] = "bond-out"
+        outbounds.append({
+            "type": "socks", "tag": "bond-out",
+            "server": "127.0.0.1", "server_port": int(upstream_socks_port),
+            "version": "5",
+        })
     return {
         "log": {"level": "warn"},
         # mixed inbound = SOCKS5 + HTTP CONNECT on one port
         "inbounds": [{"type": "mixed", "tag": "mixed-in",
                       "listen": "127.0.0.1", "listen_port": int(mixed_port)}],
-        "outbounds": [outbound, {"type": "direct", "tag": "direct"}],
+        "outbounds": outbounds,
         "route": {"rules": [{"ip_is_private": True, "outbound": "direct"}]},
     }
 
 
 def write_samizdat_config(profile: SamizdatProfile, path,
-                          mixed_port: int = DEFAULT_MIXED_PORT) -> str:
+                          mixed_port: int = DEFAULT_MIXED_PORT,
+                          upstream_socks_port: int = 0) -> str:
     """Write the config to *path* (chmod 600 — it holds pre-shared keys)."""
     import tempfile
     path = str(path)
-    cfg = build_samizdat_config(profile, mixed_port)
+    cfg = build_samizdat_config(profile, mixed_port, upstream_socks_port)
     d = os.path.dirname(os.path.abspath(path))
     os.makedirs(d, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=d, prefix=".samizdat-", suffix=".json")

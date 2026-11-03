@@ -98,6 +98,7 @@ class XrayManager:
         self._saved_proxy: Optional[dict] = None
         self.socks_port = DEFAULT_SOCKS_PORT
         self.http_port = DEFAULT_HTTP_PORT
+        self.upstream_socks_port = 0      # bond chaining (ride the bond)
         self.profile: Optional[XrayProfile] = None
 
     # ------------------------------------------------------------ overrides
@@ -105,7 +106,8 @@ class XrayManager:
         return find_xray_binary(explicit or self._binary)
 
     def _write_config(self, profile, path: str) -> None:
-        write_xray_config(profile, path, self.socks_port, self.http_port)
+        write_xray_config(profile, path, self.socks_port, self.http_port,
+                          getattr(self, "upstream_socks_port", 0))
 
     def _run_args(self, exe: str, config_path: str) -> list:
         return [exe, "run", "-c", config_path]

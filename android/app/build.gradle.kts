@@ -12,7 +12,7 @@ android {
         minSdk = 26            // Android 8.0 Oreo
         targetSdk = 34
         versionCode = 3
-        versionName = "0.3.0"
+        versionName = "0.4.0"
     }
 
     // Per-ABI APKs (armv7 + arm64) as requested for the release matrix.

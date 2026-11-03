@@ -26,11 +26,18 @@ class Tray(QSystemTrayIcon):
         self.proxy_action.setToolTip("Toggle the proxy engine (Xray VLESS "
                                      "REALITY / Trojan, or samizdat)")
         self.proxy_action.toggled.connect(self._toggle_proxy)
+        self.bond_action = QAction("Link bonding (multi-adapter)", self)
+        self.bond_action.setCheckable(True)
+        self.bond_action.setToolTip("Combine two or more network adapters "
+                                    "into one fat pipe (needs a bond "
+                                    "server)")
+        self.bond_action.toggled.connect(self._toggle_bond)
         self.quit_action = QAction("Quit", self)
         self.quit_action.triggered.connect(self._quit)
         menu.addAction(self.show_action)
         menu.addAction(self.toggle_action)
         menu.addAction(self.proxy_action)
+        menu.addAction(self.bond_action)
         menu.addSeparator()
         menu.addAction(self.quit_action)
         self.setContextMenu(menu)
@@ -42,6 +49,8 @@ class Tray(QSystemTrayIcon):
         self._on_state(controller.state.value, controller.state_detail)
         self.controller.add_proxy_listener(self._on_proxy)
         self._on_proxy(controller.proxy_state, "")
+        self.controller.add_bond_listener(self._on_bond)
+        self._on_bond(controller.bond_state, "")
 
     def _on_state(self, state: str, detail: str) -> None:
         if state in (State.CONNECTED.value,):
@@ -71,6 +80,19 @@ class Tray(QSystemTrayIcon):
             self.controller.start_proxy_async()
         else:
             self.controller.stop_proxy_async()
+
+    def _on_bond(self, state: str, detail: str) -> None:
+        on = state == "on"
+        self.bond_action.blockSignals(True)
+        self.bond_action.setChecked(on)
+        self.bond_action.blockSignals(False)
+        self.bond_action.setText("Bonding: on" if on else "Link bonding")
+
+    def _toggle_bond(self, on: bool) -> None:
+        if on:
+            self.controller.start_bond_async()
+        else:
+            self.controller.stop_bond_async()
 
     def _quit(self) -> None:
         self.controller.shutdown()

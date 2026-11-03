@@ -28,7 +28,7 @@ install -d "$PKGDIR/opt/proto-clean" \
             "$PKGDIR/DEBIAN"
 
 # ---------------------------------------------------------------- app bundle
-cp -R dist/proto-clean/. "$PKGDIR/opt/proto_clean/"
+cp -R dist/proto-clean/. "$PKGDIR/opt/proto-clean/"
 
 # ---------------------------------------------------------------- launcher
 cat > "$PKGDIR/usr/bin/proto-clean" <<'EOF'

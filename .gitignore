@@ -65,3 +65,7 @@ android/.idea/
 *.deb
 *.dmg
 *.msi
+
+# bundled engine binaries (dropped in by CI)
+packaging/flatpak/lantern-box*
+android/app/src/main/jniLibs/

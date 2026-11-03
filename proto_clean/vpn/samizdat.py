@@ -3,9 +3,11 @@
 Drives a sing-box compatible binary with a generated samizdat client
 config (see :mod:`proto_clean.vpn.samizdatconf`). Samizdat ships as
 inbound/outbound adapters in **lantern-box**, Lantern's sing-box fork —
-install that binary (or a sing-box build with samizdat support) and this
-manager runs it exactly like the Xray engine: spawn, wait for the local
-mixed (SOCKS+HTTP) inbound, switch the system proxy when asked.
+the official builds **bundle lantern-box next to the app binary**
+(built from the Lantern source in CI; Proto Clean is GPL-3.0-or-later,
+so the combination complies with the engine's license). ``find_box_binary``
+also picks up PATH installs, the deb/Flatpak locations and
+``PROTO_CLEAN_BOX_BIN``.
 
 The whole lifecycle, system-proxy integration and status reporting are
 inherited from :class:`proto_clean.vpn.xray.XrayManager`; only the binary
@@ -28,7 +30,14 @@ log = get("samizdat")
 
 
 def find_box_binary(explicit: str = "") -> Optional[str]:
-    """Locate the lantern-box / sing-box binary (samizdat support)."""
+    """Locate the lantern-box / sing-box binary (samizdat support).
+
+    Order: an explicit path, ``PROTO_CLEAN_BOX_BIN``, PATH, the app's
+    own bundle directory (the official builds ship lantern-box next to
+    the executable — onedir on every OS, .app/Contents/MacOS on macOS,
+    /app/bin in the Flatpak, /opt/proto-clean from the debs), and the
+    usual install prefixes.
+    """
     candidates = []
     if explicit:
         candidates.append(explicit)
@@ -43,11 +52,16 @@ def find_box_binary(explicit: str = "") -> Optional[str]:
         which = shutil.which(name)
         if which:
             candidates.append(which)
+    # next to our own executable — the bundled engine (frozen apps and
+    # unpackaged runs alike)
+    app_dir = os.path.dirname(os.path.abspath(sys.executable))
+    meipass = getattr(sys, "_MEIPASS", "")
     if sys.platform.startswith("win"):
-        local = os.path.dirname(os.path.abspath(sys.executable))
+        local = app_dir
         for name in names:
             candidates += [
                 os.path.join(local, name),
+                os.path.join(meipass, name) if meipass else "",
                 os.path.join(os.environ.get("ProgramFiles",
                                             r"C:\Program Files"),
                              "lantern-box", name),
@@ -56,7 +70,13 @@ def find_box_binary(explicit: str = "") -> Optional[str]:
         home = os.path.expanduser("~")
         for name in names:
             candidates += [
+                os.path.join(app_dir, name),
+                os.path.join(meipass, name) if meipass else "",
+                # deb install tree
+                "/opt/proto-clean/" + name,
                 f"/usr/local/bin/{name}", f"/usr/bin/{name}",
+                # Flatpak sandbox
+                f"/app/bin/{name}",
                 f"{home}/bin/{name}", f"/opt/lantern-box/{name}",
                 f"/opt/homebrew/bin/{name}",
             ]
@@ -76,13 +96,15 @@ class SamizdatManager(XrayManager):
         return find_box_binary(explicit or self._binary)
 
     def _write_config(self, profile, path: str) -> None:
-        write_samizdat_config(profile, path, mixed_port=self.socks_port)
+        write_samizdat_config(profile, path, mixed_port=self.socks_port,
+                              upstream_socks_port=getattr(
+                                  self, "upstream_socks_port", 0))
 
     def _binary_help(self) -> str:
-        return ("the lantern-box binary was not found — samizdat ships in "
-                "lantern-box (Lantern's sing-box fork, "
-                "https://github.com/getlantern/lantern-box); install it or "
-                "set PROTO_CLEAN_BOX_BIN")
+        return ("the lantern-box binary was not found — the official builds "
+                "bundle it next to the app; otherwise install lantern-box "
+                "(https://github.com/getlantern/lantern-box) or set "
+                "PROTO_CLEAN_BOX_BIN")
 
     def start(self, profile: SamizdatProfile,
               socks_port: int = DEFAULT_MIXED_PORT,

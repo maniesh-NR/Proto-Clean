@@ -80,6 +80,15 @@ Android** — built around your own Proton account:
   live-switches when the system flips between light and dark. The choice
   is remembered across launches (legacy `prefer_dark_theme` settings
   migrate automatically).
+- **Link bonding — all your adapters as one pipe** — traffic to the
+  same server is split across two or more network adapters (Wi-Fi +
+  Ethernet + tethering) and **rejoined at your bond server**, so one
+  download uses the combined bandwidth of every link (Speedify-style
+  channel bonding, userspace). *Per-connection balancing* spreads many
+  connections across adapters net-merge-style. On Android the bonding
+  VPN uses **Wi-Fi + mobile data simultaneously, no root**. Works with
+  the other engines: Xray and samizdat *ride the bond* automatically
+  (Settings → Link bonding).
 
 Per-OS plumbing, packaging and limitations: **[docs/PLATFORMS.md](docs/PLATFORMS.md)**
 (Android app: **[android/README.md](android/README.md)**).
@@ -291,12 +300,74 @@ How to use it in Proto Clean:
   (gsettings / WinINET / networksetup) and the local-only, `chmod 600`
   config storage.
 
-**Licensing (important):** Lantern, samizdat and lantern-box are
-**GPL-3 projects by the Lantern team**. Proto Clean is MIT and contains
-**no Lantern code** — this feature is clean-room interop via the
-*documented* lantern-box client config format and standard local proxy
-ports. Install their GPL binaries separately; your profile credentials
-never leave your machine.
+**Licensing:** Proto Clean is **GPL-3.0-or-later**. Lantern,
+samizdat and lantern-box are **GPL-3 projects by the Lantern team** —
+because the licenses are now compatible, the official releases **bundle
+lantern-box binaries built from the Lantern source at release time**
+(the `lantern-box` you get ships inside every package; set
+`PROTO_CLEAN_BOX_BIN` to use your own). The Python code drives the
+binary through its *documented* client config format — no Lantern
+source is copied into this repository's codebase — and your profile
+credentials never leave your machine.
+
+## Link bonding — two or more adapters as one connection
+
+Speedify's headline feature, in userspace and with **your own server**.
+Each bonded TCP stream is split into sequenced chunks; one *member*
+connection per selected adapter carries the chunks (every socket bound
+to its adapter's address); the bond server reorders and rejoins them.
+Responses are split the same way in reverse — one download can use the
+combined bandwidth of Wi-Fi + Ethernet + a phone tether.
+
+1. **Run the bond server** on any reachable host (a VPS, a home box):
+
+   ```bash
+   pip install proto-clean        # or clone the repo
+   python3 -m proto_clean.bondserver --listen 0.0.0.0:10820 --token s3cret
+   ```
+
+2. **Settings → Link bonding** in the app: enter the server, pick the
+   adapters (they are detected; manual names or IPs work too) and press
+   *Start bonding*. The local SOCKS5 frontend listens on
+   `127.0.0.1:10811`.
+
+Two modes:
+
+* **Stream bonding** — every stream rides *all* adapters at once
+  (maximum bandwidth for a single connection).
+* **Per-connection balancing** — each new stream is assigned to one
+  adapter, round-robin (net-merge behaviour; great for many parallel
+  downloads).
+
+A dropped adapter is removed from the schedule and its share moves to
+the survivors mid-stream — the stream keeps flowing (chunks are
+sequence-numbered, so re-ordering across links is free). Per-adapter
+stats (up/down bytes, alive) are shown in the settings tab.
+
+**Interoperability** — the bond composes with everything else:
+
+* **Xray / samizdat ride the bond**: with *Ride the bond* enabled
+  (default), their outbound dials through the bond's SOCKS frontend, so
+  the VLESS/REALITY or masqueraded HTTP/2 tunnel itself is split across
+  your adapters (Xray `proxySettings` chaining / sing-box `detour`).
+* The browser-routing **auto** mode uses the running proxy, or the bond
+  directly when nothing else is up.
+* The wire protocol (PCB — Proto Clean Bond) is spoken identically by
+  the desktop (Python) and Android (Kotlin) clients: any client can use
+  any `proto_clean.bondserver`.
+
+**Android** — the bonding VPN (Settings → Link bonding) captures all
+traffic, forwards every TCP flow through Wi-Fi **and** mobile data at
+the same time (no root: member sockets are `VpnService.protect`ed and
+bound to their network), and answers DNS through a protected socket.
+Android allows one VPN at a time, so bonding replaces the
+tunnel/ad-blocker while it runs. The *Upstream* selector can send the
+TUN traffic through the **bundled lantern-box samizdat engine** instead
+of the bond server — Lantern's masquerade on Android, no root.
+
+**Limits** — TCP only (UDP stays on one adapter or is dropped inside the
+bonding VPN); the userspace TCP responder on Android is deliberately
+minimal (no retransmit pacing); one bond server per client config.
 
 ## Security notes
 
@@ -438,8 +509,8 @@ for the privileged helper).
 This project was developed with the assistance of **[GLM](https://z.ai),
 a large language model by Z.ai** — the code, tests, packaging and CI in
 this repository were generated and iterated with the model under human
-direction. All AI-generated content is MIT-licensed like the rest of the
-project.
+direction. All AI-generated content is GPL-3.0-or-later-licensed like
+the rest of the project.
 
 Proto Clean builds on outstanding open-source work:
 
@@ -457,11 +528,16 @@ Proto Clean builds on outstanding open-source work:
   optional proxy engine for the VLESS REALITY / Trojan feature (not
   bundled; install it separately)
 - [Lantern](https://github.com/getlantern) — the samizdat
-  censorship-resistance protocol and the lantern-box engine it
-  inspired are GPL-3 works by the Lantern team (Brave New Software /
-  getlantern). Proto Clean's samizdat support is clean-room interop
-  with their documented config format; no Lantern code is included and
-  their binaries are optional, separate installs. "Lantern" is a
+  censorship-resistance protocol, and **lantern-box**
+  ([getlantern/lantern-box](https://github.com/getlantern/lantern-box),
+  a sing-box fork) which the releases now **bundle as the samizdat
+  engine** — GPL-3.0-or-later by the Lantern team (Brave New Software /
+  getlantern), built from the pinned source tag in CI (see
+  `LANTERN_BOX_VERSION` in `.github/workflows/release.yml`; the
+  corresponding source is public at that repository). Proto Clean is
+  GPL-3.0-or-later, so the combination complies with their license; the
+  Python/Kotlin code here drives the binary through its documented
+  client config format and contains no Lantern source. "Lantern" is a
   trademark of its owners; Proto Clean is not affiliated with the
   Lantern project.
 - [WireGuard](https://www.wireguard.com) by Jason A. Donenfeld — "WireGuard"
@@ -478,6 +554,6 @@ and "Proton" are trademarks of Proton AG; they are used here solely to
 describe interoperability with a service the user has subscribed to
 (nominative use). All artwork — the logo, icons, color palette and UI
 styling in this repository — is **original Proto Clean branding**, created
-for this project (MIT-licensed, see `LICENSE`); no Proton assets are
+for this project (GPL-3.0-or-later, see `LICENSE`); no Proton assets are
 included or reproduced. The client talks to Proton's website only the
 way your own browser would, using your own account.

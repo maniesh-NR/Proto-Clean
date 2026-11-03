@@ -234,6 +234,7 @@ class XraySettings:
     mode: str = "system"                     # "system" | "manual"
     socks_port: int = 10808
     http_port: int = 10809
+    ride_bond: bool = True                    # chain through the bond SOCKS
 
     def normalized(self) -> "XraySettings":
         from .vpn.xrayconf import FINGERPRINTS, FLOWS
@@ -265,6 +266,7 @@ class XraySettings:
             spider_x=self.spider_x or "/", mode=mode,
             socks_port=socks if 1 <= socks <= 65535 else 10808,
             http_port=http if 1 <= http <= 65535 else 10809,
+            ride_bond=bool(self.ride_bond),
         )
 
 
@@ -292,6 +294,7 @@ class SamizdatSettings:
     connect_timeout: str = "15s"
     mode: str = "system"                     # "system" | "manual"
     mixed_port: int = 10810                  # local SOCKS+HTTP inbound
+    ride_bond: bool = True                    # chain through the bond SOCKS
 
     def normalized(self) -> "SamizdatSettings":
         from .vpn.samizdatconf import FINGERPRINTS, PADDING_PROFILES
@@ -325,6 +328,60 @@ class SamizdatSettings:
             idle_timeout=self.idle_timeout, connect_timeout=self.connect_timeout,
             mode=mode,
             mixed_port=clamp(self.mixed_port, 1024, 65535, 10810),
+            ride_bond=bool(self.ride_bond),
+        )
+
+
+BOND_MODES = ("bond", "balance")
+
+
+@dataclass
+class BondSettings:
+    """Link bonding (multi-adapter) — see vpn/bond.py and
+    vpn/bondserver.py.
+
+    ``server``/``port`` point at a bond server the user runs on some
+    reachable host (``python3 -m proto_clean.bondserver``).
+    ``mode``: "bond" splits every stream across all selected adapters
+    (combined bandwidth, Speedify-style); "balance" assigns each new
+    stream to one adapter round-robin (net-merge style).
+    ``interfaces`` holds adapter names ("wlan0"), "name=ip" pairs or
+    bare IPv4s; empty = one member on the default route.
+    """
+    server: str = ""
+    port: int = 10820
+    token: str = ""                      # shared secret with the server
+    mode: str = "bond"                   # "bond" | "balance"
+    interfaces: List[str] = field(default_factory=list)
+    socks_port: int = 10811              # local SOCKS5 frontend
+    mode_proxy: str = "manual"           # "system" | "manual"
+
+    def normalized(self) -> "BondSettings":
+        def clamp(v, lo, hi, dflt):
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                return dflt
+            return max(lo, min(hi, v))
+
+        mode = self.mode if self.mode in BOND_MODES else "bond"
+        mode_proxy = self.mode_proxy if self.mode_proxy in ("system", "manual") else "manual"
+        raw_ifs = self.interfaces or []
+        if isinstance(raw_ifs, str):        # friendly manual JSON editing
+            raw_ifs = [t for t in raw_ifs.split(",")]
+        ifs = []
+        for i in raw_ifs:
+            tok = str(i).strip()
+            if tok and tok not in ifs:
+                ifs.append(tok)
+        return BondSettings(
+            server=str(self.server or "").strip(),
+            port=clamp(self.port, 1, 65535, 10820),
+            token=str(self.token or ""),
+            mode=mode,
+            interfaces=ifs,
+            socks_port=clamp(self.socks_port, 1024, 65535, 10811),
+            mode_proxy=mode_proxy,
         )
 
 
@@ -353,6 +410,7 @@ class Settings:
     advanced: AdvancedSettings = field(default_factory=AdvancedSettings)
     xray: XraySettings = field(default_factory=XraySettings)
     samizdat: SamizdatSettings = field(default_factory=SamizdatSettings)
+    bond: BondSettings = field(default_factory=BondSettings)
     # UI
     theme: str = "dark"                    # "system" | "light" | "dark"
     prefer_dark_theme: bool = True         # legacy (superseded by `theme`)
@@ -393,6 +451,7 @@ def load_settings() -> Settings:
                 advanced=AdvancedSettings(**{**asdict(AdvancedSettings()), **_sub(raw, "advanced")}),
                 xray=_xray_from_json(_sub(raw, "xray")),
                 samizdat=_samizdat_from_json(_sub(raw, "samizdat")),
+                bond=_bond_from_json(_sub(raw, "bond")),
             )
             return s
         except TypeError:
@@ -409,6 +468,12 @@ def _samizdat_from_json(raw: dict) -> SamizdatSettings:
     """SamizdatSettings with unknown/legacy values coerced to defaults."""
     base = {**asdict(SamizdatSettings()), **raw}
     return SamizdatSettings(**base).normalized()
+
+
+def _bond_from_json(raw: dict) -> BondSettings:
+    """BondSettings with unknown/legacy values coerced to defaults."""
+    base = {**asdict(BondSettings()), **raw}
+    return BondSettings(**base).normalized()
 
 
 def _protocol_from_json(raw: dict) -> ProtocolSettings:

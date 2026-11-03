@@ -217,3 +217,17 @@ python -m pytest tests/ -q     # 90 tests: platforms, wgconf CIDR math,
                                # controller flow, config cache, blocklists,
                                # DNS server (live), NAT-PMP, TOTP, selectors
 ```
+## Link bonding per platform
+
+* **Linux / Windows / macOS**: pure userspace — adapter-bound sockets
+  need no privileges. Interface discovery uses `ip -j` / PowerShell
+  `Get-NetIPAddress` / `ifconfig`; manual names or IPs always work.
+* **Android**: the bonding VPN (one VPN at a time — Android's rule, same
+  as net-merge) uses Wi-Fi + mobile data simultaneously without root;
+  member sockets are `VpnService.protect`ed and bound to their
+  `Network`. The upstream selector can instead route the tun through
+  the bundled lantern-box samizdat engine.
+* The bond server runs anywhere Python does — including on the Android
+  phone itself via Termux if you want to bond a phone's links for
+  another device.
+

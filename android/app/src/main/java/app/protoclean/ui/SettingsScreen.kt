@@ -213,6 +213,121 @@ fun SettingsScreen(vm: AppViewModel) {
             )
         }
 
+        Section("Link bonding (multi-adapter)") {
+            ToggleRow("Bond Wi-Fi + mobile data (Speedify-style)",
+                      app.protoclean.bond.BondVpnService.running) {
+                vm.setBonding(it)
+            }
+            Text(
+                "Every TCP stream is split across Wi-Fi and mobile data and " +
+                "rejoined at your bond server, so one download uses the " +
+                "combined bandwidth of both networks. Run " +
+                "`python3 -m proto_clean.bondserver --listen 0.0.0.0:10820` " +
+                "on any reachable host (VPS) and enter it below. Android " +
+                "allows one VPN at a time, so bonding replaces the " +
+                "tunnel/ad-blocker while it runs.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            var bondServer by remember(settings.bondServer) {
+                mutableStateOf(settings.bondServer)
+            }
+            OutlinedTextField(
+                value = bondServer, onValueChange = { bondServer = it },
+                label = { Text("bond server (host)") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+            )
+            Row {
+                OutlinedTextField(
+                    value = settings.bondPort.toString(),
+                    onValueChange = { t ->
+                        t.toIntOrNull()?.let { v ->
+                            if (v in 1..65535) {
+                                vm.updateSettings { s -> s.copy(bondPort = v) }
+                            }
+                        }
+                    },
+                    label = { Text("port") },
+                    modifier = Modifier.weight(1f), singleLine = true,
+                )
+                Spacer(Modifier.width(8.dp))
+                OutlinedTextField(
+                    value = settings.bondToken,
+                    onValueChange = {
+                        vm.updateSettings { s -> s.copy(bondToken = it) }
+                    },
+                    label = { Text("token (optional)") },
+                    modifier = Modifier.weight(2f), singleLine = true,
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Mode", Modifier.weight(1f),
+                     style = MaterialTheme.typography.bodyMedium)
+                SegButtons(
+                    options = listOf("bond" to "Stream bonding",
+                                     "balance" to "Balance"),
+                    selected = settings.bondMode,
+                ) { mode ->
+                    vm.updateSettings { s -> s.copy(bondMode = mode) }
+                }
+            }
+            TextButton(onClick = {
+                vm.updateSettings { s -> s.copy(bondServer = bondServer.trim()) }
+                vm.setBonding(true)
+            }) { Text("Save & start bonding") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Upstream", Modifier.weight(1f),
+                     style = MaterialTheme.typography.bodyMedium)
+                SegButtons(
+                    options = listOf("bond" to "Bond server",
+                                     "samizdat" to "Samizdat"),
+                    selected = settings.bondUpstream,
+                ) { up ->
+                    vm.updateSettings { s -> s.copy(bondUpstream = up) }
+                }
+            }
+            if (settings.bondUpstream == "samizdat") {
+                var samAddr by remember(settings.samAddress) {
+                    mutableStateOf(settings.samAddress)
+                }
+                OutlinedTextField(
+                    value = samAddr, onValueChange = { samAddr = it },
+                    label = { Text("samizdat server") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                )
+                OutlinedTextField(
+                    value = settings.samPublicKey,
+                    onValueChange = {
+                        vm.updateSettings { s -> s.copy(samPublicKey = it) }
+                    },
+                    label = { Text("public key (pbk, 64 hex)") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                )
+                OutlinedTextField(
+                    value = settings.samShortId,
+                    onValueChange = {
+                        vm.updateSettings { s -> s.copy(samShortId = it) }
+                    },
+                    label = { Text("short id (sid, 16 hex)") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                )
+                OutlinedTextField(
+                    value = settings.samServerName,
+                    onValueChange = {
+                        vm.updateSettings { s -> s.copy(samServerName = it) }
+                    },
+                    label = { Text("cover SNI (e.g. ok.ru)") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                )
+                Text(
+                    "Runs the bundled lantern-box engine (Lantern's GPL-3 " +
+                    "sing-box fork — shipped inside the APK) and routes " +
+                    "every TCP stream through its masqueraded HTTP/2 " +
+                    "tunnel.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+
         Section("Kill switch") {
             Text(
                 "The tunnel is always full-route (0.0.0.0/0 + ::/0), so " +
@@ -244,5 +359,22 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+@Composable
+private fun SegButtons(
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        options.forEach { (value, label) ->
+            FilterChip(
+                selected = selected == value,
+                onClick = { onSelect(value) },
+                label = { Text(label) },
+            )
+        }
     }
 }

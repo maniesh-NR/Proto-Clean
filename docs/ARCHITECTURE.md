@@ -16,6 +16,10 @@
 │  └─ DownloadsPage   ├─ PortForwarder (thread)                  │
 │     scrape/config   └─ TunnelMonitor (thread)                  │
 │                          │                                     │
+│  XrayManager · SamizdatManager · BondManager                   │
+│   (engine subprocesses / asyncio engine thread)                │
+│   system proxy: gsettings · WinINET · networksetup             │
+│                          │                                     │
 │                          ▼ sudo -n                             │
 │                /usr/local/bin/proto-clean-helper (root)           │
 │                  wg-quick · iptables · ip · cgroup              │
@@ -32,6 +36,8 @@
 | `proto-clean-dns-*` pool | DNS query handling (thread per query, bounded pool) |
 | `proto-clean-monitor` | polls helper `status` every 5 s |
 | `proto-clean-natpmp` | NAT-PMP lease keep-alive |
+| `proto-clean-proxy` | start/stop of the Xray / samizdat engine subprocess |
+| `proto-clean-bond` | the bonding engine (an asyncio loop in a daemon thread; SOCKS5 frontend + adapter-bound member sockets) |
 
 The Controller is Qt-free (plain callbacks) so it can be exercised by the
 test suite headlessly; `ControllerBridge` converts callbacks into
@@ -211,6 +217,41 @@ redirect off → kill switch off → IPv6 leak protection off.
   all IPv6 except loopback, both tunnel interfaces and the
   split-tunnel mark — armed **before** tunnel-up, independent of the
   kill switch, and torn down by `v6-off`.
+
+## Link bonding (multi-adapter) details
+
+`vpn/bondproto.py` defines **PCB**, the wire protocol (14-byte header
+`"PCB"|ver|type|flags|seq|len`; frames: HANDSHAKE (SHA-256 token auth,
+16-byte session id, member index/count, SOCKS-style destination), DATA
+(sequenced stream chunks, ≤16 KiB), FIN, PING/PONG, MEMBER_DOWN).
+`WeightedScheduler` is a smooth weighted round-robin that skips dead
+members; `Reassembler` reorders chunks by sequence — the property that
+makes re-ordering across adapters free.
+
+The **client** (`vpn/bond.py`) runs an asyncio loop on the
+`proto-clean-bond` thread: a SOCKS5 frontend on `127.0.0.1:10811`;
+per stream it opens one member socket per selected adapter
+(`sock.bind((adapter_ip, 0))`), sends interleaved chunks per the
+scheduler, and reassembles the reverse direction. The **server**
+(`vpn/bondserver.py`, `python -m proto_clean.bondserver`) groups
+members by session id, reorders, forwards to the destination, and
+splits responses back across live members.
+
+`BondManager` subclasses `XrayManager` purely to reuse the
+system-proxy switching; its lifecycle is the asyncio engine instead of
+a subprocess. Interop: Xray gains a `socks` outbound + `proxySettings`
+chaining and lantern-box/sing-box a `socks` outbound + `detour`
+pointing at the bond's SOCKS port when *ride the bond* is on
+(`xrayconf.py` / `samizdatconf.py`).
+
+On Android (`android/.../bond/`), `BondProto.kt` is the byte-identical
+Kotlin twin; `BondEngine.kt` binds member sockets to Wi-Fi/cellular
+`Network`s (`Network.bindSocket` + `VpnService.protect` — both radios
+active at once, no root); `BondVpnService.kt` owns the tun: a minimal
+userspace TCP responder (SYN/SYN-ACK, ACK, window-honored downstream,
+FIN) NATs every flow into an `UpstreamSession` — a bonded session, or
+`LocalSocksSession` through the bundled lantern-box (samizdat mode).
+DNS is answered via a protected UDP socket.
 
 ## Helper hardening
 
