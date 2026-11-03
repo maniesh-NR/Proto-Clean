@@ -8,98 +8,16 @@ wire behaviour itself.
 
 from __future__ import annotations
 
-import asyncio
 import socket
-import threading
 import time
 
 import pytest
 
+from bond_harness import _BondServerThread, _EchoServer
 from proto_clean.vpn.bondproto import (
     FRAME_DATA, FRAME_FIN, FRAME_HANDSHAKE, FrameReader,
     new_session_id, pack_frame, pack_handshake,
 )
-from proto_clean.vpn.bondserver import BondServer
-
-
-class _EchoServer(threading.Thread):
-    """Plain TCP echo destination."""
-
-    def __init__(self) -> None:
-        super().__init__(daemon=True)
-        self.sock = socket.socket()
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind(("127.0.0.1", 0))
-        self.port = self.sock.getsockname()[1]
-        self.sock.listen(4)
-        self.done = threading.Event()
-
-    def run(self) -> None:
-        while not self.done.is_set():
-            try:
-                self.sock.settimeout(0.2)
-                conn, _ = self.sock.accept()
-            except (socket.timeout, OSError):
-                continue
-            threading.Thread(target=self._serve, args=(conn,),
-                             daemon=True).start()
-
-    @staticmethod
-    def _serve(conn: socket.socket) -> None:
-        conn.settimeout(None)      # accepted sockets must not inherit
-        with conn:                 # the listening socket's timeout
-            while True:
-                try:
-                    data = conn.recv(65536)
-                except OSError:
-                    break
-                if not data:
-                    break
-                conn.sendall(data)
-
-    def stop(self) -> None:
-        self.done.set()
-        try:
-            self.sock.close()
-        except OSError:
-            pass
-
-
-class _BondServerThread(threading.Thread):
-    """Run the asyncio bond server in a background thread."""
-
-    def __init__(self, token: str = "") -> None:
-        super().__init__(daemon=True)
-        self.server = BondServer(token)
-        self.sock = socket.socket()
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind(("127.0.0.1", 0))
-        self.port = self.sock.getsockname()[1]
-        self.sock.close()
-        self.loop = asyncio.new_event_loop()
-        self.ready = threading.Event()
-        self.stopped = threading.Event()
-
-    def run(self) -> None:
-        asyncio.set_event_loop(self.loop)
-        try:
-            self.loop.run_until_complete(
-                self.server.listen("127.0.0.1", self.port))
-            self.ready.set()
-            self.loop.run_until_complete(self.server.serve_forever())
-        except Exception:  # noqa: BLE001
-            self.ready.set()
-        finally:
-            self.stopped.set()
-
-    def stop(self) -> None:
-        def _cancel_pending() -> None:
-            for task in asyncio.all_tasks(self.loop):
-                task.cancel()
-        self.loop.call_soon_threadsafe(self.server.close)
-        self.loop.call_soon_threadsafe(_cancel_pending)
-        self.loop.call_soon_threadsafe(self.loop.stop)
-        self.join(timeout=5)
 
 
 @pytest.fixture()

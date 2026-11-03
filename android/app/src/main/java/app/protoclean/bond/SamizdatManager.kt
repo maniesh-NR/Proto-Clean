@@ -108,7 +108,8 @@ object SamizdatManager {
                 .redirectErrorStream(true)
                 .start()
             running = true
-            Log.i(TAG, "lantern-box started (pid ${proc?.pid()}, " +
+            // (Process.pid() needs API 33; keep the log minSdk-safe)
+            Log.i(TAG, "lantern-box started (binary ${bin}, " +
                 "mixed inbound 127.0.0.1:$MIXED_PORT)")
             true
         } catch (e: Exception) {

@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tests.test_bondserver import _BondServerThread, _EchoServer
+from bond_harness import _BondServerThread, _EchoServer
 from proto_clean.vpn.bond import BondManager, DEFAULT_SOCKS_PORT
 from proto_clean.vpn.xray import XrayError
 

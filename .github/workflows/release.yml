@@ -14,30 +14,38 @@ env:
   # bundle. Pinned tag; the port job builds it from source for every
   # target platform (official releases only publish linux binaries).
   LANTERN_BOX_VERSION: v0.0.189
+  # Go toolchain used to port lantern-box (keep in sync with its go.mod)
+  GO_TARBALL: go1.26.10.linux-amd64.tar.gz
 
 jobs:
   # -------------------------------------------------------- lantern-box port
   # Proto Clean is GPL-3.0-or-later, so we may ship Lantern's engine.
-  # Cross-compiled from the pinned source with the tags lantern-box's
-  # own Makefile uses (all pure Go — CGO off works on every target).
+  # Cross-compiled from the pinned source with the tag set lantern-box's
+  # own goreleaser uses (minus tailscale). Linux (glibc-pinned to the
+  # oldest Mint base) and darwin are built inside their packaging jobs.
+  # NOTE: the outline-sdk dep (unconditional in lantern-box) requires
+  # cgo on unix: android builds with the runner's NDK (CC + CXX + extld
+  # clang++ for its C++ parts, -checklinkname=0 for the libbox
+  # linkname); windows builds CGO-free.
   lantern-box:
-    name: Port lantern-box (${{ matrix.goos }}/${{ matrix.goarch }})
+    name: Port lantern-box (${{ matrix.target }})
     runs-on: ubuntu-latest
+    env:
+      BOX_TAGS: with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { goos: linux,   goarch: amd64, out: lantern-box-linux-amd64 }
-          - { goos: linux,   goarch: arm64, out: lantern-box-linux-arm64 }
-          - { goos: windows, goarch: amd64, out: lantern-box-windows-amd64.exe }
-          - { goos: windows, goarch: "386", out: lantern-box-windows-386.exe }
-          - { goos: darwin,  goarch: amd64, out: lantern-box-darwin-amd64 }
-          - { goos: darwin,  goarch: arm64, out: lantern-box-darwin-arm64 }
-          # android builds are packaged as liblanternbox.so for the
-          # jniLibs trick (executables may only run from nativeLibraryDir)
-          - { goos: android, goarch: arm64, out: "android-arm64/liblanternbox.so" }
-          - { goos: android, goarch: arm,   out: "android-arm/liblanternbox.so",
-              goarm: "7" }
+          - { target: windows-amd64, goos: windows, goarch: amd64,
+              out: lantern-box-windows-amd64.exe }
+          - { target: windows-386,  goos: windows, goarch: "386",
+              out: lantern-box-windows-386.exe }
+          - { target: android-arm64, goos: android, goarch: arm64,
+              out: "android-arm64/liblanternbox.so",
+              cc: aarch64-linux-android26 }
+          - { target: android-arm,   goos: android, goarch: arm,
+              goarm: "7", out: "android-arm/liblanternbox.so",
+              cc: armv7a-linux-androideabi26 }
     steps:
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -55,25 +63,36 @@ jobs:
       - name: Cross-compile
         run: |
           cd lantern-box-src/cmd
-          TAGS="with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale"
           mkdir -p "../out/$(dirname '${{ matrix.out }}')"
-          if [ -n "${{ matrix.goarm }}" ]; then
-            export GOARM=${{ matrix.goarm }}
+          EXTRA=""
+          if [ -n "${{ matrix.goarm }}" ]; then export GOARM=${{ matrix.goarm }}; fi
+          if [ "${{ matrix.goos }}" = windows ]; then
+            # no cgo needed on windows (the outline smart-dialer's
+            # cname.go is pure Go there) and cgo-free avoids the
+            # cross-toolchain entirely
+            CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+              go build -trimpath \
+              -ldflags "-s -w -X github.com/sagernet/sing-box/constant.Version=lantern-box-${LANTERN_BOX_VERSION}" \
+              -tags "$BOX_TAGS" -o "../out/${{ matrix.out }}" .
+          else
+            NDKBIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+            CGO_ENABLED=1 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+              CC="$NDKBIN/${{ matrix.cc }}-clang" \
+              CXX="$NDKBIN/${{ matrix.cc }}-clang++" \
+              go build -trimpath \
+              -ldflags "-s -w -checklinkname=0 \
+                -X github.com/sagernet/sing-box/constant.Version=lantern-box-${LANTERN_BOX_VERSION} \
+                -extld $NDKBIN/${{ matrix.cc }}-clang++" \
+              -tags "$BOX_TAGS" -o "../out/${{ matrix.out }}" .
           fi
-          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-            go build -trimpath -ldflags "-s -w" -tags "$TAGS" \
-            -o "../out/${{ matrix.out }}" .
-          "../out/${{ matrix.out }}" version 2>/dev/null || true
           ls -la "../out/${{ matrix.out }}"
 
-      - name: License compliance note
-        run: |
-          # ship the GPL-3 offer: the source for this exact tag is public
-          cp lantern-box-src/LICENSE out/lantern-box-LICENSE.GPL-3.0
+      - name: Ship the GPL-3 license alongside
+        run: cp lantern-box-src/LICENSE lantern-box-src/out/lantern-box-LICENSE.GPL-3.0
 
       - uses: actions/upload-artifact@v4
         with:
-          name: lantern-box-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: lantern-box-${{ matrix.target }}
           path: lantern-box-src/out/
           if-no-files-found: error
 
@@ -83,24 +102,21 @@ jobs:
   linux:
     name: Linux (portable + debs + flatpak)
     runs-on: ubuntu-latest
-    needs: [lantern-box]
+    env:
+      BOX_TAGS: with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download the ported lantern-box
-        uses: actions/download-artifact@v4
-        with:
-          name: lantern-box-linux-amd64
-          path: lantern-box-bin
-
-      - name: Build onedir in Ubuntu 22.04 (oldest current Mint base)
+      - name: Build onedir + lantern-box in Ubuntu 22.04 (oldest current Mint base)
         run: |
-          docker run --rm -v "$PWD":/src -w /src ubuntu:22.04 bash -exc '
+          docker run --rm -v "$PWD":/src -w /src \
+            -e GO_TARBALL -e LANTERN_BOX_VERSION -e BOX_TAGS \
+            ubuntu:22.04 bash -exc '
             export DEBIAN_FRONTEND=noninteractive
             apt-get update -qq
             apt-get install -y --no-install-recommends \
               python3 python3-pip libegl1 libgl1 libxkbcommon0 binutils \
-              libpython3.10
+              libpython3.10 gcc g++ curl ca-certificates file
             python3 -m pip install -q -U pip
             python3 -m pip install -q -r requirements.txt pyinstaller
             python3 -m PyInstaller --noconfirm --clean \
@@ -109,15 +125,25 @@ jobs:
               --hidden-import proto_clean.platforms.linux \
               --hidden-import dnslib \
               proto_clean/__main__.py
-            dist/proto-clean/proto-clean --version'
+            dist/proto-clean/proto-clean --version
+            # ---- lantern-box (samizdat engine), same glibc floor: the
+            # outline-sdk dep needs cgo (CC/CXX=gcc/g++ here)
+            curl -fsSL "https://go.dev/dl/${GO_TARBALL}" | tar xz -C /usr/local
+            export PATH=/usr/local/go/bin:$PATH
+            curl -fsSL \
+              "https://github.com/getlantern/lantern-box/archive/refs/tags/${LANTERN_BOX_VERSION}.tar.gz" \
+              | tar xz
+            mv lantern-box-* /tmp/lb
+            cd /tmp/lb/cmd
+            CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+              go build -trimpath \
+              -ldflags "-s -w -checklinkname=0 -X github.com/sagernet/sing-box/constant.Version=lantern-box-${LANTERN_BOX_VERSION}" \
+              -tags "$BOX_TAGS" -o /src/dist/proto-clean/lantern-box .
+            cd /src
+            file dist/proto-clean/lantern-box
+            dist/proto-clean/lantern-box version || true'
           # docker ran as root: hand dist/ and build/ back to the runner
           sudo chown -R "$(id -u):$(id -g)" dist build 2>/dev/null || true
-
-      - name: Bundle lantern-box (samizdat engine) into the app dir
-        run: |
-          install -m 0755 lantern-box-bin/lantern-box-linux-amd64 \
-            dist/proto-clean/lantern-box
-          dist/proto-clean/lantern-box version || true
 
       - name: Smoke-test the onedir on Mint 21 base (jammy)
         run: |
@@ -167,7 +193,7 @@ jobs:
             greenlet
           pip wheel --no-deps -w wheels .
           # the samizdat engine ships inside the sandbox at /app/bin
-          install -m 0755 lantern-box-bin/lantern-box-linux-amd64 \
+          install -m 0755 dist/proto-clean/lantern-box \
             packaging/flatpak/lantern-box
           cd packaging/flatpak
           flatpak --user remote-add --if-not-exists flathub \
@@ -333,7 +359,8 @@ jobs:
   macos:
     name: macOS ${{ matrix.variant }}
     runs-on: macos-latest
-    needs: [lantern-box]
+    env:
+      BOX_TAGS: with_gvisor,with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api
     strategy:
       fail-fast: false
       matrix:
@@ -343,20 +370,20 @@ jobs:
           - variant: "10.15-catalina-x86_64"
             target_arch: x86_64
             min_ver: "10.15"
-            box: lantern-box-darwin-amd64
+            boxarch: amd64
           # Apple Silicon build (macOS 11+): native arm64, modern Qt 6.
           - variant: "11.0-arm64"
             target_arch: ""
             min_ver: "11.0"
-            box: lantern-box-darwin-arm64
+            boxarch: arm64
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download the ported lantern-box
-        uses: actions/download-artifact@v4
+      - name: Set up Go (lantern-box port)
+        uses: actions/setup-go@v5
         with:
-          name: ${{ matrix.box }}
-          path: lantern-box-bin
+          go-version: "1.26"
+          check-latest: true
 
       - name: Set up Python
         if: matrix.target_arch == ''
@@ -394,11 +421,22 @@ jobs:
           fi
           bash packaging/macos/build.sh
 
-      - name: Bundle lantern-box into the .app
+      - name: Build lantern-box (samizdat engine) and bundle it
         run: |
-          install -m 0755 "lantern-box-bin/${{ matrix.box }}" \
-            "dist/Proto Clean.app/Contents/MacOS/lantern-box"
-          "dist/Proto Clean.app/Contents/MacOS/lantern-box" version || true
+          curl -fsSL \
+            "https://github.com/getlantern/lantern-box/archive/refs/tags/${LANTERN_BOX_VERSION}.tar.gz" \
+            | tar xz
+          mv lantern-box-* lantern-box-src
+          cd lantern-box-src/cmd
+          # darwin needs cgo for the outline-sdk dep; Xcode clang builds
+          # both slices natively (catalina job cross-builds amd64)
+          CGO_ENABLED=1 GOOS=darwin GOARCH=${{ matrix.boxarch }} \
+            CC=clang CXX=clang++ go build -trimpath \
+            -ldflags "-s -w -checklinkname=0 -X github.com/sagernet/sing-box/constant.Version=lantern-box-${LANTERN_BOX_VERSION} -extld clang++" \
+            -tags "$BOX_TAGS" \
+            -o "$GITHUB_WORKSPACE/dist/Proto Clean.app/Contents/MacOS/lantern-box" .
+          cd "$GITHUB_WORKSPACE"
+          file "dist/Proto Clean.app/Contents/MacOS/lantern-box"
 
       - name: Zip the .app (portable)
         run: |
