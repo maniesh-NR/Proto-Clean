@@ -46,20 +46,6 @@ class BondVpnService : VpnService() {
         const val VIRTUAL_ADDR = "10.111.222.34"
         private const val DNS_UPSTREAM = "1.1.1.1"
 
-        /** Set by the ViewModel before start(). */
-        object Config {
-            @Volatile
-            var server: String = ""
-            @Volatile
-            var port: Int = 10820
-            @Volatile
-            var token: String = ""
-            @Volatile
-            var mode: String = "bond"        // "bond" | "balance"
-            @Volatile
-            var upstream: String = "bond"     // "bond" | "samizdat"
-        }
-
         @Volatile
         var running = false
             private set
@@ -84,6 +70,22 @@ class BondVpnService : VpnService() {
     private var reader: Thread? = null
     private var engine: BondEngine? = null
     private lateinit var pool: ExecutorService
+    /** Set by the ViewModel before start() — class-level nested object
+     *  (objects nested in the companion do not resolve as
+     *  BondVpnService.Config). */
+    object Config {
+        @Volatile
+        var server: String = ""
+        @Volatile
+        var port: Int = 10820
+        @Volatile
+        var token: String = ""
+        @Volatile
+        var mode: String = "bond"        // "bond" | "balance"
+        @Volatile
+        var upstream: String = "bond"     // "bond" | "samizdat"
+    }
+
     @Volatile
     private var stopping = false
     private val rng = SecureRandom()
