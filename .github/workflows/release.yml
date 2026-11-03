@@ -140,8 +140,7 @@ jobs:
               -ldflags "-s -w -checklinkname=0 -X github.com/sagernet/sing-box/constant.Version=lantern-box-${LANTERN_BOX_VERSION}" \
               -tags "$BOX_TAGS" -o /src/dist/proto-clean/lantern-box .
             cd /src
-            file dist/proto-clean/lantern-box
-            dist/proto-clean/lantern-box version || true'
+            file dist/proto-clean/lantern-box'
           # docker ran as root: hand dist/ and build/ back to the runner
           sudo chown -R "$(id -u):$(id -g)" dist build 2>/dev/null || true
 
@@ -246,7 +245,7 @@ jobs:
         run: |
           Copy-Item packaging/windows/proto-clean.ico dist/
           Copy-Item lantern-box-bin/lantern-box-windows-amd64.exe dist/ProtoClean/lantern-box.exe
-          & dist/ProtoClean/lantern-box.exe version; if ($LASTEXITCODE -gt 1) { exit 1 }
+          # (no 'version' subcommand in lantern-box; presence via Copy-Item)
           @'
           Proto Clean ${env:VERSION} — Windows 10/11 (64-bit, portable)
           =====================================================
@@ -436,7 +435,6 @@ jobs:
             -tags "$BOX_TAGS" \
             -o "$GITHUB_WORKSPACE/dist/Proto Clean.app/Contents/MacOS/lantern-box" .
           cd "$GITHUB_WORKSPACE"
-          file "dist/Proto Clean.app/Contents/MacOS/lantern-box"
 
       - name: Zip the .app (portable)
         run: |

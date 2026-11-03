@@ -43,7 +43,7 @@ cp packaging/linux/proto-clean.desktop "$PKGDIR/usr/share/applications/proto-cle
 cp packaging/linux/proto-clean.png     "$PKGDIR/usr/share/icons/hicolor/512x512/apps/proto-clean.png"
 
 # the privileged helper ships in the package (activation is left to the user)
-install -m 0755 helper/proto-clean-helper "$PKGDIR/opt/proto_clean/proto-clean-helper"
+install -m 0755 helper/proto-clean-helper "$PKGDIR/opt/proto-clean/proto-clean-helper"
 
 # ---------------------------------------------------------------- control
 cat > "$PKGDIR/DEBIAN/control" <<EOF
@@ -70,7 +70,7 @@ EOF
 cat > "$PKGDIR/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -e
-HELPER=/opt/proto_clean/proto-clean-helper
+HELPER=/opt/proto-clean/proto-clean-helper
 if [ -x "$HELPER" ]; then
     install -m 0755 "$HELPER" /usr/local/bin/proto-clean-helper 2>/dev/null || true
 fi
