@@ -11,7 +11,7 @@ android {
         applicationId = "app.protoclean"
         minSdk = 26            // Android 8.0 Oreo
         targetSdk = 34
-        versionCode = 4
+        versionCode = 5
         versionName = "0.5.0"
     }
 
@@ -78,6 +78,16 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    // unit tests (ImportParser + friends)
+    // unit tests (ImportParser + GuestApi + friends)
     testImplementation("junit:junit:4.13.2")
+    // GuestApiTest uses OkHttp's Interceptor/StubApi (already in
+    // `implementation`, re-declared here so the test classpath is
+    // explicit even if the Android Gradle Plugin changes its
+    // implementation->test classpath bridging).
+    testImplementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // org.json is bundled in the Android SDK but its stub throws
+    // "not mocked" in JVM unit tests — pull in the real artifact so
+    // GuestApi / GuestApiTest can parse JSON on the JVM.
+    testImplementation("org.json:json:20240303")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }

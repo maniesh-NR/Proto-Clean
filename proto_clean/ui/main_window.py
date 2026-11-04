@@ -101,7 +101,7 @@ class MainWindow(QMainWindow):
         status_row.addWidget(self.status_dot)
         status_row.addWidget(self.status_label)
         self.plan_label = QLabel("")
-        self.plan_label.setObjectName("Stats")
+        self.plan_label.setObjectName("Plan")
         status_col.addLayout(status_row)
         status_col.addWidget(self.plan_label)
         header.addLayout(status_col)
@@ -239,9 +239,15 @@ class MainWindow(QMainWindow):
             self._connect_started_at = 0.0
         if state == "logged_in":
             self._hide_login_banner()
-        plan = self.controller.session.user_plan_hint
-        self.plan_label.setText(
-            f"plan: {plan or 'free'}" + (" (detected)" if plan else ""))
+        # Plan / guest-mode chip: distinguish account mode from guest mode
+        # (credentialless) so the user always knows which Proton session
+        # they're operating under.
+        if self.controller.is_guest():
+            self.plan_label.setText("guest mode · free servers")
+        else:
+            plan = self.controller.session.user_plan_hint
+            self.plan_label.setText(
+                f"plan: {plan or 'free'}" + (" (detected)" if plan else ""))
 
     def _on_servers(self, servers) -> None:
         self._servers = servers
@@ -280,12 +286,24 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------- login
     def _startup_login(self) -> None:
-        """Auto-login when credentials are stored; otherwise ask for them."""
+        """Auto-login when credentials are stored; otherwise ask for them.
+
+        Preference order: stored account credentials → stored guest
+        session → prompt the user (the login dialog offers both a
+        Proton account login and a "Continue as guest" button).
+        """
         username, _password = creds.load_credentials()
         if username:
             self.controller.login_async()
-        else:
-            self._open_login_dialog(first_run=True)
+            return
+        # No stored account creds — but maybe a guest session is still
+        # valid (refresh window hasn't expired). Resume it directly.
+        guest_payload = creds.load_guest_session()
+        if guest_payload:
+            self.controller.login_guest_async()
+            return
+        # Nothing stored — ask the user.
+        self._open_login_dialog(first_run=True)
 
     def _open_login_dialog(self, first_run: bool = False,
                            prefill: str = "") -> None:

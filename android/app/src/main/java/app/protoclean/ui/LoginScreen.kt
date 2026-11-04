@@ -84,6 +84,24 @@ fun LoginScreen(vm: AppViewModel, onLoggedIn: () -> Unit) {
             "Stored encrypted on this device only.",
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(top = 4.dp))
+
+        // ---- guest mode (credentialless Proton API) ---------------------
+        // Mirrors the desktop ``Continue as guest`` entry point — same
+        // Proton credentialless flow, no WebView, no CAPTCHA. MD3
+        // FilledTonalButton is the medium-emphasis button: lower than the
+        // primary Button but higher than a plain TextButton, which is
+        // exactly the right place for a "no account" alternate path.
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+        Text(
+            "No account? Continue as guest — uses Proton's credentialless " +
+            "API (no WebView, no CAPTCHA). Free-tier servers only " +
+            "(NL, JP, PL, RO, US); one connection at a time.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        FilledTonalButton(
+            onClick = { vm.loginAsGuest(); onLoggedIn() },
+            modifier = Modifier.padding(top = 8.dp).fillMaxWidth(),
+        ) { Text("Continue as guest") }
     }
 
     LaunchedEffect(ui.loggedIn) {

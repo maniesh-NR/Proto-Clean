@@ -122,6 +122,26 @@ def controller(tmp_path, monkeypatch):
     ctl.current_server = None
     ctl.connected_via = {}
     ctl.helper_ready = lambda: True
+    # Guest-mode fields (normally initialised in Controller.__init__).
+    # These tests exercise the account-mode path; guest_session=None
+    # means is_guest() returns False and the connect worker stays on
+    # the browser/downloads flow.
+    ctl.guest_session = None
+    ctl.guest_auth = None
+    ctl._guest_loop = None
+    ctl._proxy_listeners = []
+    ctl.xray = types.SimpleNamespace()
+    ctl._protocol_engine = None
+    ctl.samizdat = types.SimpleNamespace()
+    ctl.bond = types.SimpleNamespace()
+    ctl.proxy_state = "off"
+    ctl._proxy_lock = threading.Lock()
+    ctl.bond_state = "off"
+    ctl._bond_listeners = []
+    ctl._bond_lock = threading.Lock()
+    ctl.blocklists = types.SimpleNamespace()
+    ctl._apply_browser_proxy = lambda: None
+    ctl.on_login_event = lambda k, d: None
 
     import proto_clean.controller as ctl_mod
     monkeypatch.setattr(ctl_mod, "TunnelManager", FakeTunnelManager)

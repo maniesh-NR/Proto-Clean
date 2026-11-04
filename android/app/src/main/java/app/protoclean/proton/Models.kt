@@ -3,6 +3,31 @@ package app.protoclean.proton
 import org.json.JSONObject
 
 /**
+ * A single physical server inside a logical server group. Carries the
+ * WireGuard endpoint (entry IP + X25519 public key) used to build the
+ * [Interface]/[Peer] wg-quick config for a guest-mode connection.
+ */
+data class PhysicalServer(
+    val id: String,
+    val domain: String,
+    val entryIp: String,
+    val exitIp: String = entryIp,
+    val status: Int = 1,
+    val x25519Pk: String = "",
+) {
+    companion object {
+        fun fromJson(o: JSONObject): PhysicalServer = PhysicalServer(
+            id = o.optString("ID"),
+            domain = o.optString("Domain"),
+            entryIp = o.optString("EntryIP"),
+            exitIp = o.optString("ExitIP"),
+            status = o.optInt("Status", 1),
+            x25519Pk = o.optString("X25519PublicKey"),
+        )
+    }
+}
+
+/**
  * Proton logical-server model (mirrors the desktop LogicalServer, parsed
  * from the same JSON the account web app fetches).
  */
@@ -17,16 +42,26 @@ data class LogicalServer(
     val load: Float,                  // 0..100
     val score: Float,                 // lower = better (Proton's own metric)
     val status: Int,                  // 1 = online
+    val region: String = "",
+    val enabled: Boolean = true,
+    val physical: List<PhysicalServer> = emptyList(),
 ) {
     val isFree: Boolean get() = tier == 0
     val isOnline: Boolean get() = status == 1
     val loadLabel: String get() = "${load.toInt()}%"
     val isP2p: Boolean get() = features and 4 != 0
     val isTor: Boolean get() = features and 2 != 0
+    val isSecureCore: Boolean get() = features and 1 != 0
 
     companion object {
         fun fromJson(o: JSONObject): LogicalServer? = runCatching {
             val loc = o.optJSONObject("Location")
+            val physArr = o.optJSONArray("Servers")
+            val phys = if (physArr != null) {
+                (0 until physArr.length()).mapNotNull { i ->
+                    physArr.optJSONObject(i)?.let { PhysicalServer.fromJson(it) }
+                }
+            } else emptyList()
             LogicalServer(
                 id = o.optString("ID"),
                 name = o.optString("Name"),
@@ -38,6 +73,9 @@ data class LogicalServer(
                 load = o.optDouble("Load", 0.0).toFloat(),
                 score = if (o.isNull("Score")) 1e9f else o.optDouble("Score", 1e9).toFloat(),
                 status = o.optInt("Status", 1),
+                region = loc?.optString("Region") ?: "",
+                enabled = o.optBoolean("Enabled", true),
+                physical = phys,
             )
         }.getOrNull().takeIf { it != null && it.id.isNotBlank() }
 

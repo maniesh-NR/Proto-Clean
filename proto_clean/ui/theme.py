@@ -1,240 +1,45 @@
-"""Themes for Proto Clean (Qt stylesheets): dark, light, follow-system.
+"""Themes for Proto Clean — Material Design 3 (Qt stylesheets).
+
+The desktop UI is themed with a real Material Design 3 system:
+HCT tonal palettes, MD3 color roles and MD3 widget styles (filled
+buttons, filled text fields, pill tabs, surface containers, etc.).
+The seed color is the Proto Clean brand green ``#2f6d3f`` so the
+project's identity is preserved while every other color is derived
+from a Material tonal palette.
 
 apply_theme(app, mode) styles the whole application:
 
-* "dark"   — the original Proto Clean look;
-* "light"  — a clean light variant with the same green accent;
+* "dark"   — Material 3 dark scheme (surface = tone 10);
+* "light"  — Material 3 light scheme (surface = tone 98);
 * "system" — follows the desktop color scheme and live-switches when the
   desktop switches (Qt colorSchemeChanged, Qt >= 6.5; falls back to the
   GNOME color-scheme gsettings key, then to the palette lightness).
 
 The module tracks the effective mode so runtime painters (icons, load
-bars) can pick theme-matching colors via is_dark().
+bars) can pick theme-matching colors via is_dark(). The MD3-derived
+``DARK_SCHEME`` / ``LIGHT_SCHEME`` objects expose all Material 3 color
+roles for runtime painters (e.g. ``DARK_SCHEME.primary_container``,
+``LIGHT_SCHEME.surface_container_high``).
 """
 
 from __future__ import annotations
 
-from proto_clean.qtcompat import Qt
-
-DARK_QSS = """
-* { font-family: 'Inter', 'Segoe UI', 'Noto Sans', sans-serif; }
-QWidget { background-color: #16181d; color: #e6e9ef; font-size: 13px; }
-QMainWindow, QDialog { background-color: #16181d; }
-
-QLabel#Title { font-size: 20px; font-weight: 700; color: #ffffff; }
-QLabel#Subtitle { color: #9aa3b2; font-size: 12px; }
-QLabel#Stats { color: #9aa3b2; font-size: 12px; }
-
-/* login relay banner (CAPTCHA / waiting-for-user) */
-QLabel#LoginBanner {
-    background-color: #3a2b12;
-    border: 1px solid #b45309;
-    border-left: 4px solid #f59e0b;
-    border-radius: 8px;
-    padding: 10px 14px;
-    color: #fcd34d;
-    font-weight: 600;
-}
-QLabel#LoginBanner[level="info"] {
-    background-color: #12262b;
-    border: 1px solid #0e7490;
-    border-left: 4px solid #22d3ee;
-    color: #67e8f9;
-}
-QLabel#LoginNote { color: #9aa3b2; font-size: 12px; }
-
-QPushButton {
-    background-color: #23262e;
-    border: 1px solid #2f333d;
-    border-radius: 8px;
-    padding: 8px 16px;
-    color: #e6e9ef;
-}
-QPushButton:hover { background-color: #2a2e37; }
-QPushButton:disabled { color: #5c6370; background-color: #1b1d23; }
-
-QPushButton#Connect {
-    background-color: #2f6d3f;   /* proto_clean green */
-    border: none;
-    font-size: 15px;
-    font-weight: 700;
-    padding: 12px 28px;
-    border-radius: 10px;
-    color: white;
-}
-QPushButton#Connect:hover { background-color: #60aa6b; }
-QPushButton#Connect:disabled { background-color: #3a3f4b; color: #9aa3b2; }
-QPushButton#Disconnect { background-color: #b91c1c; border: none; }
-QPushButton#Disconnect:hover { background-color: #dc2626; }
-
-QLineEdit, QComboBox, QSpinBox {
-    background-color: #1e2128;
-    border: 1px solid #2f333d;
-    border-radius: 8px;
-    padding: 7px 10px;
-    selection-background-color: #2f6d3f;
-}
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: #60aa6b; }
-
-QComboBox QAbstractItemView {
-    background-color: #1e2128;
-    border: 1px solid #2f333d;
-    selection-background-color: #2f6d3f;
-}
-
-QTableWidget {
-    background-color: #1b1d23;
-    alternate-background-color: #1e2128;
-    gridline-color: #262a33;
-    border: 1px solid #262a33;
-    border-radius: 8px;
-}
-QHeaderView::section {
-    background-color: #20242c;
-    color: #9aa3b2;
-    border: none;
-    border-bottom: 1px solid #2f333d;
-    padding: 8px;
-    font-weight: 600;
-}
-QTableWidget::item { padding: 6px; }
-QTableWidget::item:selected { background-color: #1e4629; }
-
-QTabWidget::pane { border: 1px solid #262a33; border-radius: 8px; }
-QTabBar::tab {
-    background: #1e2128; color: #9aa3b2;
-    padding: 8px 18px; margin-right: 3px;
-    border-top-left-radius: 8px; border-top-right-radius: 8px;
-}
-QTabBar::tab:selected { background: #23262e; color: #ffffff; }
-
-QCheckBox::indicator, QRadioButton::indicator {
-    width: 17px; height: 17px;
-    border: 1px solid #3a3f4b; border-radius: 5px;
-    background: #1e2128;
-}
-QCheckBox::indicator:checked, QRadioButton::indicator:checked {
-    background: #60aa6b; border-color: #60aa6b;
-}
-
-QStatusBar { color: #9aa3b2; }
-QToolTip { background-color: #23262e; color: #e6e9ef; border: 1px solid #3a3f4b; }
-
-QScrollBar:vertical { background: transparent; width: 10px; }
-QScrollBar::handle:vertical { background: #2f333d; border-radius: 5px; }
-QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
-"""
-
-LIGHT_QSS = """
-* { font-family: 'Inter', 'Segoe UI', 'Noto Sans', sans-serif; }
-QWidget { background-color: #f4f5f7; color: #20242c; font-size: 13px; }
-QMainWindow, QDialog { background-color: #f4f5f7; }
-
-QLabel#Title { font-size: 20px; font-weight: 700; color: #14161c; }
-QLabel#Subtitle { color: #5d6675; font-size: 12px; }
-QLabel#Stats { color: #5d6675; font-size: 12px; }
-
-/* login relay banner (CAPTCHA / waiting-for-user) */
-QLabel#LoginBanner {
-    background-color: #fef3c7;
-    border: 1px solid #d97706;
-    border-left: 4px solid #f59e0b;
-    border-radius: 8px;
-    padding: 10px 14px;
-    color: #92400e;
-    font-weight: 600;
-}
-QLabel#LoginBanner[level="info"] {
-    background-color: #e0f2fe;
-    border: 1px solid #0284c7;
-    border-left: 4px solid #0ea5e9;
-    color: #075985;
-}
-QLabel#LoginNote { color: #5d6675; font-size: 12px; }
-
-QPushButton {
-    background-color: #ffffff;
-    border: 1px solid #c9ced8;
-    border-radius: 8px;
-    padding: 8px 16px;
-    color: #20242c;
-}
-QPushButton:hover { background-color: #eceff3; }
-QPushButton:disabled { color: #9aa3b2; background-color: #eef0f3; }
-
-QPushButton#Connect {
-    background-color: #60aa6b;   /* proto_clean green */
-    border: none;
-    font-size: 15px;
-    font-weight: 700;
-    padding: 12px 28px;
-    border-radius: 10px;
-    color: white;
-}
-QPushButton#Connect:hover { background-color: #2f6d3f; }
-QPushButton#Connect:disabled { background-color: #b3c9c6; color: #f4f5f7; }
-QPushButton#Disconnect { background-color: #dc2626; border: none; }
-QPushButton#Disconnect:hover { background-color: #b91c1c; }
-
-QLineEdit, QComboBox, QSpinBox {
-    background-color: #ffffff;
-    border: 1px solid #c9ced8;
-    border-radius: 8px;
-    padding: 7px 10px;
-    selection-background-color: #60aa6b;
-    selection-color: #ffffff;
-}
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: #60aa6b; }
-
-QComboBox QAbstractItemView {
-    background-color: #ffffff;
-    border: 1px solid #c9ced8;
-    selection-background-color: #60aa6b;
-    selection-color: #ffffff;
-}
-
-QTableWidget {
-    background-color: #ffffff;
-    alternate-background-color: #f2f4f7;
-    gridline-color: #e3e6eb;
-    border: 1px solid #d8dce3;
-    border-radius: 8px;
-}
-QHeaderView::section {
-    background-color: #eceff3;
-    color: #5d6675;
-    border: none;
-    border-bottom: 1px solid #c9ced8;
-    padding: 8px;
-    font-weight: 600;
-}
-QTableWidget::item { padding: 6px; }
-QTableWidget::item:selected { background-color: #dcefe2; color: #20242c; }
-
-QTabWidget::pane { border: 1px solid #d8dce3; border-radius: 8px; }
-QTabBar::tab {
-    background: #eef0f3; color: #5d6675;
-    padding: 8px 18px; margin-right: 3px;
-    border-top-left-radius: 8px; border-top-right-radius: 8px;
-}
-QTabBar::tab:selected { background: #ffffff; color: #14161c; }
-
-QCheckBox::indicator, QRadioButton::indicator {
-    width: 17px; height: 17px;
-    border: 1px solid #9aa3b2; border-radius: 5px;
-    background: #ffffff;
-}
-QCheckBox::indicator:checked, QRadioButton::indicator:checked {
-    background: #60aa6b; border-color: #60aa6b;
-}
-
-QStatusBar { color: #5d6675; }
-QToolTip { background-color: #ffffff; color: #20242c; border: 1px solid #c3c8d2; }
-
-QScrollBar:vertical { background: transparent; width: 10px; }
-QScrollBar::handle:vertical { background: #c3c8d2; border-radius: 5px; }
-QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
-"""
+# Qt is imported lazily inside the functions that actually need it
+# (apply_theme, system_prefers_dark) so this module can be imported
+# headlessly to read DARK_QSS / LIGHT_QSS / STATE_COLORS — which is
+# what the test suite does.
+from .md3 import (
+    DARK_QSS,
+    LIGHT_QSS,
+    DARK_SCHEME,
+    LIGHT_SCHEME,
+    MaterialScheme,
+    md3_palette_qss,
+    md3_qss,
+    md3_scheme_for,
+    scheme_from_seed,
+    state_colors as _state_colors_for,
+)
 
 # Backward-compat alias (old imports / scripts use `QSS`).
 QSS = DARK_QSS
@@ -255,7 +60,7 @@ _scheme_connected = False
 
 def system_prefers_dark() -> bool:
     """Best-effort desktop color-scheme detection."""
-    from proto_clean.qtcompat import QGuiApplication
+    from proto_clean.qtcompat import QGuiApplication, Qt
 
     app = QGuiApplication.instance()
     if app is not None:
@@ -308,6 +113,12 @@ def is_dark() -> bool:
     return _effective == "dark"
 
 
+def effective_scheme() -> MaterialScheme:
+    """The MaterialScheme object currently in effect (for runtime painters
+    that want full MD3 color roles, not just dark/light)."""
+    return DARK_SCHEME if _effective == "dark" else LIGHT_SCHEME
+
+
 def stylesheet_for(mode: str) -> str:
     return DARK_QSS if resolve_theme(mode) == "dark" else LIGHT_QSS
 
@@ -329,49 +140,73 @@ def apply_theme(app, mode: str = "dark") -> str:
 
 def _apply_palette(app, effective: str) -> None:
     """Keep the base palette in sync so native bits (menus, popups, edits)
-    that the stylesheet does not cover still match the theme."""
+    that the stylesheet does not cover still match the Material 3 scheme."""
     from proto_clean.qtcompat import QColor, QPalette
 
+    scheme = DARK_SCHEME if effective == "dark" else LIGHT_SCHEME
+    roles_map = md3_palette_qss(scheme)
+
     p = QPalette()
-    if effective == "dark":
-        roles = {
-            QPalette.Window: "#16181d",
-            QPalette.WindowText: "#e6e9ef",
-            QPalette.Base: "#1b1d23",
-            QPalette.AlternateBase: "#1e2128",
-            QPalette.Text: "#e6e9ef",
-            QPalette.Button: "#23262e",
-            QPalette.ButtonText: "#e6e9ef",
-            QPalette.Highlight: "#2f6d3f",
-            QPalette.HighlightedText: "#ffffff",
-            QPalette.ToolTipBase: "#23262e",
-            QPalette.ToolTipText: "#e6e9ef",
-            QPalette.PlaceholderText: "#6b7280",
-            QPalette.Link: "#8ec59a",
-        }
-        disabled = "#5c6370"
-    else:
-        roles = {
-            QPalette.Window: "#f4f5f7",
-            QPalette.WindowText: "#20242c",
-            QPalette.Base: "#ffffff",
-            QPalette.AlternateBase: "#f2f4f7",
-            QPalette.Text: "#20242c",
-            QPalette.Button: "#ffffff",
-            QPalette.ButtonText: "#20242c",
-            QPalette.Highlight: "#60aa6b",
-            QPalette.HighlightedText: "#ffffff",
-            QPalette.ToolTipBase: "#ffffff",
-            QPalette.ToolTipText: "#20242c",
-            QPalette.PlaceholderText: "#8a92a3",
-            QPalette.Link: "#60aa6b",
-        }
-        disabled = "#9aa3b2"
-    for role, color in roles.items():
-        p.setColor(role, QColor(color))
-    for role in (QPalette.WindowText, QPalette.Text,
-                 QPalette.ButtonText):
-        p.setColor(QPalette.Disabled, role, QColor(disabled))
+    # The md3_palette_qss map uses Qt role names as string keys
+    # (Window, WindowText, Base, Text, Button, ButtonText, Highlight,
+    #  HighlightedText, ToolTipBase, ToolTipText, PlaceholderText,
+    #  AlternateBase, Link). Material 3 roles map to:
+    #   Window        → surface_container_low
+    #   WindowText    → on_surface
+    #   Base          → surface_container_highest (edit/list backgrounds)
+    #   AlternateBase → surface_container
+    #   Text          → on_surface
+    #   Button        → surface_container_high
+    #   ButtonText    → on_surface
+    #   Highlight     → primary
+    #   HighlightedText → on_primary
+    #   ToolTipBase   → surface_container_highest
+    #   ToolTipText   → on_surface
+    #   PlaceholderText → on_surface_variant
+    #   AlternateBase → surface_container
+    #   Link          → primary
+    material_palette = {
+        "Window": scheme.surface_container_low,
+        "WindowText": scheme.on_surface,
+        "Base": scheme.surface_container_highest,
+        "AlternateBase": scheme.surface_container,
+        "Text": scheme.on_surface,
+        "Button": scheme.surface_container_high,
+        "ButtonText": scheme.on_surface,
+        "Highlight": scheme.primary,
+        "HighlightedText": scheme.on_primary,
+        "ToolTipBase": scheme.surface_container_highest,
+        "ToolTipText": scheme.on_surface,
+        "PlaceholderText": scheme.on_surface_variant,
+        "Link": scheme.primary,
+    }
+    disabled = scheme.outline_variant
+
+    # Resolve Qt role names → QPalette role enum values
+    role_name_to_enum = {
+        "Window": getattr(QPalette, "Window", None),
+        "WindowText": getattr(QPalette, "WindowText", None),
+        "Base": getattr(QPalette, "Base", None),
+        "AlternateBase": getattr(QPalette, "AlternateBase", None),
+        "Text": getattr(QPalette, "Text", None),
+        "Button": getattr(QPalette, "Button", None),
+        "ButtonText": getattr(QPalette, "ButtonText", None),
+        "Highlight": getattr(QPalette, "Highlight", None),
+        "HighlightedText": getattr(QPalette, "HighlightedText", None),
+        "ToolTipBase": getattr(QPalette, "ToolTipBase", None),
+        "ToolTipText": getattr(QPalette, "ToolTipText", None),
+        "PlaceholderText": getattr(QPalette, "PlaceholderText", None),
+        "Link": getattr(QPalette, "Link", None),
+    }
+    for name, color_hex in material_palette.items():
+        role = role_name_to_enum.get(name)
+        if role is not None and color_hex:
+            p.setColor(role, QColor(color_hex))
+    # Disabled state
+    for name in ("WindowText", "Text", "ButtonText"):
+        role = role_name_to_enum.get(name)
+        if role is not None:
+            p.setColor(QPalette.Disabled, role, QColor(disabled))
     app.setPalette(p)
 
 
@@ -401,12 +236,9 @@ def _on_scheme_changed(_scheme=None) -> None:
         apply_theme(app, "system")
 
 
-# state → (dot color, text color, label) — mid-tones readable on both themes
-STATE_COLORS = {
-    "logged_out": ("#9aa3b2", "Not logged in"),
-    "logged_in": ("#3b82f6", "Ready"),
-    "connecting": ("#f59e0b", "Connecting…"),
-    "connected": ("#22c55e", "Protected"),
-    "disconnecting": ("#f59e0b", "Disconnecting…"),
-    "error": ("#ef4444", "Error"),
-}
+# State → (dot color, text color, label) — derived from the active MD3
+# scheme so the dots stay readable on both light and dark surfaces.
+# Kept as a module-level constant for backward compat with callers that
+# do ``from proto_clean.ui.theme import STATE_COLORS``; the lookup is
+# always the dark-scheme values (mid-tones readable on both themes).
+STATE_COLORS = _state_colors_for(DARK_SCHEME)

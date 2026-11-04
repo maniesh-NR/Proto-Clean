@@ -7,6 +7,7 @@ import os
 import pytest
 
 from proto_clean import settings as S
+from proto_clean.qtcompat import qt_available
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -102,12 +103,16 @@ def test_state_colors_shared_between_themes():
 # ------------------------------------------------------------------ runtime
 @pytest.fixture(scope="module")
 def qapp():
+    if not qt_available():
+        pytest.skip("no Qt binding available in this environment")
     from proto_clean.qtcompat import QApplication
 
     app = QApplication.instance() or QApplication([])
     yield app
 
 
+@pytest.mark.skipif(not qt_available(),
+                    reason="requires a real Qt binding")
 def test_apply_theme_switches_stylesheet(qapp):
     from proto_clean.ui import theme as T
 
@@ -127,6 +132,8 @@ def test_apply_theme_switches_stylesheet(qapp):
     T.apply_theme(qapp, "dark")
 
 
+@pytest.mark.skipif(not qt_available(),
+                    reason="requires a real Qt binding")
 def test_apply_theme_system_resolves(qapp, monkeypatch):
     from proto_clean.ui import theme as T
 
@@ -139,25 +146,35 @@ def test_apply_theme_system_resolves(qapp, monkeypatch):
     T.apply_theme(qapp, "dark")
 
 
+@pytest.mark.skipif(not qt_available(),
+                    reason="requires a real Qt binding")
 def test_apply_theme_sets_matching_palette(qapp):
     from proto_clean.ui import theme as T
+    from proto_clean.ui.md3 import DARK_SCHEME, LIGHT_SCHEME
 
     T.apply_theme(qapp, "dark")
-    assert qapp.palette().window().color().name() == "#16181d"
+    assert qapp.palette().window().color().name() == \
+        DARK_SCHEME.surface_container_low.lower()
     T.apply_theme(qapp, "light")
-    assert qapp.palette().window().color().name() == "#f4f5f7"
+    assert qapp.palette().window().color().name() == \
+        LIGHT_SCHEME.surface_container_low.lower()
     T.apply_theme(qapp, "dark")
 
 
+@pytest.mark.skipif(not qt_available(),
+                    reason="requires a real Qt binding")
 def test_load_bar_uses_theme_track(qapp):
     from proto_clean.ui import resources
     from proto_clean.ui import theme as T
+    from proto_clean.ui.md3 import DARK_SCHEME, LIGHT_SCHEME
 
     # x=80 sits beyond the 50% fill, so the pixel shows the track color
     T.apply_theme(qapp, "dark")
     pm = resources.load_bar_pixmap(50.0)
-    assert pm.toImage().pixelColor(80, 5).name() == "#262a33"
+    assert pm.toImage().pixelColor(80, 5).name() == \
+        DARK_SCHEME.outline_variant.lower()
     T.apply_theme(qapp, "light")
     pm = resources.load_bar_pixmap(50.0)
-    assert pm.toImage().pixelColor(80, 5).name() == "#dfe3ea"
+    assert pm.toImage().pixelColor(80, 5).name() == \
+        LIGHT_SCHEME.outline_variant.lower()
     T.apply_theme(qapp, "dark")

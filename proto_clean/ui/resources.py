@@ -58,7 +58,13 @@ def load_bar_pixmap(percent: float, width: int = 90, height: int = 10) -> QPixma
     p = QPainter(pm)
     p.setRenderHint(QPainter.Antialiasing)
     p.setPen(Qt.NoPen)
-    p.setBrush(QColor("#262a33" if is_dark() else "#dfe3ea"))
+    # MD3 surface-variant for the track, derived from the active scheme
+    from .theme import effective_scheme
+    try:
+        track = effective_scheme().outline_variant
+    except Exception:  # noqa: BLE001 — fallback when no scheme resolved yet
+        track = "#262a33" if is_dark() else "#dfe3ea"
+    p.setBrush(QColor(track))
     p.drawRoundedRect(0, 0, width, height, 5, 5)
     frac = max(0.0, min(1.0, percent / 100.0))
     if percent < 50:

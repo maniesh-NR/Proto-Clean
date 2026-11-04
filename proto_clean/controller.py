@@ -4,6 +4,7 @@ so it can be driven headless (tests) or from Qt."""
 
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
 import time
@@ -17,6 +18,13 @@ from .log import get
 from .netshield.blocklists import BlocklistManager
 from .netshield.dns_server import DnsBlocker, DnsUpstream
 from .paths import DNS_BLOCKER_PORT, ensure_dirs
+from .proton.guest import (
+    GuestAuth,
+    GuestAuthError,
+    GuestSession,
+    build_wg_quick_config,
+    gen_x25519_keypair,
+)
 from .servers.models import LogicalServer
 from .servers.selection import fastest_server
 from .servers.store import ServerStore
@@ -90,8 +98,9 @@ class Controller:
         self._proxy_listeners: List[Callable] = []
         self.totp_provider: Callable[[], Optional[str]] = lambda: None
 
-        # pending login request: {mode: stored|once|interactive, username,
-        # password, totp_secret, remember} — consumed by the login worker
+        # pending login request: {mode: stored|once|interactive|guest,
+        # username, password, totp_secret, remember} — consumed by the login
+        # worker
         self._login_request: Optional[dict] = None
         self.session.on_event = self._on_session_event
 
@@ -112,6 +121,14 @@ class Controller:
         self.bond_state: str = PROXY_OFF
         self._bond_listeners: List[Callable] = []
         self._bond_lock = threading.Lock()
+
+        # Guest-mode (credentialless) state. When ``guest_session`` is set
+        # the controller uses the Proton API directly (GuestAuth) instead of
+        # the backend browser session — no Playwright, no CAPTCHA, no
+        # account. Free-tier (Tier=0) servers only; max one connection.
+        self.guest_session: Optional["GuestSession"] = None
+        self.guest_auth: Optional["GuestAuth"] = None
+        self._guest_loop: Optional[asyncio.AbstractEventLoop] = None
 
     # ------------------------------------------------------------- plumbing
     def _set_state(self, state: State, detail: str = "") -> None:
@@ -161,6 +178,23 @@ class Controller:
         }
         self._spawn(self._login_worker, "proto_clean-login")
 
+    def login_guest_async(self) -> None:
+        """Continue as guest — credentialless Proton API flow.
+
+        Spawns a worker that calls the Proton API directly (no browser,
+        no account, no CAPTCHA) to obtain a Tier=0 session bound to a
+        client-generated Ed25519 keypair. The session is persisted so
+        subsequent launches auto-resume as guest until the user explicitly
+        logs out. Free servers only; one concurrent connection.
+        """
+        self._login_request = {"mode": "guest"}
+        self._spawn(self._login_worker, "proto_clean-guest-login")
+
+    def is_guest(self) -> bool:
+        """True when the controller is running a credentialless guest
+        session (no Proton account)."""
+        return self.guest_session is not None
+
     def _on_session_event(self, kind: str, detail: str) -> None:
         """Relay login progress from the backend browser to the UI."""
         user_visible = {
@@ -196,6 +230,10 @@ class Controller:
         self._login_request = None
         try:
             mode = request.get("mode", "stored")
+
+            if mode == "guest":
+                self._login_guest_worker()
+                return
 
             if mode == "interactive":
                 self._set_state(State.LOGGED_OUT,
@@ -276,9 +314,252 @@ class Controller:
 
     def logout(self) -> None:
         self.disconnect_async()
+        # Tear down any guest session first so a subsequent "Log in…"
+        # properly resets to account-mode.
+        if self.guest_session is not None:
+            self._stop_guest_loop()
+            self.guest_session = None
+            self.guest_auth = None
+        creds.clear_guest_session()
         creds.clear_credentials()
         self.session.logout()
         self._set_state(State.LOGGED_OUT, "logged out")
+
+    # ----------------------------------------------------------- guest mode
+    def _login_guest_worker(self) -> None:
+        """Guest-mode login worker — runs inside ``_login_worker`` (the
+        op lock is already held). Calls the Proton API directly to obtain
+        a credentialless Tier=0 session, persists it, then refreshes
+        servers via the same API (no browser session needed)."""
+        self._set_state(State.LOGGED_OUT, "guest login — contacting Proton API…")
+        try:
+            stored = creds.load_guest_session()
+            if stored:
+                try:
+                    session = GuestSession.from_storage_dict(stored)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("stored guest session unreadable: %s", e)
+                    session = None
+                if session and session.refresh_expires_at > time.time():
+                    # Stored session still within refresh window — reuse it.
+                    self.guest_session = session
+                    self.guest_auth = GuestAuth()
+                    self._spawn_guest_loop()
+                    self._after_guest_login(fresh=False)
+                    return
+                # Stored session expired — clear it and do a fresh login.
+                creds.clear_guest_session()
+
+            # Fresh guest login: spin up a GuestAuth (owns an httpx client)
+            # and run the async login coroutine on a dedicated event loop
+            # so we don't collide with Qt's loop.
+            auth = GuestAuth()
+            loop = asyncio.new_event_loop()
+            try:
+                session = loop.run_until_complete(auth.login())
+            finally:
+                # Keep the loop alive for follow-up calls (fetch_logicals,
+                # fetch_certificate) — park it on a background thread.
+                self.guest_auth = auth
+                self._guest_loop = loop
+                self._spawn_guest_loop_with_loop(loop)
+            self.guest_session = session
+            creds.store_guest_session(session.to_storage_dict())
+            self._after_guest_login(fresh=True)
+        except GuestAuthError as e:
+            log.warning("guest login failed: %s", e)
+            self._set_state(State.LOGGED_OUT, str(e))
+            self.on_message(f"Guest login failed: {e}", "error")
+            self.on_login_event("guest_login_failed", str(e))
+        except Exception as e:  # noqa: BLE001
+            log.exception("guest login crashed")
+            self._set_state(State.LOGGED_OUT, str(e))
+            self.on_message(f"Guest login error: {e}", "error")
+            self.on_login_event("guest_login_failed", str(e))
+
+    def _spawn_guest_loop(self) -> None:
+        """Park ``self._guest_loop`` on a background thread if not already."""
+        if self._guest_loop is None and self.guest_auth is not None:
+            loop = asyncio.new_event_loop()
+            self._guest_loop = loop
+            self._spawn_guest_loop_with_loop(loop)
+
+    def _spawn_guest_loop_with_loop(self, loop) -> None:
+        """Run ``loop`` forever on a daemon thread."""
+        def _runner():
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+        t = threading.Thread(target=_runner, daemon=True,
+                             name="proto_clean-guest-loop")
+        t.start()
+
+    def _stop_guest_loop(self) -> None:
+        """Stop the guest event loop and close the httpx client."""
+        loop = self._guest_loop
+        auth = self.guest_auth
+        if loop is not None and auth is not None:
+            try:
+                fut = asyncio.run_coroutine_threadsafe(auth.close(), loop)
+                fut.result(timeout=5)
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                loop.call_soon_threadsafe(loop.stop)
+            except Exception:  # noqa: BLE001
+                pass
+        self._guest_loop = None
+
+    def _after_guest_login(self, fresh: bool) -> None:
+        """Mirror of ``_after_login`` for guest mode: marks the session
+        as logged in and kicks off the guest-specific server refresh."""
+        self.session.logged_in = True
+        self.session.user_plan_hint = "guest"
+        self._set_state(State.LOGGED_IN, "guest mode — free servers only")
+        self.on_message("Guest login successful — free-tier servers only",
+                        "info")
+        self._spawn(self._refresh_guest_servers_worker,
+                    "proto_clean-guest-servers")
+        if self.settings.netshield.enabled:
+            self.update_blocklists_async()
+
+    def _refresh_guest_servers_worker(self) -> None:
+        """Fetch the free-tier server list via the Proton API (guest mode)."""
+        if self.guest_session is None or self.guest_auth is None \
+                or self._guest_loop is None:
+            self.on_message(
+                "guest server refresh requested without a guest session",
+                "warn")
+            return
+        try:
+            coro = self.guest_auth.fetch_logicals(self.guest_session)
+            fut = asyncio.run_coroutine_threadsafe(coro, self._guest_loop)
+            guest_servers = fut.result(timeout=60)
+            logicals = [s.to_logical_server() for s in guest_servers]
+            self.store.replace(logicals)
+            self._emit_servers()
+            log.info("guest server refresh: %d free servers", len(logicals))
+        except GuestAuthError as e:
+            log.warning("guest server refresh failed: %s", e)
+            self.on_message(f"Guest server refresh failed: {e}", "warn")
+            if "token" in str(e).lower() or "auth" in str(e).lower():
+                # Token expired — try a refresh, then retry once.
+                self._refresh_guest_token_and_retry()
+        except Exception as e:  # noqa: BLE001
+            log.exception("guest server refresh crashed")
+            self.on_message(f"Guest server refresh error: {e}", "warn")
+
+    def _refresh_guest_token_and_retry(self) -> None:
+        if self.guest_session is None or self.guest_auth is None \
+                or self._guest_loop is None:
+            return
+        try:
+            coro = self.guest_auth.refresh(self.guest_session)
+            fut = asyncio.run_coroutine_threadsafe(coro, self._guest_loop)
+            refreshed = fut.result(timeout=30)
+            # Build a new GuestSession with the refreshed tokens (preserving
+            # the device keypair + plan info).
+            new_session = GuestSession(
+                access_token=refreshed.get("access_token", ""),
+                refresh_token=refreshed.get("refresh_token", ""),
+                uid=refreshed.get("uid", self.guest_session.uid),
+                expires_at=refreshed.get("expires_at", time.time() + 3600),
+                refresh_expires_at=refreshed.get(
+                    "refresh_expires_at",
+                    self.guest_session.refresh_expires_at),
+                scope=refreshed.get("scope", self.guest_session.scope),
+                device_ed25519_pub_b64=self.guest_session.device_ed25519_pub_b64,
+                device_ed25519_priv=self.guest_session.device_ed25519_priv,
+                max_tier=0, max_connect=1, plan_name="guest",
+            )
+            self.guest_session = new_session
+            creds.store_guest_session(new_session.to_storage_dict())
+            log.info("guest token refreshed — retrying server fetch")
+            self._spawn(self._refresh_guest_servers_worker,
+                        "proto_clean-guest-servers-retry")
+        except Exception as e:  # noqa: BLE001
+            log.warning("guest token refresh failed: %s", e)
+            self.on_message(
+                "Guest session expired — log in as guest again", "warn")
+            self.guest_session = None
+            self._set_state(State.LOGGED_OUT, "guest session expired")
+
+    def _connect_guest_worker(self, server: LogicalServer) -> None:
+        """Guest-mode connect path: build a wg-quick config from the API
+        certificate + server's X25519 public key, then bring up the tunnel.
+        Bypasses the browser downloads-page flow entirely."""
+        if self.guest_session is None or self.guest_auth is None \
+                or self._guest_loop is None:
+            self.on_message(
+                "guest connect requested without a guest session", "error")
+            self._set_state(State.ERROR, "no guest session")
+            return
+        try:
+            self._set_state(State.CONNECTING,
+                            f"generating WireGuard cert for {server.name}…")
+            # Generate a fresh X25519 keypair for this connection (the
+            # public key is sent to Proton; the private key goes into the
+            # wg-quick [Interface] block).
+            client_pub_b64, client_priv_b64 = gen_x25519_keypair()
+            coro = self.guest_auth.fetch_certificate(
+                self.guest_session, client_pub_b64, persistent=True)
+            fut = asyncio.run_coroutine_threadsafe(coro, self._guest_loop)
+            cert = fut.result(timeout=60)
+
+            # DNS override: Proto Clean's DNS blocker redirects 127.0.0.1
+            # on Linux/macOS via the firewall; Windows uses the
+            # ``dns_loopback`` config knob. Match the regular path.
+            from . import paths as _paths
+            from .platforms import capabilities
+            caps = capabilities()
+            netshield_on = self.settings.netshield.enabled
+            custom_dns_on = (self.settings.advanced.custom_dns_enabled
+                             and self.settings.advanced.custom_dns_list())
+            dns_active = netshield_on or custom_dns_on
+            dns_server = None
+            if dns_active:
+                dns_server = ("127.0.0.1" if not _paths.IS_WINDOWS
+                              else ("127.0.0.1" if caps.dns_loopback_in_config
+                                    else None))
+
+            # Build the wg-quick config text.
+            # The GuestLogicalServer.to_logical_server() conversion stored
+            # the server's X25519 pubkey + entry IP in physical[0]; reuse
+            # the same fields directly from the stored LogicalServer.
+            phys = server.physical[0] if server.physical else None
+            if phys is None or not phys.x25519_pk or not phys.entry_ip:
+                self.on_message(
+                    f"{server.name} has no usable WireGuard endpoint "
+                    "(missing X25519 key or entry IP)", "error")
+                self._set_state(State.ERROR, "no WG endpoint")
+                return
+
+            # Build a tiny ad-hoc server object quacking like
+            # GuestLogicalServer for build_wg_quick_config() (it only
+            # reads entry_ip + x25519_public_key).
+            server_view = type("_S", (), {
+                "entry_ip": phys.entry_ip,
+                "x25519_public_key": phys.x25519_pk,
+            })()
+            config_text = build_wg_quick_config(
+                server_view, cert, client_priv_b64,
+                dns_server=dns_server,
+                ipv6=self.settings.advanced.ipv6_support,
+            )
+
+            self._set_state(State.CONNECTING, "bringing the tunnel up…")
+            self._bring_up(config_text, server)
+            self._set_connected(server, server.id, via_cache=False,
+                                exact=True)
+        except GuestAuthError as e:
+            log.warning("guest connect failed: %s", e)
+            self._teardown_partial()
+            self._set_state(State.ERROR, str(e))
+            self.on_message(f"Guest connect failed: {e}", "error")
+        except Exception as e:  # noqa: BLE001
+            log.exception("guest connect crashed")
+            self._teardown_partial()
+            self._set_state(State.ERROR, str(e))
+            self.on_message(f"Guest connect error: {e}", "error")
 
     # ------------------------------------------------------------- servers
     def refresh_servers_async(self) -> None:
@@ -353,6 +634,29 @@ class Controller:
             return
         if not self._op_lock.acquire(blocking=False):
             self.on_message("busy — try again in a moment", "warn")
+            return
+        # Guest-mode dispatch: bypass the browser/downloads flow entirely
+        # and use the Proton API directly (no Playwright, no CAPTCHA).
+        if self.is_guest():
+            try:
+                self._set_state(State.CONNECTING, "choosing server…")
+                if not self.store.servers:
+                    self._set_state(State.CONNECTING, "fetching servers…")
+                    self._refresh_guest_servers_worker()
+                server = self.select_server(server_id)
+                if not server:
+                    self.on_message("no usable free server found", "error")
+                    self._set_state(State.LOGGED_IN, "no servers")
+                    return
+                self.current_server = server
+                self._connect_guest_worker(server)
+            except Exception as e:  # noqa: BLE001
+                log.exception("guest connect dispatch failed")
+                self._teardown_partial()
+                self._set_state(State.ERROR, str(e))
+                self.on_message(f"Guest connect error: {e}", "error")
+            finally:
+                self._op_lock.release()
             return
         self._apply_browser_proxy()      # downloads may need the proxy
         try:

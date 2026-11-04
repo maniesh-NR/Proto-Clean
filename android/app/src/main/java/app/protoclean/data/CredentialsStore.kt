@@ -46,6 +46,31 @@ class CredentialsStore(context: Context) {
 
     fun sessionCookies(): String = prefs.getString("session_cookies", "") ?: ""
 
+    // ----------------------------------------------------------- guest mode
+    //
+    // Guest-mode (credentialless Proton) sessions are stored under the
+    // ``guest_session`` key in the same encrypted prefs file. The value
+    // is the JSON-serialised ``GuestSession.toStorageJson()`` payload —
+    // see ``app.protoclean.proton.GuestSession`` for the schema.
+
+    /** Persist the guest-mode session JSON (the output of
+     *  ``GuestSession.toStorageJson().toString()``). Replaces any
+     *  previously stored guest session. */
+    fun saveGuestSession(json: String) {
+        prefs.edit().putString("guest_session", json).apply()
+    }
+
+    /** Return the stored guest-mode session JSON, or null when no guest
+     *  session has been persisted (or it has been cleared). */
+    fun loadGuestSession(): String? = prefs.getString("guest_session", null)
+
+    /** Remove the stored guest-mode session. Does NOT touch the
+     *  account credentials or session cookies — call [clear] for a
+     *  full wipe. */
+    fun clearGuestSession() {
+        prefs.edit().remove("guest_session").apply()
+    }
+
     fun clear() {
         prefs.edit().clear().apply()
     }

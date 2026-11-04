@@ -1,11 +1,13 @@
 """Login dialog: save Proton credentials for auto-login, or log in by hand
-in a visible browser window (CAPTCHA-friendly)."""
+in a visible browser window (CAPTCHA-friendly). Also offers Material 3
+"Continue as guest" — Proton's credentialless Tier=0 session (no account,
+no CAPTCHA, no Playwright)."""
 
 from __future__ import annotations
 
 from proto_clean.qtcompat import Qt
 from proto_clean.qtcompat import (
-    QCheckBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel,
+    QCheckBox, QDialog, QFrame, QHBoxLayout, QFormLayout, QLabel,
     QLineEdit, QPushButton, QVBoxLayout,
 )
 
@@ -21,6 +23,10 @@ class LoginDialog(QDialog):
     * Un-checking it uses the credentials for this login only.
     * "Log in in browser…" opens a visible Chromium window where you can
       type everything by hand and solve any CAPTCHA yourself.
+    * "Continue as guest" uses Proton's credentialless API flow
+      (``POST /auth/v4/sessions`` -> ``POST /auth/v4/credentialless``)
+      to obtain a Tier=0 session bound to a client-generated Ed25519
+      keypair. No account, no CAPTCHA, free servers only.
     """
 
     def __init__(self, controller, parent=None,
@@ -28,7 +34,7 @@ class LoginDialog(QDialog):
         super().__init__(parent)
         self.controller = controller
         self.setWindowTitle("Log in to Proton VPN")
-        self.setMinimumWidth(520)
+        self.setMinimumWidth(560)
 
         layout = QVBoxLayout(self)
         intro = QLabel(
@@ -69,6 +75,32 @@ class LoginDialog(QDialog):
         note.setWordWrap(True)
         note.setObjectName("LoginNote")
         layout.addWidget(note)
+
+        # ---- Material 3 "Continue as guest" — filled tonal button with
+        # a divider above it. Mirrors Proton's own Android first-run UI:
+        # the guest option is the low-emphasis fallback below the primary
+        # account-login CTAs.
+        divider = QFrame()
+        divider.setFrameShape(QFrame.HLine)
+        divider.setObjectName("M3Divider")
+        layout.addWidget(divider)
+
+        guest_row = QHBoxLayout()
+        guest_blurb = QLabel(
+            "No account? Continue as guest — uses Proton's credentialless "
+            "API to obtain a free-tier (Tier=0) session. Free servers "
+            "only (NL, JP, PL, RO, US); one connection at a time.")
+        guest_blurb.setWordWrap(True)
+        guest_blurb.setObjectName("LoginNote")
+        guest_row.addWidget(guest_blurb, 1)
+        self.guest_btn = QPushButton("Continue as guest")
+        self.guest_btn.setObjectName("GuestButton")
+        self.guest_btn.setToolTip(
+            "Proton's credentialless login: no account, no CAPTCHA, "
+            "no Playwright. Free-tier servers only.")
+        self.guest_btn.clicked.connect(self._on_guest_login)
+        guest_row.addWidget(self.guest_btn, 0)
+        layout.addLayout(guest_row)
 
         buttons = QHBoxLayout()
         self.login_btn = QPushButton("Log in")
@@ -116,4 +148,9 @@ class LoginDialog(QDialog):
                 self.accept()
                 return
         self.controller.login_interactive_async()
+        self.accept()
+
+    def _on_guest_login(self) -> None:
+        """Trigger the credentialless guest login flow."""
+        self.controller.login_guest_async()
         self.accept()

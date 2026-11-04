@@ -178,3 +178,100 @@ def _wipe_fallback() -> None:
             CREDENTIALS_FILE.unlink()
         except OSError:
             pass
+
+
+# ---------------------------------------------------------------------------
+# Guest-mode session storage
+# ---------------------------------------------------------------------------
+
+_GUEST_KEY = "guest-session"
+
+
+def store_guest_session(payload: dict) -> None:
+    """Persist the guest-mode session payload (the
+    ``GuestSession.to_storage_dict()`` output) so guest mode auto-resumes
+    on next launch. Same keyring/file strategy as ordinary credentials."""
+    keyring, KeyringError = _keyring()
+    if keyring is not None:
+        try:
+            import json as _json
+            keyring.set_password(_SERVICE, _GUEST_KEY,
+                                 _json.dumps(payload))
+            _wipe_guest_fallback()
+            log.info("guest session stored in system keyring")
+            return
+        except KeyringError:
+            log.warning("keyring write failed, falling back to file storage")
+    import json as _json
+    import os
+    import stat
+
+    ensure_dirs()
+    data = {}
+    if CREDENTIALS_FILE.exists():
+        try:
+            data = _json.loads(CREDENTIALS_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            data = {}
+    data["guest_session"] = payload
+    CREDENTIALS_FILE.write_text(_json.dumps(data), encoding="utf-8")
+    os.chmod(CREDENTIALS_FILE, stat.S_IRUSR | stat.S_IWUSR)
+    log.info("guest session stored in restricted file %s", CREDENTIALS_FILE)
+
+
+def load_guest_session() -> Optional[dict]:
+    """Return the stored guest session payload, or None if absent."""
+    import json as _json
+
+    keyring, KeyringError = _keyring()
+    if keyring is not None:
+        try:
+            raw = keyring.get_password(_SERVICE, _GUEST_KEY)
+            if raw:
+                try:
+                    return _json.loads(raw)
+                except (json.JSONDecodeError, OSError):
+                    log.warning("guest session payload unreadable in keyring")
+        except KeyringError:
+            pass
+    if CREDENTIALS_FILE.exists():
+        try:
+            data = _json.loads(CREDENTIALS_FILE.read_text(encoding="utf-8"))
+            payload = data.get("guest_session")
+            if isinstance(payload, dict):
+                return payload
+        except (json.JSONDecodeError, OSError):
+            log.error("could not parse fallback credential file")
+    return None
+
+
+def clear_guest_session() -> None:
+    """Drop the guest session from keyring and fallback file."""
+    keyring, KeyringError = _keyring()
+    if keyring is not None:
+        try:
+            keyring.delete_password(_SERVICE, _GUEST_KEY)
+        except KeyringError:
+            pass
+    _wipe_guest_fallback()
+    log.info("guest session cleared")
+
+
+def _wipe_guest_fallback() -> None:
+    """Remove just the guest_session key from the fallback file."""
+    import json as _json
+
+    if not CREDENTIALS_FILE.exists():
+        return
+    try:
+        data = _json.loads(CREDENTIALS_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+    if data.pop("guest_session", None) is not None:
+        if data:
+            CREDENTIALS_FILE.write_text(_json.dumps(data), encoding="utf-8")
+        else:
+            try:
+                CREDENTIALS_FILE.unlink()
+            except OSError:
+                pass
