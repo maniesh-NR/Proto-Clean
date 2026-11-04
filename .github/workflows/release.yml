@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  VERSION: 0.4.0
+  VERSION: 0.5.0
   # lantern-box (Lantern's GPL-3 sing-box fork) — the samizdat engine we
   # bundle. Pinned tag; the port job builds it from source for every
   # target platform (official releases only publish linux binaries).
@@ -520,66 +520,69 @@ jobs:
       - name: Create / update release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.4.0
-          name: Proto Clean v0.4.0
+          tag_name: v0.5.0
+          name: Proto Clean v0.5.0
           body: |
-            New in v0.4.0: **link bonding** — use two or more network
-            adapters as one pipe (Speedify-style stream bonding and
-            net-merge-style per-connection balancing, on every platform
-            including Android), and **bundled lantern-box** — the
-            samizdat engine now ships inside every package (the project
-            relicensed to **GPL-3.0-or-later** to comply with Lantern's
-            GPL-3).
+            New in v0.5.0: **25+ protocol engines in one app** —
+            Shadowsocks (AEAD/2022), VMess, VLESS + REALITY, Trojan,
+            Hysteria 2, TUIC v5, MASQUE over QUIC, NaïveProxy,
+            ShadowsocksR, OpenVPN over Cloak, AmneziaWG 1.5/2.0, IKEv2,
+            Tor (with bridges), Obscura relays, Lantern
+            samizdat/radiance/lampshade, Reflex, WATER, Outline,
+            ALGeneva, **Cloudflare WARP** and multiprotocol **chains**.
+            Plus **Clash / V2ray / V2fly / sing-box config import** (or
+            raw sing-box passthrough) and subscriptions.
 
             ## Downloads
             | Platform | File | Notes |
             |---|---|---|
-            | **Windows 7+ x64** | `Proto-Clean-0.4.0-win7-x64-portable.zip` | Python 3.8 + Qt 5.15 legacy stack |
-            | **Windows 7+ x86 (32-bit)** | `Proto-Clean-0.4.0-win7-x86-portable.zip` | 32-bit Qt 5.15 legacy stack |
-            | **Windows 10/11 x64 (portable)** | `Proto-Clean-0.4.0-win-x64-portable.zip` | Qt 6 modern stack |
-            | **Windows 10/11 x64 (setup)** | `Proto-Clean-0.4.0-win-x64-setup.exe` | Inno Setup installer |
-            | **macOS 10.15 Catalina+ (Intel)** | `Proto-Clean-0.4.0-macos-10.15-catalina-x86_64-portable.zip` | Qt 6.2, runs on 10.14+ |
-            | **macOS 11+ (Apple Silicon)** | `Proto-Clean-0.4.0-macos-11.0-arm64-portable.zip` | native arm64, Qt 6 |
-            | **Linux Mint 21 / Ubuntu 22.04** | `proto-clean_0.4.0-mint21-ubuntu22.04_amd64.deb` | also LMDE-era compatible glibc |
-            | **Linux Mint 22 / Ubuntu 24.04** | `proto-clean_0.4.0-mint22-ubuntu24.04_amd64.deb` | |
-            | **LMDE 6 / Debian 12** | `proto-clean_0.4.0-debian12_amd64.deb` | |
-            | **Linux (portable)** | `Proto-Clean-0.4.0-linux-x86_64-portable.tar.gz` | built on Ubuntu 22.04; runs on Mint 21/22, LMDE 6 |
-            | **Linux (Flatpak)** | `Proto-Clean-0.4.0-x86_64.flatpak` | `flatpak install --user Proto-Clean-0.4.0-x86_64.flatpak` |
-            | **Android 8.0+ (armv7)** | `Proto-Clean-0.4.0-android-armeabi-v7a.apk` | debug-signed APK |
-            | **Android 8.0+ (arm64)** | `Proto-Clean-0.4.0-android-arm64-v8a.apk` | debug-signed APK |
+            | **Windows 7+ x64** | `Proto-Clean-0.5.0-win7-x64-portable.zip` | Python 3.8 + Qt 5.15 legacy stack |
+            | **Windows 7+ x86 (32-bit)** | `Proto-Clean-0.5.0-win7-x86-portable.zip` | 32-bit Qt 5.15 legacy stack |
+            | **Windows 10/11 x64 (portable)** | `Proto-Clean-0.5.0-win-x64-portable.zip` | Qt 6 modern stack |
+            | **Windows 10/11 x64 (setup)** | `Proto-Clean-0.5.0-win-x64-setup.exe` | Inno Setup installer |
+            | **macOS 10.15 Catalina+ (Intel)** | `Proto-Clean-0.5.0-macos-10.15-catalina-x86_64-portable.zip` | Qt 6.2, runs on 10.14+ |
+            | **macOS 11+ (Apple Silicon)** | `Proto-Clean-0.5.0-macos-11.0-arm64-portable.zip` | native arm64, Qt 6 |
+            | **Linux Mint 21 / Ubuntu 22.04** | `proto-clean_0.5.0-mint21-ubuntu22.04_amd64.deb` | also LMDE-era compatible glibc |
+            | **Linux Mint 22 / Ubuntu 24.04** | `proto-clean_0.5.0-mint22-ubuntu24.04_amd64.deb` | |
+            | **LMDE 6 / Debian 12** | `proto-clean_0.5.0-debian12_amd64.deb` | |
+            | **Linux (portable)** | `Proto-Clean-0.5.0-linux-x86_64-portable.tar.gz` | built on Ubuntu 22.04; runs on Mint 21/22, LMDE 6 |
+            | **Linux (Flatpak)** | `Proto-Clean-0.5.0-x86_64.flatpak` | `flatpak install --user Proto-Clean-0.5.0-x86_64.flatpak` |
+            | **Android 8.0+ (armv7)** | `Proto-Clean-0.5.0-android-armeabi-v7a.apk` | debug-signed APK |
+            | **Android 8.0+ (arm64)** | `Proto-Clean-0.5.0-android-arm64-v8a.apk` | debug-signed APK |
 
-            Every platform ships a **portable** build (extract & run — no
-            installation) and now **bundles lantern-box** (Lantern's
-            GPL-3 sing-box fork, built from
-            [getlantern/lantern-box](https://github.com/getlantern/lantern-box)
-            v0.0.189 — samizdat works out of the box).
+            Every package still bundles **lantern-box** (Lantern's GPL-3
+            sing-box fork — samizdat out of the box) and every platform
+            ships a **portable** build (extract & run).
 
-            ## Link bonding (new)
-            * **Stream bonding** — traffic to the same server is split
-              across Wi-Fi + Ethernet + tethering and **rejoined at your
-              bond server**, so one connection gets the combined
-              bandwidth of every adapter (Settings → Link bonding).
-            * **Per-connection balancing** — net-merge-style: each new
-              connection picks an adapter; many downloads spread across
-              links.
-            * Run the rejoin server on any host:
-              `python3 -m proto_clean.bondserver --listen 0.0.0.0:10820 --token s3cret`
-            * **Android**: the bonding VPN uses Wi-Fi + mobile data at the
-              same time (no root) — the Speedify feature set.
-            * **Interoperability**: leave "Ride the bond" on and Xray /
-              samizdat dial through the bond automatically; the browser
-              "auto" proxy mode rides it too. A dead adapter drops out of
-              the schedule and the survivors take over seamlessly.
+            ## Protocols (new)
+            * **Built-in engines** (no extra binaries): Shadowsocks AEAD,
+              Hysteria 2 (official wire protocol + salamander obfs), TUIC
+              v5, MASQUE CONNECT-UDP over HTTP/3, Cover-DTLS (DTLS 1.2
+              covert transport), IKEv2 (strongSwan / rasdial / Apple
+              profiles), Tor (bridges: obfs4, snowflake, webtunnel).
+            * **Through lantern-box**: VMess (ws/grpc/h2 + uTLS),
+              ShadowsocksR, NaïveProxy, AmneziaWG (junk packets + magic
+              headers), Reflex, WATER, Outline smart dialer, ALGeneva —
+              with automatic capability probing (`box check`).
+            * **Clash / V2ray / V2fly / sing-box**: import YAML/JSON
+              configs, or run any sing-box config verbatim (passthrough).
+              Subscription URLs auto-detect the format (plain links,
+              base64, Clash YAML, sing-box JSON).
+            * **Import**: clipboard, QR on screen, QR images, config
+              files (.conf/.ovpn/.yaml/.json/.txt), subscriptions. Share
+              any profile as a QR code.
+            * **Cloudflare WARP hops**: register with Cloudflare (the
+              oblivion / warp-plus way) and chain **WARP → protocol** or
+              **protocol → WARP** with one click.
+            * **Chains**: compose any engines (`client → VMess → Tor →
+              internet`); QUIC engines tunnel through SOCKS5 UDP relays,
+              Xray uses dialerProxy, lantern-box uses detour.
+            * Settings → **Protocols** (or the tray menu).
 
-            ## Samizdat (Lantern) — now bundled
-            * The lantern-box engine ships with every package (desktop:
-              next to the app binary; Android: inside the APK).
-            * Import `samizdat://server:443?pbk=…&sid=…&sni=…` in
-              Settings → Proxy to use Lantern's HTTP/2 masquerade with
-              uTLS fingerprints, Geneva fragmentation and active-probe
-              resistance.
-            * Proto Clean is now **GPL-3.0-or-later** to comply with
-              Lantern's license.
+            ## Also in this release
+            * v0.4.0's **link bonding** (multi-adapter Speedify-style),
+              samizdat bundling and the GPL-3 relicense carry over.
+            * 549 automated tests; Python 3.8 (Windows 7) to 3.12.
 
             ## After install
             * Log in with your own Proton account (credentials stay in your
@@ -588,13 +591,14 @@ jobs:
               helper + sudoers line (printed by the deb postinst / see
               `scripts/install.sh`, `scripts/install_macos.sh`).
             * Flatpak note: the sandbox cannot run the privileged
-              WireGuard/OpenVPN helper — use the bundled samizdat proxy
-              and the DNS ad-blocker mode there.
+              WireGuard/OpenVPN helper — use the protocol engines and
+              the DNS ad-blocker mode there.
 
             ## Attribution
             Built with **GLM**, an LLM by **Z.ai**. Uses PySide6/Qt,
-            Playwright, dnslib, httpx, keyring, PyInstaller, Inno Setup,
-            Xray-core and lantern-box (getlantern, GPL-3) — see README
+            Playwright, dnslib, httpx, keyring, aioquic, PyYAML,
+            zxing-cpp, segno, PyInstaller, Inno Setup, Xray-core and
+            lantern-box (getlantern, GPL-3) — see README
             for the full attribution.
 
             Not affiliated with or endorsed by Proton AG — see README.
