@@ -1,24 +1,30 @@
 """Guest-mode (credentialless) ProtonVPN API client.
 
 Implements the "Continue as guest" flow used by the official ProtonVPN
-Android app to obtain a free-tier (Tier=0) VPN session without any account
-credentials. The flow is:
+clients to obtain a free-tier (Tier=0) VPN session without any account
+credentials. The request/response shapes below were transcribed from the
+open-source official clients (ProtonMail/protoncore_android
+``AuthenticationApi.kt`` + ``ChallengeFrame.kt``, ProtonVPN/android-app
+``ProtonVPNRetrofit.kt`` + ``CertificateRequestBody.kt`` +
+``Constants.kt``) — do not "simplify" the payloads, the API is strict
+about the envelope.
 
-1. ``POST /auth/v4/sessions`` with a ``challengePayload`` describing the
-   client device -> returns an anonymous ``AccessToken`` + ``RefreshToken``
-   + ``UID``.
-2. ``POST /auth/v4/credentialless`` (bearer-authenticated with the
-   anonymous token, same ``challengePayload``) -> returns the full guest
-   session with ``Scope`` including ``self vpn`` and ``tier=0``.
+The flow (same one the morphe-patches project exposes by unlocking the
+guest server list):
+
+1. ``POST /auth/v4/sessions`` with the anti-abuse ``Payload``
+   (a ``vpn-android-v4-challenge-0`` device frame) -> creates an
+   *unauthenticated* session: ``AccessToken``/``RefreshToken``/``UID``.
+2. ``POST /auth/v4/credentialless`` with the same ``Payload``, bearer-
+   authenticated with the anonymous token -> returns the full guest
+   session (``Scopes`` including ``vpn``, ``LocalID``, ``EventID``).
 3. Standard VPN endpoints (``/vpn/v2``, ``/vpn/v2/logicals``,
-   ``/vpn/v1/certificate``) are then reachable with the guest bearer token.
-
-The challenge payload is currently permissively validated by Proton's
-credentialless endpoint — the server only records the device metadata, it
-does not verify the ``ED25519`` public key. That key is, however, required
-later for ``POST /vpn/v1/certificate`` (it must match the
-``ClientPublicKey`` sent there), so the same keypair is reused for the
-lifetime of the guest session.
+   ``/vpn/v1/certificate``) are then reachable with the guest bearer
+   token. Guest tier is always 0 (free servers only).
+4. The WireGuard tunnel uses *fixed* addresses (10.2.0.2/32 client,
+   10.2.0.1 gateway/DNS) — they are NOT part of the certificate
+   response; the cert PEM authenticates the session with Proton's
+   local agent (10.2.0.1:65432) inside the tunnel.
 
 This module is async-only (uses ``httpx.AsyncClient``) and has no Qt or
 aioquic dependency.
@@ -43,13 +49,31 @@ import secrets as _secrets  # noqa: F401  (kept for spec compliance / future use
 
 API_BASE = "https://api.protonmail.ch"
 
+#: Anti-abuse challenge frame constants (protoncore-android
+#: ``challenge/domain/ChallengeUtils.kt``): the device frame is sent
+#: under this exact key in the ``Payload`` object of both
+#: ``/auth/v4/sessions`` and ``/auth/v4/credentialless``.
+CHALLENGE_VERSION = "2.0.7"
+CHALLENGE_FRAME_KEY = "vpn-android-v4-challenge-0"
+
+#: WireGuard tunnel constants (ProtonVPN/android-app ``Constants.kt``).
+#: Every Proton WG client uses the same fixed addresses — the gateway
+#: doubles as the tunnel DNS resolver and hosts the local agent on
+#: :data:`LOCAL_AGENT_PORT`.
+VPN_CLIENT_IP = "10.2.0.2"
+VPN_CLIENT_IP_V6 = "2a07:b944::2:2"
+VPN_GATEWAY_IP = "10.2.0.1"
+VPN_GATEWAY_IP_V6 = "2a07:b944::2:1"
+LOCAL_AGENT_PORT = 65432
+
 #: Default headers that every request to the Proton API must carry. These
 #: mimic the official ProtonVPN Android client so the credentialless
-#: endpoint recognises us as a legitimate guest-mode caller. ``x-pm-uid``
-#: is added per-request by :func:`default_headers`.
+#: endpoint recognises us as a legitimate guest-mode caller (the
+#: ``x-pm-appversion`` format is ``{platform}-{app}@{version}+{store}``).
+#: ``x-pm-uid`` is added per-request by :func:`default_headers`.
 GUEST_HEADERS: Dict[str, str] = {
     "User-Agent": "ProtonVPN/5.15.95.5 (Android 14; samsung SM-S901U)",
-    "x-pm-appversion": "android-vpn@5.15.95.5-dev+play",
+    "x-pm-appversion": "android-vpn@5.15.95.5+play",
     "x-pm-apiversion": "4",
     "Accept": "application/vnd.protonmail.v1+json",
     "Content-Type": "application/json",
@@ -70,36 +94,51 @@ def default_headers(uid: str = "guest") -> Dict[str, str]:
     return h
 
 
-def make_challenge_payload(device_pub_b64: str) -> dict:
-    """Build the device-integrity ``challengePayload``.
+def make_challenge_frame() -> dict:
+    """Build the device-integrity challenge frame.
 
-    The official Android app's exact payload is opaque (it includes
-    Play-Integrity attestations that Proton does not currently enforce for
-    the credentialless flow); the shape below matches what
-    community re-implementations (``proton-caller``,
-    ``protonvpn-cli-community``) have verified against the production API.
-    The server records the metadata but does not verify the
-    ``ED25519`` public key.
+    Shape transcribed from protoncore-android ``ChallengeFrame.Device``
+    (``challenge/data/src/main/kotlin/.../frame/ChallengeFrame.kt``):
+    the server-side anti-abuse check expects these exact ``@SerialName``
+    keys (``v``, ``appLang``, ``timezone``, ``deviceName`` …). The values
+    describe a plausible stock Android device; the API records but does
+    not attest them for guest sessions.
     """
     return {
-        "DeviceName": "SM-S901U",
-        "DeviceType": "2",                       # 2 = Android
-        "DeviceModulation": " android-",
-        "DevicePublicKeys": {"ED25519": device_pub_b64},
-        "OS": "Android",
-        "OSVersion": "14",
-        "SerialNumber": str(uuid.uuid4()),
-        "Platform": "PlayStore",
+        "v": CHALLENGE_VERSION,
+        "appLang": "en",
+        "timezone": "Europe/Zurich",
+        "deviceName": 3605,          # stable numeric model id (Build hash)
+        "regionCode": "CH",
+        "timezoneOffset": 60,
+        "isJailbreak": False,
+        "preferredContentSize": "1.0",
+        "storageCapacity": 128.0,
+        "isDarkmodeOn": False,
+        "keyboards": ["com.google.android.inputmethod.latin"],
     }
 
 
-def gen_device_keypair() -> Tuple[str, bytes]:
-    """Generate a fresh Ed25519 keypair for a guest session.
+def make_challenge_payload() -> dict:
+    """Build the request body for the auth endpoints.
 
-    Returns ``(base64_public_key, raw_32_byte_private_key)``. The public
-    key is included in the ``challengePayload`` and later sent as
-    ``ClientPublicKey`` to ``POST /vpn/v1/certificate``; the private key
-    is kept client-side for signing / WG handshake use by the caller.
+    Both ``POST /auth/v4/sessions`` (unauthenticated session creation,
+    protoncore-android ``RequestSessionRequest``) and
+    ``POST /auth/v4/credentialless`` (``LoginLessRequest``) wrap the
+    device frame in ``{"Payload": {"vpn-android-v4-challenge-0": …}}``.
+    """
+    return {"Payload": {CHALLENGE_FRAME_KEY: make_challenge_frame()}}
+
+
+def gen_device_keypair() -> Tuple[str, bytes]:
+    """Generate a fresh Ed25519 keypair identifying this installation.
+
+    Returns ``(base64_public_key, raw_32_byte_private_key)``. NOTE: the
+    official credentialless flow does NOT send device keys to the server
+    (the challenge payload carries device metadata only) — this keypair
+    is a purely local device identity, kept in the stored guest session
+    so resumed sessions keep a stable fingerprint. The WireGuard identity
+    is the separate X25519 keypair from :func:`gen_x25519_keypair`.
 
     Uses ``cryptography`` (already pulled in transitively via aioquic).
     """
@@ -135,6 +174,26 @@ class GuestAuthError(RuntimeError):
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
+
+def _scopes_to_str(resp: dict) -> str:
+    """Normalise ``Scopes`` (official: a JSON array of strings) or the
+    legacy ``Scope`` string to a single space-joined string."""
+    scopes = resp.get("Scopes")
+    if isinstance(scopes, (list, tuple)):
+        return " ".join(str(s) for s in scopes if s)
+    return str(resp.get("Scope", "") or "")
+
+
+def _expires_in(resp: dict, *keys: str, default: float = 3600.0) -> float:
+    """Best-effort token TTL. The official auth responses do not include
+    expiry fields — fall back to the conservative default so the caller
+    refreshes early rather than late."""
+    for k in keys:
+        v = resp.get(k)
+        if isinstance(v, (int, float)) and v > 0:
+            return float(v)
+    return default
 
 
 @dataclass
@@ -184,9 +243,10 @@ class GuestSession:
             credless_resp.get("RefreshToken") or anon_resp.get("RefreshToken", "")
         )
         uid = credless_resp.get("UID") or anon_resp.get("UID", "")
-        scope = credless_resp.get("Scope", "")
-        expires_in = credless_resp.get("ExpiresIn", 3600)
-        refresh_expires_in = credless_resp.get("RefreshExpiresIn", 2592000)
+        scope = _scopes_to_str(credless_resp) or _scopes_to_str(anon_resp)
+        expires_in = _expires_in(credless_resp, "ExpiresIn", default=3600.0)
+        refresh_expires_in = _expires_in(
+            credless_resp, "RefreshExpiresIn", default=2592000.0)
         # ``MaxTier`` / ``MaxConnect`` are not part of the auth response;
         # they come from ``/vpn/v2`` later. For guest mode Tier is always 0
         # and MaxConnect is 1, so default them here.
@@ -301,20 +361,26 @@ class GuestLogicalServer:
 
 @dataclass
 class GuestCertificate:
-    """The WireGuard certificate + tunnel IP assignment Proton hands out.
+    """The WireGuard session certificate Proton hands out.
 
-    Returned by ``POST /vpn/v1/certificate``; the ``certificate_pem`` is a
-    short-lived (typically ~24h) PEM-encoded certificate that the
-    WireGuard handshake layer signs/verifies against. ``refresh_time`` is
-    the epoch timestamp at which the cert should be refreshed.
+    Returned by ``POST /vpn/v1/certificate``; the ``certificate_pem`` is
+    a short-lived PEM certificate that authenticates the session with
+    Proton's local agent (``10.2.0.1:65432``) once the tunnel is up.
+    ``refresh_time`` / ``expiration_time`` are epoch seconds. The tunnel
+    addresses are the fixed constants from ProtonVPN/android-app
+    ``Constants.kt`` (they are *not* in the API response): client
+    ``10.2.0.2/32`` (+ ``2a07:b944::2:2/128``), gateway/DNS
+    ``10.2.0.1`` (+ ``2a07:b944::2:1``).
     """
 
     certificate_pem: str
     server_status: Dict[str, Any] = field(default_factory=dict)
     refresh_time: int = 0            # epoch seconds
-    ipv4: str = ""                   # internal tunnel IP, e.g. "10.2.0.2"
-    ipv6: Optional[str] = None
-    dns_ips: List[str] = field(default_factory=list)
+    expiration_time: int = 0         # epoch seconds
+    ipv4: str = VPN_CLIENT_IP        # fixed tunnel IP (constant)
+    ipv6: Optional[str] = VPN_CLIENT_IP_V6
+    dns_ips: List[str] = field(
+        default_factory=lambda: [VPN_GATEWAY_IP, VPN_GATEWAY_IP_V6])
     client_public_key_b64: str = ""
 
 
@@ -406,15 +472,18 @@ class GuestAuth:
 
     # ---- 1. anonymous session ------------------------------------------
 
-    async def create_anonymous_session(self, device_pub_b64: str) -> dict:
+    async def create_anonymous_session(self, device_pub_b64: str = "") -> dict:
         """``POST /auth/v4/sessions`` with the challenge payload.
 
         Returns the parsed ``Response`` (with ``AccessToken`` /
         ``RefreshToken`` / ``UID`` keys). Uses :attr:`initial_uid` as the
         ``x-pm-uid`` header — the server hasn't assigned a UID yet.
+        ``device_pub_b64`` is accepted for call-site compatibility but
+        NOT sent: the official unauth-session body carries device
+        metadata only (no keys).
         """
         url = f"{API_BASE}/auth/v4/sessions"
-        body = {"challengePayload": make_challenge_payload(device_pub_b64)}
+        body = make_challenge_payload()
         headers = default_headers(self.initial_uid)
         resp = await self.client.post(url, json=body, headers=headers)
         resp.raise_for_status()
@@ -426,16 +495,16 @@ class GuestAuth:
     async def credentialless_upgrade(
         self,
         anonymous_session: dict,
-        device_pub_b64: str,
+        device_pub_b64: str = "",
     ) -> dict:
         """``POST /auth/v4/credentialless`` authenticated with the
         anonymous ``AccessToken``.
 
-        Returns the parsed ``Response`` — a full guest session with
-        ``Scope`` including ``self vpn`` and ``tier=0``.
+        Returns the parsed ``Response`` — a full guest session whose
+        ``Scopes`` array includes ``vpn`` (tier is always 0).
         """
         url = f"{API_BASE}/auth/v4/credentialless"
-        body = {"challengePayload": make_challenge_payload(device_pub_b64)}
+        body = make_challenge_payload()
         headers = default_headers(anonymous_session.get("UID", ""))
         anon_token = anonymous_session.get("AccessToken", "")
         if anon_token:
@@ -471,7 +540,15 @@ class GuestAuth:
         :class:`GuestSession` if they want to use the refreshed tokens.
         """
         url = f"{API_BASE}/auth/v4/refresh"
-        body = {"RefreshToken": session.refresh_token, "UID": session.uid}
+        # Body shape per protoncore-android ``RefreshSessionRequest`` —
+        # the grant fields are required, not decorative.
+        body = {
+            "UID": session.uid,
+            "RefreshToken": session.refresh_token,
+            "ResponseType": "token",
+            "GrantType": "refresh_token",
+            "RedirectURI": "http://protonmail.ch",
+        }
         # Refresh uses the UID header but NO bearer token (Proton's refresh
         # endpoint is itself the thing that mints new bearer tokens).
         headers = default_headers(session.uid)
@@ -483,11 +560,10 @@ class GuestAuth:
         return {
             "access_token": unwrapped.get("AccessToken", ""),
             "refresh_token": unwrapped.get("RefreshToken", ""),
-            "expires_at": now + float(unwrapped.get("ExpiresIn", 3600)),
-            "refresh_expires_at": now + float(
-                unwrapped.get("RefreshExpiresIn", 2592000)
-            ),
-            "scope": unwrapped.get("Scope", session.scope),
+            "expires_at": now + _expires_in(unwrapped, "ExpiresIn"),
+            "refresh_expires_at": now + _expires_in(
+                unwrapped, "RefreshExpiresIn", default=2592000.0),
+            "scope": _scopes_to_str(unwrapped) or session.scope,
             "uid": unwrapped.get("UID", session.uid),
         }
 
@@ -556,6 +632,10 @@ class GuestAuth:
                 status = int(first.get("Status", 0))
             except (TypeError, ValueError):
                 status = 0
+            # The current API returns Status as a JSON boolean
+            # (``isOnline: Boolean`` in the official model); accept both.
+            if isinstance(first.get("Status"), bool):
+                status = 1 if first["Status"] else 0
             try:
                 load = float(entry.get("Load", 0.0))
             except (TypeError, ValueError):
@@ -591,40 +671,53 @@ class GuestAuth:
         *,
         persistent: bool = True,
     ) -> GuestCertificate:
-        """``POST /vpn/v1/certificate`` — returns the WireGuard cert +
-        internal tunnel IP assignment.
+        """``POST /vpn/v1/certificate`` — returns the WireGuard session
+        certificate.
+
+        Body and response shapes per ProtonVPN/android-app
+        ``CertificateRequestBody`` / ``CertificateResponseBody``:
+        ``{ClientPublicKey, ClientPublicKeyMode: "EC", DeviceName,
+        Mode: "session", Features: []}`` -> ``{Certificate,
+        ExpirationTime, RefreshTime}``. The response carries NO tunnel
+        addresses — every Proton WG client uses the fixed
+        :data:`VPN_CLIENT_IP` / :data:`VPN_GATEWAY_IP` constants (the
+        certificate authenticates the session against the local agent
+        inside the tunnel), so the returned dataclass populates
+        ``ipv4``/``ipv6``/``dns_ips`` from those constants.
 
         ``client_public_key_b64`` should be a base64-encoded X25519
         public key (NOT the Ed25519 device key — WireGuard uses
-        Curve25519). The caller is responsible for generating it. With
-        ``persistent=True`` the cert is valid for ~24h and refreshable;
-        with ``ephemeral`` it is single-use.
+        Curve25519). The caller is responsible for generating it.
         """
         url = f"{API_BASE}/vpn/v1/certificate"
         body = {
             "ClientPublicKey": client_public_key_b64,
-            "Mode": "persistent" if persistent else "ephemeral",
+            "ClientPublicKeyMode": "EC",
+            "DeviceName": "SM-S901U",
+            "Mode": "session",
+            "Features": [],
         }
         headers = self._auth_headers(session)
         resp = await self.client.post(url, json=body, headers=headers)
         resp.raise_for_status()
         data = resp.json()
         unwrapped = self._unwrap(data, context="POST /vpn/v1/certificate")
-        dns_block = unwrapped.get("DNS") or {}
-        dns_ips = dns_block.get("IP") if isinstance(dns_block, dict) else None
-        if dns_ips is None:
-            dns_ips = []
         try:
             refresh_time = int(unwrapped.get("RefreshTime", 0))
         except (TypeError, ValueError):
             refresh_time = 0
+        try:
+            expiration_time = int(unwrapped.get("ExpirationTime", 0))
+        except (TypeError, ValueError):
+            expiration_time = 0
         return GuestCertificate(
             certificate_pem=str(unwrapped.get("Certificate", "")),
             server_status=unwrapped.get("ServerStatus", {}) or {},
             refresh_time=refresh_time,
-            ipv4=str(unwrapped.get("IPv4", "")),
-            ipv6=unwrapped.get("IPv6"),
-            dns_ips=list(dns_ips),
+            expiration_time=expiration_time,
+            ipv4=VPN_CLIENT_IP,
+            ipv6=VPN_CLIENT_IP_V6 if unwrapped.get("IPv6") is not False else None,
+            dns_ips=[VPN_GATEWAY_IP, VPN_GATEWAY_IP_V6],
             client_public_key_b64=client_public_key_b64,
         )
 
@@ -744,4 +837,7 @@ def build_wg_quick_config(
     lines.append(f"AllowedIPs = {', '.join(allowed_ips)}")
     if endpoint:
         lines.append(f"Endpoint = {endpoint}")
+    # Match the official clients: keepalive so the handshake fires even
+    # with no user traffic (avoids stuck-in-CONNECTING on some devices).
+    lines.append("PersistentKeepalive = 60")
     return "\n".join(lines) + "\n"

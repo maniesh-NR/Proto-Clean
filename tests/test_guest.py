@@ -18,6 +18,7 @@ import httpx
 import pytest
 
 from proto_clean.proton.guest import (
+    CHALLENGE_FRAME_KEY,
     GUEST_HEADERS,
     GuestAuth,
     GuestAuthError,
@@ -99,12 +100,12 @@ def _ok(response: dict) -> httpx.Response:
 def test_default_headers_include_required_fields():
     h = default_headers("abc")
     assert h["User-Agent"].startswith("ProtonVPN/")
-    assert h["x-pm-appversion"] == "android-vpn@5.15.95.5-dev+play"
+    assert h["x-pm-appversion"] == "android-vpn@5.15.95.5+play"
     assert h["x-pm-apiversion"] == "4"
     assert h["x-pm-uid"] == "abc"
     assert h["Accept"] == "application/vnd.protonmail.v1+json"
     # And the constant mirrors these (minus the per-request uid).
-    assert GUEST_HEADERS["x-pm-appversion"] == "android-vpn@5.15.95.5-dev+play"
+    assert GUEST_HEADERS["x-pm-appversion"] == "android-vpn@5.15.95.5+play"
 
 
 # ---------------------------------------------------------------------------
@@ -113,29 +114,26 @@ def test_default_headers_include_required_fields():
 
 
 def test_make_challenge_payload_shape():
-    pub = base64.b64encode(bytes(range(32))).decode()
-    payload = make_challenge_payload(pub)
-    expected_keys = {
-        "DeviceName",
-        "DeviceType",
-        "DeviceModulation",
-        "DevicePublicKeys",
-        "OS",
-        "OSVersion",
-        "SerialNumber",
-        "Platform",
+    # Official shape (protoncore-android RequestSessionRequest /
+    # LoginLessRequest + ChallengeFrame.Device): the device frame is
+    # wrapped in {"Payload": {"vpn-android-v4-challenge-0": ...}}.
+    payload = make_challenge_payload()
+    assert set(payload.keys()) == {"Payload"}
+    assert set(payload["Payload"].keys()) == {CHALLENGE_FRAME_KEY}
+    frame = payload["Payload"][CHALLENGE_FRAME_KEY]
+    assert set(frame.keys()) == {
+        "v", "appLang", "timezone", "deviceName", "regionCode",
+        "timezoneOffset", "isJailbreak", "preferredContentSize",
+        "storageCapacity", "isDarkmodeOn", "keyboards",
     }
-    assert set(payload.keys()) == expected_keys
-    assert payload["DevicePublicKeys"]["ED25519"] == pub
-    # SerialNumber must be a uuid-parseable string
-    uuid.UUID(str(payload["SerialNumber"]))
-    # Defaults match the documented guest-mode fingerprint.
-    assert payload["DeviceName"] == "SM-S901U"
-    assert payload["DeviceType"] == "2"
-    assert payload["OS"] == "Android"
-    assert payload["OSVersion"] == "14"
-    assert payload["Platform"] == "PlayStore"
-    assert payload["DeviceModulation"] == " android-"
+    # Values match a plausible stock device (the server records but does
+    # not attest them for credentialless sessions).
+    assert frame["v"] == "2.0.7"
+    assert frame["appLang"] == "en"
+    assert isinstance(frame["deviceName"], int)
+    assert frame["isJailbreak"] is False
+    assert frame["storageCapacity"] > 0
+    assert isinstance(frame["keyboards"], list)
 
 
 # ---------------------------------------------------------------------------
@@ -173,13 +171,15 @@ def test_GuestSession_from_response():
         "RefreshExpiresIn": 2592000,
         "Scope": "self",
     }
+    # Official LoginResponse uses a Scopes ARRAY (no ExpiresIn field).
     credless = {
         "AccessToken": "guest-tok",
         "RefreshToken": "guest-refresh",
         "UID": "guest-uid",
-        "ExpiresIn": 600,
-        "RefreshExpiresIn": 1209600,
-        "Scope": "self vpn",
+        "UserID": "user-uid",
+        "EventID": "event-1",
+        "LocalID": 42,
+        "Scopes": ["self", "vpn"],
     }
     pub = base64.b64encode(bytes(range(32))).decode()
     priv = bytes(range(32))
@@ -221,12 +221,17 @@ def test_create_anonymous_session_posts_correct_body():
     result = asyncio.run(go())
     assert result["AccessToken"] == "anon-tok"
     body, headers = api.find("POST", "/auth/v4/sessions")
-    assert "challengePayload" in body
-    assert body["challengePayload"]["DevicePublicKeys"]["ED25519"] == "devpub"
+    # Official body: the anti-abuse device frame wrapped in Payload.
+    assert "Payload" in body
+    assert CHALLENGE_FRAME_KEY in body["Payload"]
+    frame = body["Payload"][CHALLENGE_FRAME_KEY]
+    assert frame["v"] == "2.0.7"
+    # No device keys are sent (the official flow sends metadata only).
+    assert "DevicePublicKeys" not in str(body)
     # The initial uid is used as the x-pm-uid header on this first request.
     assert headers["x-pm-uid"] == "initial-uid-123"
     # Required app headers are present.
-    assert headers["x-pm-appversion"] == "android-vpn@5.15.95.5-dev+play"
+    assert headers["x-pm-appversion"] == "android-vpn@5.15.95.5+play"
     assert headers["x-pm-apiversion"] == "4"
     # No bearer auth on the very first request.
     assert "authorization" not in headers
@@ -261,9 +266,10 @@ def test_credentialless_upgrade_uses_anonymous_bearer():
     assert headers["authorization"] == "Bearer anon-tok"
     # x-pm-uid is the anonymous UID returned by step 1.
     assert headers["x-pm-uid"] == "anon-uid"
-    # Body still carries the challenge payload.
-    assert "challengePayload" in body
-    assert body["challengePayload"]["DevicePublicKeys"]["ED25519"] == "devpub"
+    # Body still carries the challenge payload (same official shape).
+    assert "Payload" in body
+    assert CHALLENGE_FRAME_KEY in body["Payload"]
+    assert body["Payload"][CHALLENGE_FRAME_KEY]["v"] == "2.0.7"
 
 
 # ---------------------------------------------------------------------------
@@ -398,14 +404,14 @@ def test_fetch_logicals_filters_paid_servers():
 def test_fetch_certificate_parses_response():
     api = _FakeApi()
     cert_pem = "-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----\n"
+    # Official response shape (CertificateResponseBody): only the PEM
+    # and the refresh/expiry timestamps — tunnel addresses are fixed
+    # constants, not part of the response.
     api.set("POST", "/vpn/v1/certificate",
             _ok({
                 "Certificate": cert_pem,
-                "ServerStatus": {"Status": 1},
+                "ExpirationTime": 1735786000,
                 "RefreshTime": 1735689600,
-                "IPv4": "10.2.0.2",
-                "IPv6": "fd00::2",
-                "DNS": {"IP": ["10.64.0.1", "10.64.0.2"]},
             }))
     auth = GuestAuth(client=api.client())
     sess = GuestSession(
@@ -421,16 +427,20 @@ def test_fetch_certificate_parses_response():
     cert = asyncio.run(go())
     assert isinstance(cert, GuestCertificate)
     assert cert.certificate_pem == cert_pem
+    # Tunnel addresses are the fixed constants from Constants.kt.
     assert cert.ipv4 == "10.2.0.2"
-    assert cert.ipv6 == "fd00::2"
-    assert cert.dns_ips == ["10.64.0.1", "10.64.0.2"]
+    assert cert.ipv6 == "2a07:b944::2:2"
+    assert cert.dns_ips == ["10.2.0.1", "2a07:b944::2:1"]
     assert cert.refresh_time == 1735689600
-    assert cert.server_status == {"Status": 1}
+    assert cert.expiration_time == 1735786000
     assert cert.client_public_key_b64 == "wgpub=="
-    # Body had the right shape.
+    # Body matches CertificateRequestBody from the official app.
     body, headers = api.find("POST", "/vpn/v1/certificate")
     assert body["ClientPublicKey"] == "wgpub=="
-    assert body["Mode"] == "persistent"
+    assert body["ClientPublicKeyMode"] == "EC"
+    assert body["DeviceName"]
+    assert body["Mode"] == "session"
+    assert body["Features"] == []
     # Bearer auth used.
     assert headers["authorization"] == "Bearer guest-tok"
 
@@ -464,6 +474,10 @@ def test_refresh_posts_correct_body():
     body, headers = api.find("POST", "/auth/v4/refresh")
     assert body["RefreshToken"] == "old-refresh"
     assert body["UID"] == "guest-uid"
+    # Grant fields per protoncore-android RefreshSessionRequest (required).
+    assert body["ResponseType"] == "token"
+    assert body["GrantType"] == "refresh_token"
+    assert body["RedirectURI"] == "http://protonmail.ch"
     # Refresh uses the UID header but no bearer token.
     assert headers["x-pm-uid"] == "guest-uid"
     assert "authorization" not in headers

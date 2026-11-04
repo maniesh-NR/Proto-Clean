@@ -7,6 +7,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.security.SecureRandom
 import java.util.UUID
@@ -18,32 +19,48 @@ import java.util.concurrent.TimeUnit
  *
  * Implements the "Continue as guest" flow used by the official ProtonVPN
  * Android app to obtain a free-tier (Tier=0) VPN session without any
- * account credentials. The flow is:
+ * account credentials. The flow (shapes transcribed from the official
+ * open-source clients: protoncore-android AuthenticationApi.kt +
+ * ChallengeFrame.kt, ProtonVPN/android-app ProtonVPNRetrofit.kt +
+ * CertificateRequestBody.kt + Constants.kt):
  *
- *   1. `POST /auth/v4/sessions` with a `challengePayload` -> anonymous
+ *   1. `POST /auth/v4/sessions` with the anti-abuse `Payload`
+ *      (`vpn-android-v4-challenge-0` device frame) -> anonymous
  *      AccessToken + RefreshToken + UID.
  *   2. `POST /auth/v4/credentialless` (bearer-authenticated with the
- *      anonymous token, same challengePayload) -> full guest session
- *      with `Scope` including `self vpn` and `tier=0`.
+ *      anonymous token, same Payload) -> full guest session with
+ *      `Scopes` (array) including `vpn`; tier is always 0.
  *   3. Standard VPN endpoints (`/vpn/v2`, `/vpn/v2/logicals`,
  *      `/vpn/v1/certificate`) are then reachable with the guest bearer
  *      token — the logicals endpoint is used to fetch the free-only
  *      server list, and the certificate endpoint is used to obtain the
- *      WireGuard cert + internal tunnel IP for each connection.
- *
- * The challenge payload is permissively validated by Proton's
- * credentialless endpoint — the ED25519 pubkey in `DevicePublicKeys`
- * is recorded but NOT verified, so a randomly-generated 32-byte
- * "pubkey" is acceptable there (documented in `genDeviceKeypair`).
+ *      WireGuard session certificate.
+ *   4. The WireGuard tunnel uses FIXED addresses (10.2.0.2/32 client,
+ *      10.2.0.1 gateway/DNS, per Constants.kt) — they are NOT in the
+ *      certificate response; the cert authenticates the session with
+ *      Proton's local agent (10.2.0.1:65432) once the tunnel is up.
  */
 object GuestApi {
 
     const val API_BASE = "https://api.protonmail.ch"
     const val WG_DEFAULT_PORT = 51820
 
+    /** Challenge frame constants (protoncore-android ChallengeUtils.kt). */
+    const val CHALLENGE_VERSION = "2.0.7"
+    const val CHALLENGE_FRAME_KEY = "vpn-android-v4-challenge-0"
+
+    /** WireGuard tunnel constants (ProtonVPN/android-app Constants.kt):
+     *  every Proton WG client uses these fixed addresses; the gateway
+     *  doubles as the tunnel DNS resolver and local-agent host. */
+    const val VPN_CLIENT_IP = "10.2.0.2"
+    const val VPN_CLIENT_IP_V6 = "2a07:b944::2:2"
+    const val VPN_GATEWAY_IP = "10.2.0.1"
+    const val VPN_GATEWAY_IP_V6 = "2a07:b944::2:1"
+    const val LOCAL_AGENT_PORT = 65432
+
     val GUEST_HEADERS: Map<String, String> = mapOf(
         "User-Agent" to "ProtonVPN/5.15.95.5 (Android 14; samsung SM-S901U)",
-        "x-pm-appversion" to "android-vpn@5.15.95.5-dev+play",
+        "x-pm-appversion" to "android-vpn@5.15.95.5+play",
         "x-pm-apiversion" to "4",
         "Accept" to "application/vnd.protonmail.v1+json",
         "Content-Type" to "application/json",
@@ -56,27 +73,34 @@ object GuestApi {
     fun defaultHeaders(uid: String = "guest"): Map<String, String> =
         GUEST_HEADERS + ("x-pm-uid" to (uid.ifBlank { "guest" }))
 
-    /** Build the device-integrity challengePayload. The official Android
-     *  app's exact payload includes Play-Integrity attestations that
-     *  Proton does not currently enforce for credentialless — the shape
-     *  below matches what community re-implementations have verified
-     *  against the production API. */
-    fun makeChallengePayload(devicePubB64: String): JSONObject = JSONObject().apply {
-        put("DeviceName", "SM-S901U")
-        put("DeviceType", "2")           // 2 = Android
-        put("DeviceModulation", " android-")
-        put("DevicePublicKeys", JSONObject().put("ED25519", devicePubB64))
-        put("OS", "Android")
-        put("OSVersion", "14")
-        put("SerialNumber", UUID.randomUUID().toString())
-        put("Platform", "PlayStore")
+    /** Build the device-integrity challenge frame. Shape transcribed
+     *  from protoncore-android `ChallengeFrame.Device` (the exact
+     *  @SerialName keys — v, appLang, timezone, deviceName, ...); the
+     *  server records but does not attest these for guest sessions. */
+    fun makeChallengeFrame(): JSONObject = JSONObject().apply {
+        put("v", CHALLENGE_VERSION)
+        put("appLang", "en")
+        put("timezone", "Europe/Zurich")
+        put("deviceName", 3605)          // stable numeric model id
+        put("regionCode", "CH")
+        put("timezoneOffset", 60)
+        put("isJailbreak", false)
+        put("preferredContentSize", "1.0")
+        put("storageCapacity", 128.0)
+        put("isDarkmodeOn", false)
+        put("keyboards", JSONArray().put("com.google.android.inputmethod.latin"))
     }
 
-    /** Generates a fresh "device keypair" for the credentialless
-     *  challengePayload. The credentialless endpoint does NOT verify
-     *  this key (it just records the metadata), so we generate 32
-     *  random bytes for both pub and priv — Proton's server never
-     *  validates them. Returns (base64_pub, base64_priv). */
+    /** Build the request body for the auth endpoints (both
+     *  `POST /auth/v4/sessions` and `POST /auth/v4/credentialless`):
+     *  `{"Payload": {"vpn-android-v4-challenge-0": <device frame>}}`. */
+    fun makeChallengePayload(): JSONObject = JSONObject().put(
+        "Payload", JSONObject().put(CHALLENGE_FRAME_KEY, makeChallengeFrame()))
+
+    /** Generates a fresh local device identity keypair. NOTE: the
+     *  official credentialless flow does NOT send device keys — this is
+     *  a purely local fingerprint kept in the stored guest session so
+     *  resumed sessions stay stable. Returns (base64_pub, base64_priv). */
     fun genDeviceKeypair(): Pair<String, String> {
         val rand = SecureRandom()
         val priv = ByteArray(32).also { rand.nextBytes(it) }
@@ -108,6 +132,18 @@ object GuestApi {
     /** Decode an unwrapped base64 string to raw bytes. */
     fun decodeB64(s: String): ByteArray =
         Base64.getDecoder().decode(s)
+}
+
+/** Normalise `Scopes` (official: a JSON array) or the legacy `Scope`
+ *  string to a single space-joined string. */
+private fun scopesToOptString(
+    resp: JSONObject, fallback: String,
+): String {
+    val arr = resp.optJSONArray("Scopes")
+    if (arr != null) {
+        return (0 until arr.length()).joinToString(" ") { arr.optString(it) }
+    }
+    return resp.optString("Scope", fallback)
 }
 
 /** Raised when the Proton API returns a non-success Code in its
@@ -164,15 +200,21 @@ data class GuestSession(
             devicePubB64: String, devicePrivB64: String,
         ): GuestSession {
             val now = System.currentTimeMillis() / 1000
+            // The official LoginResponse has no ExpiresIn field — default
+            // conservatively so the caller refreshes early rather than late.
+            val expiresIn = if (credless.optLong("ExpiresIn", 0) > 0)
+                credless.optLong("ExpiresIn") else 3600L
+            val refreshExpiresIn = if (credless.optLong("RefreshExpiresIn", 0) > 0)
+                credless.optLong("RefreshExpiresIn") else 2592000L
             return GuestSession(
                 accessToken = credless.optString("AccessToken",
                     anon.optString("AccessToken")),
                 refreshToken = credless.optString("RefreshToken",
                     anon.optString("RefreshToken")),
                 uid = credless.optString("UID", anon.optString("UID")),
-                expiresAt = now + credless.optLong("ExpiresIn", 3600),
-                refreshExpiresAt = now + credless.optLong("RefreshExpiresIn", 2592000),
-                scope = credless.optString("Scope"),
+                expiresAt = now + expiresIn,
+                refreshExpiresAt = now + refreshExpiresIn,
+                scope = scopesToOptString(credless, ""),
                 deviceEd25519PubB64 = devicePubB64,
                 deviceEd25519PrivB64 = devicePrivB64,
                 maxTier = 0,
@@ -225,12 +267,16 @@ data class GuestLogicalServer(
  *  `POST /vpn/v1/certificate`. */
 data class GuestCertificate(
     val certificatePem: String,
-    val serverStatus: JSONObject,
-    val refreshTime: Long,
-    val ipv4: String,
-    val ipv6: String?,
-    val dnsIps: List<String>,
-    val clientPublicKeyB64: String,
+    val serverStatus: JSONObject = JSONObject(),
+    val refreshTime: Long = 0,
+    val expirationTime: Long = 0,
+    // Tunnel addresses are the FIXED constants from Constants.kt — they
+    // are NOT part of the API response (every Proton WG client uses them).
+    val ipv4: String = GuestApi.VPN_CLIENT_IP,
+    val ipv6: String? = GuestApi.VPN_CLIENT_IP_V6,
+    val dnsIps: List<String> = listOf(
+        GuestApi.VPN_GATEWAY_IP, GuestApi.VPN_GATEWAY_IP_V6),
+    val clientPublicKeyB64: String = "",
 )
 
 /** Async guest-mode Proton API client. The Android mirror of the
@@ -252,28 +298,27 @@ class GuestAuth(
         GuestSession.fromResponses(anon, credless, pubB64, privB64)
     }
 
-    suspend fun createAnonSession(devicePubB64: String): JSONObject =
+    suspend fun createAnonSession(devicePubB64: String = ""): JSONObject =
         withContext(Dispatchers.IO) {
-            val body = JSONObject().put(
-                "challengePayload",
-                GuestApi.makeChallengePayload(devicePubB64))
+            // devicePubB64 is accepted for call-site compatibility but NOT
+            // sent: the official unauth-session body carries device
+            // metadata only (no keys).
             post("${GuestApi.API_BASE}/auth/v4/sessions",
-                 body, GuestApi.defaultHeaders(initialUid),
+                 GuestApi.makeChallengePayload(),
+                 GuestApi.defaultHeaders(initialUid),
                  context = "POST /auth/v4/sessions")
         }
 
     suspend fun credentiallessUpgrade(
-        anon: JSONObject, devicePubB64: String,
+        anon: JSONObject, devicePubB64: String = "",
     ): JSONObject = withContext(Dispatchers.IO) {
         val uid = anon.optString("UID")
         val anonToken = anon.optString("AccessToken")
         val headers = GuestApi.defaultHeaders(uid).toMutableMap()
         if (anonToken.isNotBlank()) headers["Authorization"] = "Bearer $anonToken"
-        val body = JSONObject().put(
-            "challengePayload",
-            GuestApi.makeChallengePayload(devicePubB64))
         post("${GuestApi.API_BASE}/auth/v4/credentialless",
-             body, headers, context = "POST /auth/v4/credentialless")
+             GuestApi.makeChallengePayload(), headers,
+             context = "POST /auth/v4/credentialless")
     }
 
     /** Refresh the access token using the refresh token. Returns a
@@ -281,9 +326,14 @@ class GuestAuth(
      *  `scope`, `uid`. Does NOT mutate the passed-in session. */
     suspend fun refresh(session: GuestSession): JSONObject =
         withContext(Dispatchers.IO) {
+            // Body per protoncore-android RefreshSessionRequest — the
+            // grant fields are required, not decorative.
             val body = JSONObject()
-                .put("RefreshToken", session.refreshToken)
                 .put("UID", session.uid)
+                .put("RefreshToken", session.refreshToken)
+                .put("ResponseType", "token")
+                .put("GrantType", "refresh_token")
+                .put("RedirectURI", "http://protonmail.ch")
             val resp = post("${GuestApi.API_BASE}/auth/v4/refresh",
                             body, GuestApi.defaultHeaders(session.uid),
                             context = "POST /auth/v4/refresh")
@@ -294,7 +344,7 @@ class GuestAuth(
                 .put("expires_at", now + resp.optLong("ExpiresIn", 3600))
                 .put("refresh_expires_at",
                      now + resp.optLong("RefreshExpiresIn", 2592000))
-                .put("scope", resp.optString("Scope", session.scope))
+                .put("scope", scopesToOptString(resp, session.scope))
                 .put("uid", resp.optString("UID", session.uid))
         }
 
@@ -334,38 +384,43 @@ class GuestAuth(
                     domain = first.optString("Domain"),
                     entryIp = first.optString("EntryIP"),
                     x25519PublicKey = first.optString("X25519PublicKey"),
-                    status = first.optInt("Status", 0),
+                    // The current API returns Status as a JSON boolean
+                    // (isOnline: Boolean in the official model).
+                    status = if (first.opt("Status") is Boolean)
+                        (if (first.optBoolean("Status")) 1 else 0)
+                    else first.optInt("Status", 0),
                 )
             }
             out
         }
 
-    /** `POST /vpn/v1/certificate` — returns the WireGuard cert + tunnel IP. */
+    /** `POST /vpn/v1/certificate` — returns the WireGuard session cert.
+     *  Body/response per ProtonVPN/android-app CertificateRequestBody /
+     *  CertificateResponse: `{ClientPublicKey, ClientPublicKeyMode: "EC",
+     *  DeviceName, Mode: "session", Features: []}` -> `{Certificate,
+     *  ExpirationTime, RefreshTime}` (no tunnel addresses in the
+     *  response — they are fixed constants). */
     suspend fun fetchCertificate(
         session: GuestSession, clientPublicKeyB64: String,
         persistent: Boolean = true,
     ): GuestCertificate = withContext(Dispatchers.IO) {
         val body = JSONObject()
             .put("ClientPublicKey", clientPublicKeyB64)
-            .put("Mode", if (persistent) "persistent" else "ephemeral")
+            .put("ClientPublicKeyMode", "EC")
+            .put("DeviceName", "SM-S901U")
+            .put("Mode", "session")
+            .put("Features", JSONArray())
         val resp = post("${GuestApi.API_BASE}/vpn/v1/certificate",
                         body, authHeaders(session),
                         context = "POST /vpn/v1/certificate")
-        val dnsBlock = resp.optJSONObject("DNS") ?: JSONObject()
-        val dnsIps = mutableListOf<String>()
-        val dnsArr = dnsBlock.optJSONArray("IP")
-        if (dnsArr != null) {
-            for (i in 0 until dnsArr.length()) {
-                dnsIps.add(dnsArr.optString(i))
-            }
-        }
         GuestCertificate(
             certificatePem = resp.optString("Certificate"),
             serverStatus = resp.optJSONObject("ServerStatus") ?: JSONObject(),
             refreshTime = resp.optLong("RefreshTime", 0),
-            ipv4 = resp.optString("IPv4"),
-            ipv6 = if (resp.isNull("IPv6")) null else resp.optString("IPv6", null),
-            dnsIps = dnsIps,
+            expirationTime = resp.optLong("ExpirationTime", 0),
+            ipv4 = GuestApi.VPN_CLIENT_IP,
+            ipv6 = GuestApi.VPN_CLIENT_IP_V6,
+            dnsIps = listOf(GuestApi.VPN_GATEWAY_IP, GuestApi.VPN_GATEWAY_IP_V6),
             clientPublicKeyB64 = clientPublicKeyB64,
         )
     }
@@ -436,8 +491,7 @@ fun buildWgQuickConfig(
     dnsServer: String? = null,
     ipv6: Boolean = true,
 ): String {
-    val dns = if (dnsServer != null) listOf(dnsServer)
-              else cert.dnsIps.ifEmpty { listOf("1.1.1.1") }
+    val dns = if (dnsServer != null) listOf(dnsServer) else cert.dnsIps
     val addresses = mutableListOf<String>()
     if (cert.ipv4.isNotBlank()) addresses += "${cert.ipv4}/32"
     if (ipv6 && !cert.ipv6.isNullOrBlank()) addresses += "${cert.ipv6}/128"
@@ -457,5 +511,8 @@ fun buildWgQuickConfig(
         append("PublicKey = ${server.x25519PublicKey}\n")
         append("AllowedIPs = ${allowedIps.joinToString(", ")}\n")
         append("Endpoint = $endpoint\n")
+        // Match the official clients: keepalive so the handshake fires
+        // even with no user traffic (avoids stuck-in-CONNECTING).
+        append("PersistentKeepalive = 60\n")
     }
 }

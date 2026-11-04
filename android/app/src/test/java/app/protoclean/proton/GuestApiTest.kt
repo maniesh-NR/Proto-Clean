@@ -47,13 +47,13 @@ class GuestApiTest {
     @Test fun defaultHeadersIncludeRequiredFields() {
         val h = GuestApi.defaultHeaders("abc")
         assertEquals("abc", h["x-pm-uid"])
-        assertEquals("android-vpn@5.15.95.5-dev+play", h["x-pm-appversion"])
+        assertEquals("android-vpn@5.15.95.5+play", h["x-pm-appversion"])
         assertEquals("4", h["x-pm-apiversion"])
         assertEquals("application/vnd.protonmail.v1+json", h["Accept"])
         assertTrue(h["User-Agent"]!!.startsWith("ProtonVPN/"))
         // The constant mirrors these (minus the per-request uid).
         assertEquals(
-            "android-vpn@5.15.95.5-dev+play",
+            "android-vpn@5.15.95.5+play",
             GuestApi.GUEST_HEADERS["x-pm-appversion"],
         )
         // Blank uid falls back to the "guest" sentinel.
@@ -66,31 +66,28 @@ class GuestApiTest {
     // ------------------------------------------------------------------
 
     @Test fun makeChallengePayloadHasAllFields() {
-        val payload = GuestApi.makeChallengePayload("pubkey")
-        // Defaults match the documented guest-mode fingerprint.
-        assertEquals("SM-S901U", payload.getString("DeviceName"))
-        assertEquals("2", payload.getString("DeviceType"))
-        assertEquals(" android-", payload.getString("DeviceModulation"))
-        assertEquals("Android", payload.getString("OS"))
-        assertEquals("14", payload.getString("OSVersion"))
-        assertEquals("PlayStore", payload.getString("Platform"))
-        // Nested ED25519 pubkey is preserved.
-        val pubKeys = payload.getJSONObject("DevicePublicKeys")
-        assertEquals("pubkey", pubKeys.getString("ED25519"))
-        // SerialNumber must be a uuid-parseable string.
-        UUID.fromString(payload.getString("SerialNumber"))
-        // Exactly 8 top-level keys (the Python suite asserts the same set).
-        val keys = sequence {
-            val iter = payload.keys()
-            while (iter.hasNext()) yield(iter.next())
-        }.toSet()
+        val payload = GuestApi.makeChallengePayload()
+        // Official shape: the device frame is wrapped in
+        // {"Payload": {"vpn-android-v4-challenge-0": ...}}.
+        assertEquals(setOf("Payload"), payload.keySet().toSet())
+        val frames = payload.getJSONObject("Payload")
+        assertEquals(setOf(GuestApi.CHALLENGE_FRAME_KEY), frames.keySet().toSet())
+        val frame = frames.getJSONObject(GuestApi.CHALLENGE_FRAME_KEY)
         assertEquals(
             setOf(
-                "DeviceName", "DeviceType", "DeviceModulation",
-                "DevicePublicKeys", "OS", "OSVersion", "SerialNumber", "Platform",
+                "v", "appLang", "timezone", "deviceName", "regionCode",
+                "timezoneOffset", "isJailbreak", "preferredContentSize",
+                "storageCapacity", "isDarkmodeOn", "keyboards",
             ),
-            keys,
+            frame.keySet().toSet(),
         )
+        // Values match a plausible stock device; no device keys are sent.
+        assertEquals("2.0.7", frame.getString("v"))
+        assertEquals("en", frame.getString("appLang"))
+        assertTrue(frame.getLong("deviceName") > 0)
+        assertEquals(false, frame.getBoolean("isJailbreak"))
+        assertTrue(frame.getDouble("storageCapacity") > 0)
+        assertTrue(frame.getJSONArray("keyboards").length() > 0)
     }
 
     // ------------------------------------------------------------------
@@ -155,15 +152,15 @@ class GuestApiTest {
             listOf("/auth/v4/sessions", "/auth/v4/credentialless"),
             postPaths,
         )
-        // The same device pubkey was used in both challenge payloads.
+        // Both bodies carry the same official challenge frame.
         val body1 = api.find("POST", "/auth/v4/sessions").bodyJson!!
         val body2 = api.find("POST", "/auth/v4/credentialless").bodyJson!!
-        val pub1 = body1.getJSONObject("challengePayload")
-            .getJSONObject("DevicePublicKeys").getString("ED25519")
-        val pub2 = body2.getJSONObject("challengePayload")
-            .getJSONObject("DevicePublicKeys").getString("ED25519")
-        assertEquals(pub1, pub2)
-        assertEquals(pub1, sess.deviceEd25519PubB64)
+        val frame1 = body1.getJSONObject("Payload")
+            .getJSONObject(GuestApi.CHALLENGE_FRAME_KEY)
+        val frame2 = body2.getJSONObject("Payload")
+            .getJSONObject(GuestApi.CHALLENGE_FRAME_KEY)
+        assertEquals(frame1.toString(), frame2.toString())
+        assertEquals("2.0.7", frame1.getString("v"))
         // The initial uid is used as x-pm-uid on the very first request.
         val headers1 = api.find("POST", "/auth/v4/sessions").headers
         assertEquals("initial-uid-123", headers1["x-pm-uid"])
@@ -248,30 +245,31 @@ class GuestApiTest {
     @Test fun fetchCertificateParsesResponse() = runBlocking {
         val api = StubApi()
         val certPem = "-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----\n"
+        // Official CertificateResponse: only the PEM + timestamps (the
+        // tunnel addresses are fixed constants, not in the response).
         api.setEnvelope("POST", "/vpn/v1/certificate", JSONObject().apply {
             put("Certificate", certPem)
-            put("ServerStatus", JSONObject().put("Status", 1))
+            put("ExpirationTime", 1735786000L)
             put("RefreshTime", 1735689600L)
-            put("IPv4", "10.2.0.2")
-            put("IPv6", "fd00::2")
-            put("DNS", JSONObject().put("IP", JSONArray().apply {
-                put("10.64.0.1"); put("10.64.0.2")
-            }))
         })
         val auth = GuestAuth(api.client())
         val sess = testSession()
         val cert = auth.fetchCertificate(sess, "wgpub==")
         assertEquals(certPem, cert.certificatePem)
+        // Fixed tunnel constants from Constants.kt.
         assertEquals("10.2.0.2", cert.ipv4)
-        assertEquals("fd00::2", cert.ipv6)
-        assertEquals(listOf("10.64.0.1", "10.64.0.2"), cert.dnsIps)
+        assertEquals("2a07:b944::2:2", cert.ipv6)
+        assertEquals(listOf("10.2.0.1", "2a07:b944::2:1"), cert.dnsIps)
         assertEquals(1735689600L, cert.refreshTime)
-        assertEquals(1, cert.serverStatus.optInt("Status"))
+        assertEquals(1735786000L, cert.expirationTime)
         assertEquals("wgpub==", cert.clientPublicKeyB64)
-        // Body had the right shape.
+        // Body matches CertificateRequestBody from the official app.
         val body = api.find("POST", "/vpn/v1/certificate").bodyJson!!
         assertEquals("wgpub==", body.getString("ClientPublicKey"))
-        assertEquals("persistent", body.getString("Mode"))
+        assertEquals("EC", body.getString("ClientPublicKeyMode"))
+        assertTrue(body.getString("DeviceName").isNotEmpty())
+        assertEquals("session", body.getString("Mode"))
+        assertEquals(0, body.getJSONArray("Features").length())
         // Bearer auth used.
         val headers = api.find("POST", "/vpn/v1/certificate").headers
         assertEquals("Bearer guest-tok", headers["authorization"])
@@ -390,6 +388,8 @@ class GuestApiTest {
         )
         // AllowedIPs defaults to both v4 and v6.
         assertTrue(config.contains("AllowedIPs = 0.0.0.0/0, ::/0"))
+        // Keepalive matches the official clients.
+        assertTrue(config.contains("PersistentKeepalive = 60"))
     }
 
     // ------------------------------------------------------------------

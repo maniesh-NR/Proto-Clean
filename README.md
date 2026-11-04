@@ -9,18 +9,27 @@ Android** — built around your own Proton account:
 
 - **Continue as guest (no Proton account)** — Proto Clean implements
   Proton's credentialless API flow (`POST /auth/v4/sessions` →
-  `POST /auth/v4/credentialless`, the same flow the official Android
-  app uses for its "Continue as guest" first-run option). No account,
-  no password, no CAPTCHA, no Playwright — the Proton API is contacted
-  directly with a client-generated Ed25519 device keypair, returning a
-  Tier=0 VPN session bound to free servers only (NL, JP, PL, RO, US;
-  one connection at a time). The guest session is persisted in the
+  `POST /auth/v4/credentialless`, request/response shapes transcribed
+  from the official open-source clients: protoncore-android's
+  `AuthenticationApi.kt`/`ChallengeFrame.kt` and ProtonVPN/android-app's
+  `ProtonVPNRetrofit.kt`/`CertificateRequestBody.kt`/`Constants.kt`) —
+  the same flow the official Android app uses for its "Continue as
+  guest" first-run option, and the same one morphe-patches unlocks the
+  free-server list for. No account, no password, no CAPTCHA, no
+  Playwright — the anti-abuse device frame is sent under the
+  `vpn-android-v4-challenge-0` key, returning a Tier=0 VPN session
+  bound to free servers only (NL, JP, PL, RO, US; one connection at a
+  time). The guest session is persisted in the
   system keyring and auto-resumed on next launch (refresh-token flow
   keeps it alive across restarts until it expires). WireGuard
   certificates for each connection are obtained via
-  `POST /vpn/v1/certificate` with a fresh X25519 keypair, then the
-  wg-quick config is built locally — no downloads-page scraping
-  needed. Available on both desktop (Login dialog → "Continue as
+  `POST /vpn/v1/certificate` (`ClientPublicKeyMode: "EC"`,
+  `Mode: "session"`) with a fresh X25519 keypair — verified against
+  RFC 7748 test vectors on both platforms — and the wg-quick config is
+  built locally with Proton's fixed tunnel addresses
+  (10.2.0.2/32 ↔ 10.2.0.1) and a 60 s keepalive, matching the official
+  clients. No downloads-page scraping needed. Available on both
+  desktop (Login dialog → "Continue as
   guest") and Android (LoginScreen → "Continue as guest"
   `FilledTonalButton`).
 - **Material Design 3 UI** — the desktop Qt stylesheets are now
