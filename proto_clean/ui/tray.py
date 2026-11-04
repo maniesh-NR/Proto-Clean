@@ -32,12 +32,24 @@ class Tray(QSystemTrayIcon):
                                     "into one fat pipe (needs a bond "
                                     "server)")
         self.bond_action.toggled.connect(self._toggle_bond)
+        # -- multi-protocol quick access ----------------------------------
+        self.protocols_menu = QMenu("Protocols", self)
+        self.protocols_open = QAction("Manage protocols…", self)
+        self.protocols_open.triggered.connect(self._open_protocols)
+        self.protocols_stop = QAction("Stop protocol engine", self)
+        self.protocols_stop.triggered.connect(
+            self.controller.stop_protocol_async)
         self.quit_action = QAction("Quit", self)
         self.quit_action.triggered.connect(self._quit)
         menu.addAction(self.show_action)
         menu.addAction(self.toggle_action)
         menu.addAction(self.proxy_action)
         menu.addAction(self.bond_action)
+        self.protocols_menu.addAction(self.protocols_open)
+        self.protocols_menu.addSeparator()
+        self.protocols_menu.addAction(self.protocols_stop)
+        self._reload_protocol_profiles()
+        menu.addMenu(self.protocols_menu)
         menu.addSeparator()
         menu.addAction(self.quit_action)
         self.setContextMenu(menu)
@@ -61,6 +73,32 @@ class Tray(QSystemTrayIcon):
             self.toggle_action.setText("Connect (fastest)")
             self.setIcon(resources.shield_icon("#2f6d3f"))
             self.setToolTip(f"Proto Clean — {state.replace('_', ' ')}")
+
+    def _reload_protocol_profiles(self) -> None:
+        """(Re)build the pinned-profile entries in the Protocols menu."""
+        from ..vpn.protocols.profiles import ProfileStore
+        menu = self.protocols_menu
+        # remove previous profile actions (keep open/stop/separator)
+        for action in list(menu.actions()):
+            if action not in (self.protocols_open, self.protocols_stop) \
+                    and not action.isSeparator():
+                menu.removeAction(action)
+        try:
+            entries = [e for e in ProfileStore().all() if e.pinned][:8]
+        except Exception:                       # noqa: BLE001 — tray must live
+            entries = []
+        for entry in entries:
+            action = QAction("%s (%s)" % (entry.name, entry.kind), self)
+            action.triggered.connect(
+                lambda _checked=False, eid=entry.id:
+                    self.controller.start_profile_async(eid))
+            menu.addAction(action)
+
+    def _open_protocols(self) -> None:
+        from .protocols_dialog import ProtocolsDialog
+        dialog = ProtocolsDialog(self.controller, self.window)
+        dialog.show()
+        self._reload_protocol_profiles()
 
     def _toggle(self) -> None:
         if self.controller.state in (State.CONNECTED, State.CONNECTING):

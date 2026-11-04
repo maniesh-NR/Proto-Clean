@@ -53,6 +53,7 @@ class SettingsDialog(QDialog):
         tabs.addTab(self._split_tab(), "Split tunneling")
         tabs.addTab(self._portfwd_tab(), "Port forwarding")
         tabs.addTab(self._xray_tab(), "Proxy")
+        tabs.addTab(self._protocols_tab(), "Protocols")
         tabs.addTab(self._bond_tab(), "Link bonding")
 
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
@@ -424,6 +425,53 @@ class SettingsDialog(QDialog):
 
     # ------------------------------------------------------------- account
     # ------------------------------------------------------ Link bonding
+    def _protocols_tab(self) -> QWidget:
+        """Multi-protocol profiles (imports, chains, WARP)."""
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setSpacing(12)
+
+        intro = QLabel(
+            "Every protocol in one place: import configs from the "
+            "clipboard, QR codes, files or subscriptions, chain them "
+            "(including Cloudflare WARP hops) and start them here.")
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        open_btn = QPushButton("Open Protocols manager…")
+        open_btn.setMinimumHeight(38)
+
+        def _open() -> None:
+            from .protocols_dialog import ProtocolsDialog
+            ProtocolsDialog(self.controller, self).show()
+
+        open_btn.clicked.connect(_open)
+        layout.addWidget(open_btn)
+
+        stats = QLabel()
+        layout.addWidget(stats)
+
+        def _refresh() -> None:
+            try:
+                store = self.controller.protocol_store()
+                entries = store.all()
+                kinds = {}
+                for e in entries:
+                    kinds[e.kind] = kinds.get(e.kind, 0) + 1
+                text = "%d profile%s imported" % (
+                    len(entries), "s" if len(entries) != 1 else "")
+                if kinds:
+                    text += " — " + ", ".join(
+                        "%s ×%d" % (k, v) for k, v in
+                        sorted(kinds.items())[:6])
+                stats.setText(text)
+            except Exception as exc:              # noqa: BLE001
+                stats.setText("profiles: %s" % exc)
+
+        _refresh()
+        layout.addStretch(1)
+        return widget
+
     def _bond_tab(self) -> QWidget:
         """Multi-adapter link bonding (Speedify-style stream bonding /
         net-merge-style per-connection balancing)."""

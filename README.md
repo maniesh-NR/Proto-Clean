@@ -310,6 +310,58 @@ binary through its *documented* client config format — no Lantern
 source is copied into this repository's codebase — and your profile
 credentials never leave your machine.
 
+## Protocols — 25+ engines, one app
+
+The Protocols manager (Settings → Protocols, or the tray menu) runs every
+protocol below behind one lifecycle, one SOCKS5 front-end and one
+system-proxy switch. Import from the **clipboard**, **QR on screen**,
+**QR images**, **config files** or **subscription URLs**; share any saved
+profile as a QR code.
+
+| Protocol | Engine | Chainable | Notes |
+| --- | --- | --- | --- |
+| Shadowsocks (AEAD + 2022) | built-in Python | yes | aes-gcm / chacha20-poly1305, SIP002 links, plugins via lantern-box |
+| ShadowsocksR | lantern-box | yes | SSR links + Clash import |
+| VMess (V2ray / V2fly) | lantern-box | yes | ws / grpc / h2 transports, uTLS fingerprints, vmess:// links |
+| VLESS + REALITY / Trojan | Xray-core | yes | SNI masking (see the Xray section) |
+| Hysteria 2 | built-in (aioquic) | yes | official wire protocol, salamander obfs, port hopping |
+| TUIC v5 | built-in (aioquic) | via lantern-box | token auth via lantern-box; built-in engine for wire testing |
+| MASQUE (RFC 9298) | built-in (aioquic) | yes | CONNECT-UDP over HTTP/3 |
+| NaïveProxy | lantern-box / naive | via lantern-box | Chromium-padding proxy |
+| OpenVPN over Cloak | ck-client + openvpn | no | TLS-masked OpenVPN composite |
+| AmneziaWG 1.5 / 2.0 | lantern-box endpoint | first hop only | junk packets + magic headers; vpn:// Amnezia links |
+| WireGuard | built-in (Proton) | first hop only | Proton configs + WG conf import |
+| IKEv2 | system (strongSwan / rasdial / Apple) | first hop only | EAP / PSK |
+| Tor | tor binary | yes | bridges (obfs4 / snowflake / webtunnel), NEWNYM, Tor-over-Xray |
+| Obscura relays | Obscura API + WG | first hop only | relay → exit multihop |
+| Lantern samizdat | lantern-box | yes | DPI-resistant HTTP/2 (see the samizdat section) |
+| Lantern radiance / lampshade | lantern-box probe | yes | via capability-probed outbounds |
+| Reflex / WATER / Outline / ALGeneva | lantern-box | yes | censorship-evasion add-ons |
+| Cloudflare WARP | lantern-box (WG) | both ends | oblivion/warp-plus registration |
+| Clash configs | converted on import | per proxy | YAML proxies → concrete profiles |
+| V2ray / V2fly / sing-box JSON | converted or raw | per proxy | raw sing-box passthrough keeps everything verbatim |
+| Chains | ChainEngine | — | any combination, e.g. WARP → VMess → Tor |
+
+### Cloudflare WARP hops (oblivion-style)
+
+WARP registers a device with Cloudflare (the same API the
+[bepass-org/oblivion](https://github.com/bepass-org/oblivion) client
+uses) and runs the WireGuard tunnel through lantern-box. In the
+Protocols manager select a profile → **Chain…**:
+
+* **WARP → profile** — the protocol server is reached *through* WARP
+  (your IP towards the server is a Cloudflare IP).
+* **profile → WARP** — you reach the server, the internet sees a
+  Cloudflare IP as the exit.
+
+### Multiprotocol chains
+
+**Chain… → Custom chain** composes any engines in order
+(`client → hop1 → hop2 → internet`); each hop dials through the previous
+hop's local SOCKS. QUIC engines tunnel through SOCKS5 UDP relays, Xray
+uses `dialerProxy`, lantern-box uses outbound `detour`. Full-tunnel
+engines (WireGuard family, IKEv2) must be the first — and only — hop.
+
 ## Link bonding — two or more adapters as one connection
 
 Speedify's headline feature, in userspace and with **your own server**.

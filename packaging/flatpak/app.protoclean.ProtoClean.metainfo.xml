@@ -21,6 +21,23 @@
   </description>
   <launchable type="desktop-id">app.protoclean.ProtoClean.desktop</launchable>
   <releases>
+    <release version="0.5.0" date="2026-11-04">
+      <description>
+        <p>Multi-protocol engine layer: 25+ protocols with one UI.</p>
+        <ul>
+          <li>Built-in engines: Shadowsocks AEAD, Hysteria 2 (salamander),
+            TUIC v5, MASQUE over QUIC, Cover-DTLS, IKEv2, Tor</li>
+          <li>lantern-box engine: VMess, ShadowsocksR, NaïveProxy, AmneziaWG
+            1.5/2.0, Reflex, WATER, Outline, ALGeneva</li>
+          <li>Clash, V2ray/V2fly and sing-box config import (or raw
+            sing-box passthrough); subscription URLs</li>
+          <li>Cloudflare WARP hops before/after any protocol (oblivion-style
+            registration)</li>
+          <li>Multiprotocol chains: client → engine → engine → internet</li>
+          <li>Import from clipboard, QR on screen, QR images and files</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-11-03">
       <description>
         <p>Link bonding (Speedify-style multi-adapter streams, net-merge-style

@@ -1,9 +1,10 @@
-# Windows 7 / 32-bit legacy stack (Python 3.8).
-# Qt 5.15 via PySide2 — the last Qt line with 32-bit Windows wheels and
-# Windows 7 support. The app code runs on either binding via
-# proto_clean/qtcompat.py.
 PySide2==5.15.2.1
 playwright==1.42.0
 dnslib>=0.9.25
 httpx==0.27.2
 keyring==24.3.0
+aioquic==1.2.0
+pyyaml==6.0.1
+zxing-cpp==2.2.1
+segno==1.6.6
+pillow==10.4.0

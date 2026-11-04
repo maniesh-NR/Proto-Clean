@@ -11,8 +11,8 @@ android {
         applicationId = "app.protoclean"
         minSdk = 26            // Android 8.0 Oreo
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.4.0"
+        versionCode = 4
+        versionName = "0.5.0"
     }
 
     // Per-ABI APKs (armv7 + arm64) as requested for the release matrix.
@@ -77,4 +77,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // unit tests (ImportParser + friends)
+    testImplementation("junit:junit:4.13.2")
 }

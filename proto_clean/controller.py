@@ -104,6 +104,7 @@ class Controller:
         # Xray / v2ray proxy (VLESS REALITY / Trojan) + samizdat (Lantern)
         # + link bonding (multi-adapter)
         self.xray = XrayManager()
+        self._protocol_engine = None          # generic protocol layer
         self.samizdat = SamizdatManager()
         self.bond = BondManager()
         self.proxy_state: str = PROXY_OFF
@@ -951,6 +952,136 @@ class Controller:
         st.update(self.samizdat.status())
         st["provider"] = self._proxy_provider()
         return st
+
+    # ---------------------------------------------------- protocol engines
+    # the generic multi-protocol layer (imported profiles, chains, WARP):
+    # any engine from proto_clean.vpn.protocols can run behind the same
+    # start/stop/status lifecycle, sharing the system-proxy switch.
+    def start_profile_async(self, entry_id: str) -> None:
+        """Start a saved profile from the protocols store (async)."""
+        self._spawn(lambda: self._profile_start_worker(entry_id),
+                    "proto_clean-protocol")
+
+    def _profile_start_worker(self, entry_id: str) -> None:
+        if not self._proxy_lock.acquire(blocking=False):
+            self.on_message("a proxy operation is already running", "warn")
+            return
+        try:
+            from .vpn.protocols import chain as chain_mod
+            from .vpn.protocols import make_engine
+            from .vpn.protocols.profiles import ProfileStore
+            store = ProfileStore()
+            entry = store.get(entry_id)
+            if entry is None:
+                self.on_message("profile not found", "error")
+                return
+            profile = entry.profile()
+            if profile is None:
+                self.on_message(f"cannot restore {entry.name}", "error")
+                return
+            self._set_proxy(PROXY_STARTING)
+            # stop anything else first — one proxy engine at a time
+            for mgr in (self.xray, self.samizdat):
+                try:
+                    mgr.stop()
+                except Exception:  # noqa: BLE001
+                    pass
+            if getattr(self, "_protocol_engine", None) is not None:
+                try:
+                    self._protocol_engine.stop()
+                except Exception:  # noqa: BLE001
+                    pass
+                self._protocol_engine = None
+            try:
+                if entry.kind == "chain":
+                    eng = chain_mod.engine(profile)
+                    eng.start(profile)
+                elif entry.kind == "warp":
+                    from .vpn.protocols import warp as warp_mod
+                    warp_mod.register(profile)
+                    from .vpn.protocols import boxproto
+                    eng = boxproto.engine("warp", profile,
+                                          socks_port=10800)
+                    eng.start(profile, socks_port=eng.socks_port or 10800)
+                elif entry.kind == "clash" or entry.kind == "boxraw":
+                    from .vpn.protocols import boxproto
+                    kind = "boxraw" if entry.kind == "boxraw" else \
+                        profile.kind
+                    # clash entries expand on import; a stored clash doc
+                    # means the user kept the whole config — run raw
+                    if entry.kind == "clash":
+                        from .vpn.protocols.convert import parse_clash_yaml
+                        subs = parse_clash_yaml(profile.yaml_text)
+                        if len(subs) == 1:
+                            profile = subs[0]
+                            kind = subs[0].kind
+                    eng = boxproto.engine(kind, profile)
+                    eng.start(profile, socks_port=eng.socks_port or 10800)
+                else:
+                    eng = make_engine(entry.kind, profile,
+                                      socks_port=10800)
+                    eng.start(profile, socks_port=eng.socks_port or 10800)
+            except Exception as e:  # noqa: BLE001
+                self._set_proxy(PROXY_ERROR, str(e))
+                self.on_message(f"{entry.kind}: {e}", "error")
+                return
+            self._protocol_engine = eng
+            self._set_proxy(PROXY_ON, entry.kind)
+            # share the system-proxy switch with the xray family
+            try:
+                if hasattr(eng, "apply_system_proxy"):
+                    eng.apply_system_proxy()
+            except Exception as e:  # noqa: BLE001
+                self.on_message(f"running; system proxy switch failed: {e}",
+                                "warn")
+            self.on_message(f"{entry.name} is running", "info")
+            self._apply_browser_proxy()
+        finally:
+            self._proxy_lock.release()
+
+    def stop_protocol_async(self) -> None:
+        """Stop the running protocol engine (shares the proxy lock)."""
+        self._spawn(self._protocol_stop_worker, "proto_clean-protocol")
+
+    def _protocol_stop_worker(self) -> None:
+        if not self._proxy_lock.acquire(blocking=False):
+            self.on_message("a proxy operation is already running", "warn")
+            return
+        try:
+            eng = getattr(self, "_protocol_engine", None)
+            if eng is not None:
+                try:
+                    eng.stop()
+                except Exception as e:  # noqa: BLE001
+                    self.on_message(f"stop failed: {e}", "warn")
+                self._protocol_engine = None
+                self._set_proxy(PROXY_OFF)
+                self.on_message("Protocol engine stopped", "info")
+                self._apply_browser_proxy()
+                return
+            # fall through to the classic proxy stop
+            self._proxy_stop_worker()
+        finally:
+            self._proxy_lock.release()
+
+    def protocol_engine_status(self) -> dict:
+        eng = getattr(self, "_protocol_engine", None)
+        if eng is None:
+            return {"running": False, "kind": ""}
+        try:
+            st = eng.status()
+        except Exception:  # noqa: BLE001
+            st = {"running": False, "kind": getattr(eng, "proxy_kind", "")}
+        return st
+
+    def protocol_store(self):
+        """The profiles store (imported servers) for the UI."""
+        from .vpn.protocols.profiles import ProfileStore
+        return ProfileStore()
+
+    def import_center(self):
+        from .vpn.protocols.importers import ImportCenter
+        return ImportCenter(self.protocol_store())
 
     # ------------------------------------------------------- link bonding
     def _set_bond(self, state: str, detail: str = "") -> None:
