@@ -94,7 +94,16 @@ def _looks_like_config(text: str) -> bool:
     return (head.lstrip().startswith("{")
             or convert._looks_like_clash(head)
             or "[Interface]" in head or "[Peer]" in head
-            or head.lstrip().startswith("client "))
+            or _starts_with_client_directive(head))
+
+
+def _starts_with_client_directive(text: str) -> bool:
+    """OpenVPN configs open with a bare `client` directive on its own
+    line (``client\ndev tun...``) or as ``client dev tun``; accept the
+    keyword followed by any whitespace (or end of input)."""
+    head = text.lstrip()
+    return head.startswith("client") and (
+        len(head) == 6 or head[6] in " \t\r\n")
 
 
 def parse_file(path: str) -> List[ProtocolProfile]:
@@ -111,7 +120,7 @@ def parse_file(path: str) -> List[ProtocolProfile]:
         profiles = _parse_wireguard_text(text, path)
         if profiles:
             return profiles
-    if ext == ".ovpn" or text.lstrip().startswith("client "):
+    if ext == ".ovpn" or _starts_with_client_directive(text[:400]):
         return [M.CloakProfile(server="", port=443,
                                openvpn_config=text)]
     profiles = parse_text(text)

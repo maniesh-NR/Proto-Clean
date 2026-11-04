@@ -117,9 +117,17 @@ object ImportParser {
     /** True when the text looks like a whole config document. */
     fun looksLikeConfig(text: String): Boolean {
         val head = text.take(4000)
-        return head.trimStart().startsWith("{") ||
+        val trimmed = head.trimStart()
+        return trimmed.startsWith("{") ||
             head.contains("proxies:") ||
             head.contains("[Interface]") ||
-            head.trimStart().startsWith("client ")
+            startsWithClientDirective(trimmed)
     }
+
+    /** OpenVPN configs open with a bare `client` directive on its own
+     *  line (`client\ndev tun...`) or as `client dev tun`; accept the
+     *  keyword followed by any whitespace (or end of input). */
+    private fun startsWithClientDirective(t: String): Boolean =
+        t.startsWith("client") &&
+            (t.length == 6 || t[6].isWhitespace())
 }

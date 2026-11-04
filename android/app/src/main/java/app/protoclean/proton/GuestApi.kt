@@ -1,6 +1,6 @@
 package app.protoclean.proton
 
-import android.util.Base64
+import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -87,8 +87,8 @@ object GuestApi {
     /** Generate a fresh X25519 (Curve25519) keypair for WireGuard.
      *  The public key is sent to Proton in `POST /vpn/v1/certificate`
      *  as `ClientPublicKey`; the private key is the WireGuard
-     *  `[Interface] PrivateKey`. Uses a self-contained, public-domain
-     *  Curve25519 scalar-base multiplication (curve25519-donna style). */
+     *  `[Interface] PrivateKey`. Uses a self-contained public-domain
+     *  TweetNaCl-derived Curve25519 scalar-base multiplication. */
     fun genX25519Keypair(): Pair<String, String> {
         val rand = SecureRandom()
         val privRaw = ByteArray(32).also { rand.nextBytes(it) }
@@ -99,13 +99,15 @@ object GuestApi {
         return base64(pubRaw) to base64(privRaw)
     }
 
-    /** Encode raw bytes as NO_WRAP base64 (the form Proton expects). */
+    /** Encode raw bytes as base64 without line wrapping (the form
+     *  Proton expects). java.util.Base64 is used (not android.util) so
+     *  the JVM unit tests can exercise the same code path. */
     fun base64(bytes: ByteArray): String =
-        Base64.encodeToString(bytes, Base64.NO_WRAP)
+        Base64.getEncoder().encodeToString(bytes)
 
-    /** Decode a NO_WRAP base64 string to raw bytes. */
+    /** Decode an unwrapped base64 string to raw bytes. */
     fun decodeB64(s: String): ByteArray =
-        Base64.decode(s, Base64.NO_WRAP)
+        Base64.getDecoder().decode(s)
 }
 
 /** Raised when the Proton API returns a non-success Code in its
@@ -211,7 +213,7 @@ data class GuestLogicalServer(
         return LogicalServer(
             id = serverId, name = name,
             entryCountry = exitCountry, exitCountry = exitCountry,
-            domain = domain, tier = tier, features = features,
+            tier = tier, features = features,
             city = city ?: "", region = "",
             load = load, score = score, status = status, enabled = true,
             physical = listOf(phys),

@@ -147,7 +147,7 @@ class GuestApiTest {
         assertEquals("guest", sess.planName)
         // The session is bound to a fresh device keypair.
         assertTrue(sess.deviceEd25519PubB64.isNotEmpty())
-        assertEquals(32, sess.deviceEd25519Priv.size)
+        assertEquals(32, GuestApi.decodeB64(sess.deviceEd25519PrivB64).size)
 
         // Two POSTs were made in sequence: /sessions then /credentialless.
         val postPaths = api.requests.filter { it.method == "POST" }.map { it.path }
@@ -290,7 +290,7 @@ class GuestApiTest {
         }.toString())
         val auth = GuestAuth(api.client())
         try {
-            runBlocking { auth.createAnonymousSession("devpub") }
+            runBlocking { auth.createAnonSession("devpub") }
             fail("expected GuestAuthError to be raised")
         } catch (e: GuestAuthError) {
             assertTrue(
@@ -318,7 +318,7 @@ class GuestApiTest {
             refreshExpiresAt = now + 9999,
             scope = "self vpn",
             deviceEd25519PubB64 = "devpub",
-            deviceEd25519Priv = ByteArray(32) { it.toByte() },
+            deviceEd25519PrivB64 = GuestApi.base64(ByteArray(32) { it.toByte() }),
             maxTier = 0,
             maxConnect = 1,
             planName = "guest",
@@ -337,8 +337,13 @@ class GuestApiTest {
         assertEquals(original.maxTier, restored.maxTier)
         assertEquals(original.maxConnect, restored.maxConnect)
         assertEquals(original.planName, restored.planName)
-        // Raw priv bytes match (use contentEquals, not ==).
-        assertTrue(restored.deviceEd25519Priv.contentEquals(original.deviceEd25519Priv))
+        // The priv key round-trips through its base64 form (storage
+        // keeps it JSON-safe as a String).
+        assertEquals(original.deviceEd25519PrivB64, restored.deviceEd25519PrivB64)
+        assertTrue(
+            restored.deviceEd25519PrivB64.isNotEmpty() &&
+                GuestApi.decodeB64(restored.deviceEd25519PrivB64).size == 32,
+        )
     }
 
     // ------------------------------------------------------------------
@@ -403,7 +408,7 @@ class GuestApiTest {
             refreshExpiresAt = now + 9999,
             scope = "self vpn",
             deviceEd25519PubB64 = "devpub",
-            deviceEd25519Priv = ByteArray(32),
+            deviceEd25519PrivB64 = GuestApi.base64(ByteArray(32)),
         )
     }
 
