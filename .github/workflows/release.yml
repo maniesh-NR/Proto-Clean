@@ -520,35 +520,35 @@ jobs:
       - name: Create / update release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.5.0
-          name: Proto Clean v0.5.0
+          tag_name: v${{ env.VERSION }}
+          name: Proto Clean v${{ env.VERSION }}
           body: |
-            New in v0.5.0: **25+ protocol engines in one app** —
-            Shadowsocks (AEAD/2022), VMess, VLESS + REALITY, Trojan,
-            Hysteria 2, TUIC v5, MASQUE over QUIC, NaïveProxy,
-            ShadowsocksR, OpenVPN over Cloak, AmneziaWG 1.5/2.0, IKEv2,
-            Tor (with bridges), Obscura relays, Lantern
-            samizdat/radiance/lampshade, Reflex, WATER, Outline,
-            ALGeneva, **Cloudflare WARP** and multiprotocol **chains**.
-            Plus **Clash / V2ray / V2fly / sing-box config import** (or
-            raw sing-box passthrough) and subscriptions.
+            New in v0.6.0: **Guest mode + Material Design 3 UI** —
+            "Continue as guest" via Proton's credentialless API flow
+            (no account, no CAPTCHA, no Playwright; free-tier servers,
+            auto-resume via refresh-token, WireGuard certs from the API
+            with the wg-quick config built locally), plus a full
+            **Material Design 3** interface: HCT tonal palettes
+            (CIELAB-backed), all 30+ MD3 color roles, MD3 widget styles
+            seeded from the Proto Clean pine-green, and a matching MD3
+            theme on Android. 603 tests passing.
 
             ## Downloads
             | Platform | File | Notes |
             |---|---|---|
-            | **Windows 7+ x64** | `Proto-Clean-0.5.0-win7-x64-portable.zip` | Python 3.8 + Qt 5.15 legacy stack |
-            | **Windows 7+ x86 (32-bit)** | `Proto-Clean-0.5.0-win7-x86-portable.zip` | 32-bit Qt 5.15 legacy stack |
-            | **Windows 10/11 x64 (portable)** | `Proto-Clean-0.5.0-win-x64-portable.zip` | Qt 6 modern stack |
-            | **Windows 10/11 x64 (setup)** | `Proto-Clean-0.5.0-win-x64-setup.exe` | Inno Setup installer |
-            | **macOS 10.15 Catalina+ (Intel)** | `Proto-Clean-0.5.0-macos-10.15-catalina-x86_64-portable.zip` | Qt 6.2, runs on 10.14+ |
-            | **macOS 11+ (Apple Silicon)** | `Proto-Clean-0.5.0-macos-11.0-arm64-portable.zip` | native arm64, Qt 6 |
-            | **Linux Mint 21 / Ubuntu 22.04** | `proto-clean_0.5.0-mint21-ubuntu22.04_amd64.deb` | also LMDE-era compatible glibc |
-            | **Linux Mint 22 / Ubuntu 24.04** | `proto-clean_0.5.0-mint22-ubuntu24.04_amd64.deb` | |
-            | **LMDE 6 / Debian 12** | `proto-clean_0.5.0-debian12_amd64.deb` | |
-            | **Linux (portable)** | `Proto-Clean-0.5.0-linux-x86_64-portable.tar.gz` | built on Ubuntu 22.04; runs on Mint 21/22, LMDE 6 |
-            | **Linux (Flatpak)** | `Proto-Clean-0.5.0-x86_64.flatpak` | `flatpak install --user Proto-Clean-0.5.0-x86_64.flatpak` |
-            | **Android 8.0+ (armv7)** | `Proto-Clean-0.5.0-android-armeabi-v7a.apk` | debug-signed APK |
-            | **Android 8.0+ (arm64)** | `Proto-Clean-0.5.0-android-arm64-v8a.apk` | debug-signed APK |
+            | **Windows 7+ x64** | `Proto-Clean-0.6.0-win7-x64-portable.zip` | Python 3.8 + Qt 5.15 legacy stack |
+            | **Windows 7+ x86 (32-bit)** | `Proto-Clean-0.6.0-win7-x86-portable.zip` | 32-bit Qt 5.15 legacy stack |
+            | **Windows 10/11 x64 (portable)** | `Proto-Clean-0.6.0-win-x64-portable.zip` | Qt 6 modern stack |
+            | **Windows 10/11 x64 (setup)** | `Proto-Clean-0.6.0-win-x64-setup.exe` | Inno Setup installer |
+            | **macOS 10.15 Catalina+ (Intel)** | `Proto-Clean-0.6.0-macos-10.15-catalina-x86_64-portable.zip` | Qt 6.2, runs on 10.14+ |
+            | **macOS 11+ (Apple Silicon)** | `Proto-Clean-0.6.0-macos-11.0-arm64-portable.zip` | native arm64, Qt 6 |
+            | **Linux Mint 21 / Ubuntu 22.04** | `proto-clean_0.6.0-mint21-ubuntu22.04_amd64.deb` | also LMDE-era compatible glibc |
+            | **Linux Mint 22 / Ubuntu 24.04** | `proto-clean_0.6.0-mint22-ubuntu24.04_amd64.deb` | |
+            | **LMDE 6 / Debian 12** | `proto-clean_0.6.0-debian12_amd64.deb` | |
+            | **Linux (portable)** | `Proto-Clean-0.6.0-linux-x86_64-portable.tar.gz` | built on Ubuntu 22.04; runs on Mint 21/22, LMDE 6 |
+            | **Linux (Flatpak)** | `Proto-Clean-0.6.0-x86_64.flatpak` | `flatpak install --user Proto-Clean-0.6.0-x86_64.flatpak` |
+            | **Android 8.0+ (armv7)** | `Proto-Clean-0.6.0-android-armeabi-v7a.apk` | debug-signed APK |
+            | **Android 8.0+ (arm64)** | `Proto-Clean-0.6.0-android-arm64-v8a.apk` | debug-signed APK |
 
             Every package still bundles **lantern-box** (Lantern's GPL-3
             sing-box fork — samizdat out of the box) and every platform

@@ -3,7 +3,7 @@
 ; dist/ProtoClean:
 ;   iscc installer.iss
 #define AppName "Proto Clean"
-#define AppVersion "0.5.0"
+#define AppVersion "0.6.0"
 #define AppPublisher "Proto Clean contributors"
 #define AppExeName "ProtoClean.exe"
 #define AppId "{{8E1F4C77-6D2A-4E8B-9A63-2F1D5B9E4A31}"
