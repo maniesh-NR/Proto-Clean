@@ -180,7 +180,9 @@ def _parse_ssr(u: _Url) -> M.ShadowsocksrProfile:
 
 def _parse_hysteria2(u: _Url) -> M.Hysteria2Profile:
     auth, _ = u.user_pass()
-    pin = u.first("pin", "pinSHA256").removeprefix("sha256:")
+    pin = u.first("pin", "pinSHA256")
+    if pin.startswith("sha256:"):        # py3.8-safe removeprefix
+        pin = pin[len("sha256:"):]
     return M.Hysteria2Profile(
         server=u.host, port=u.port or 443, auth=auth, sni=u.first("sni", "peer"),
         insecure=u.flag("insecure", "allow_insecure"),
