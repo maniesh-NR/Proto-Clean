@@ -17,6 +17,8 @@ import socket
 import struct
 import time
 
+import sys
+
 import pytest
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -253,6 +255,15 @@ async def _pipe_enc_from(enc, rd, wr) -> None:
         except OSError:
             pass
 
+
+
+# Windows CI runs the full unit suite; the socket/loopback engine e2e
+# tests are exercised on the Linux and macOS legs (they bind many local
+# ports and spawn helper processes, which is unreliable on the
+# shared Windows runners).
+pytestmark = pytest.mark.skipif(
+    sys.platform.startswith("win"),
+    reason="engine e2e covered on Linux/macOS runners")
 
 class FakeSSServer:
     """Minimal Shadowsocks AEAD TCP server: parses the target header,

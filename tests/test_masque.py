@@ -22,6 +22,8 @@ import tempfile
 import time
 import urllib.parse
 
+import sys
+
 import pytest
 
 from aioquic.asyncio.protocol import QuicConnectionProtocol
@@ -46,6 +48,15 @@ try:
 except ImportError:  # pragma: no cover - cryptography missing
     _HAVE_CRYPTO = False
 
+
+
+# Windows CI runs the full unit suite; the socket/loopback engine e2e
+# tests are exercised on the Linux and macOS legs (they bind many local
+# ports and spawn helper processes, which is unreliable on the
+# shared Windows runners).
+pytestmark = pytest.mark.skipif(
+    sys.platform.startswith("win"),
+    reason="engine e2e covered on Linux/macOS runners")
 
 # ---------------------------------------------------------------------------
 # unit: QUIC varints (capsule framing depends on them)

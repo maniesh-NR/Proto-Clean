@@ -16,6 +16,8 @@ import threading
 import time
 from typing import List, Optional, Tuple
 
+import sys
+
 import pytest
 
 from proto_clean.vpn.protocols import models as M
@@ -38,6 +40,15 @@ try:
 except ImportError:                                     # pragma: no cover
     HAVE_AIOQUIC = False
 
+
+
+# Windows CI runs the full unit suite; the socket/loopback engine e2e
+# tests are exercised on the Linux and macOS legs (they bind many local
+# ports and spawn helper processes, which is unreliable on the
+# shared Windows runners).
+pytestmark = pytest.mark.skipif(
+    sys.platform.startswith("win"),
+    reason="engine e2e covered on Linux/macOS runners")
 
 # ---------------------------------------------------------------------------
 # helpers

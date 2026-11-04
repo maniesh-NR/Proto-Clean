@@ -12,6 +12,8 @@ from __future__ import annotations
 import asyncio
 import time
 
+import sys
+
 import pytest
 
 try:
@@ -111,6 +113,15 @@ async def _exercise(psk: str) -> None:
             except Exception:
                 pass
         server.stop()
+
+
+# Windows CI runs the full unit suite; the socket/loopback engine e2e
+# tests are exercised on the Linux and macOS legs (they bind many local
+# ports and spawn helper processes, which is unreliable on the
+# shared Windows runners).
+pytestmark = pytest.mark.skipif(
+    sys.platform.startswith("win"),
+    reason="engine e2e covered on Linux/macOS runners")
 
 
 @pytest.mark.parametrize("psk", ["", "hunter2-covered"], ids=["plain", "psk"])
