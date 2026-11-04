@@ -2,18 +2,20 @@
 <component type="desktop-application">
   <id>app.protoclean.ProtoClean</id>
   <metadata_license>MIT</metadata_license>
-  <project_license>MIT</project_license>
+  <project_license>GPL-3.0-or-later</project_license>
   <name>Proto Clean</name>
   <summary>Independent clean-room VPN client for Proton accounts</summary>
   <description>
     <p>
-      Proto Clean is an independent (clean-room) desktop client for Proton
-      VPN accounts: backend-browser login with saved credentials and TOTP
-      auto-fill, a free-server list with live loads, fastest-server
+      Proto Clean is an independent (clean-room) desktop and mobile client
+      for Proton VPN: backend-browser login with saved credentials and
+      TOTP auto-fill (or Proton's credentialless "Continue as guest" flow
+      with no account), a free-server list with live loads, fastest-server
       auto-connect, WireGuard and OpenVPN tunnels, local blocklist
       ad-blocking, split tunneling, NAT-PMP port forwarding, IPv6 leak
-      protection and an Xray proxy (VLESS REALITY with SNI masking and
-      Trojan).
+      protection, an Xray proxy (VLESS REALITY with SNI masking and
+      Trojan), 25+ protocol engines with multiprotocol chains and a
+      Material Design 3 UI.
     </p>
     <p>
       Not affiliated with or endorsed by Proton AG.
@@ -21,6 +23,28 @@
   </description>
   <launchable type="desktop-id">app.protoclean.ProtoClean.desktop</launchable>
   <releases>
+    <release version="0.6.0" date="2026-11-04">
+      <description>
+        <p>Guest mode + Material Design 3 UI.</p>
+        <ul>
+          <li>Continue as guest: Proton's credentialless API flow
+            (POST /auth/v4/sessions → /auth/v4/credentialless) — no
+            account, no CAPTCHA, no Playwright. Free-tier servers only;
+            one connection at a time. Auto-resumes on next launch via
+            refresh-token. WireGuard certs obtained via the API; wg-quick
+            config built locally (no downloads-page scraping).</li>
+          <li>Material Design 3 UI: HCT tonal palettes (CIELAB-backed),
+            all 30+ MD3 color roles, MD3 widget styles (filled-pill /
+            filled-tonal / text buttons, filled text fields with focus
+            underline, pill tabs with secondary-container highlight,
+            surface-container tables without hard borders). Seed colour
+            is the Proto Clean pine-green #2f6d3f. Android app's Theme.kt
+            is now a full MD3 colour scheme.</li>
+          <li>603 tests passing (12 new guest-mode tests, 25 new MD3
+            tests, 13 new controller-guest integration tests).</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-11-04">
       <description>
         <p>Multi-protocol engine layer: 25+ protocols with one UI.</p>

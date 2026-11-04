@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  VERSION: 0.5.0
+  VERSION: 0.6.0
   # lantern-box (Lantern's GPL-3 sing-box fork) — the samizdat engine we
   # bundle. Pinned tag; the port job builds it from source for every
   # target platform (official releases only publish linux binaries).

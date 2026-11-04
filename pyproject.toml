@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "proto-clean"
-version = "0.5.0"
+version = "0.6.0"
 description = "Clean-room client for ProtonVPN on Windows 7+, macOS 10.15+, Linux and Android 8+: 25+ protocol engines (Shadowsocks, VMess, VLESS REALITY, Hysteria 2, TUIC, MASQUE, NaïveProxy, AmneziaWG, Cloak, Tor, Obscura, WARP, samizdat…), Clash/V2ray/sing-box import, multiprotocol chains, link bonding, split tunneling, NAT-PMP"
 readme = "README.md"
 requires-python = ">=3.8"
