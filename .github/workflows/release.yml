@@ -531,7 +531,23 @@ jobs:
             **Material Design 3** interface: HCT tonal palettes
             (CIELAB-backed), all 30+ MD3 color roles, MD3 widget styles
             seeded from the Proto Clean pine-green, and a matching MD3
-            theme on Android. 603 tests passing.
+            theme on Android.
+
+            These builds ship the final hardening passes on top: a
+            **performance / stability / memory** pass across all
+            platforms — QUIC-obfs & salamander whitening 28× faster,
+            QUIC flow-control windows 1→8 MiB (≈10× on 150 ms-RTT
+            paths), 256 KiB relay chunks (~7× bulk throughput),
+            O(n²) SS/MASQUE decrypt buffers compacted to 74+ MB/s,
+            QUIC idle keepalive + TCP keepalive to survive NAT idle
+            drops, bounded child-output tails (no more pipe-full
+            tunnel deadlocks), zero thread/event-loop/socket leaks
+            across connect cycles, SOCKS5-UDP session lifecycle caps
+            — and a **final interop series**: 42 cross-feature tests
+            over the real production paths (chains, WARP hops, the
+            whole import universe, QR round-trips, guest-mode ↔
+            WireGuard, controller lifecycle) with 6 composition fixes
+            they flushed out. 669 tests passing.
 
             ## Downloads
             | Platform | File | Notes |
@@ -582,7 +598,7 @@ jobs:
             ## Also in this release
             * v0.4.0's **link bonding** (multi-adapter Speedify-style),
               samizdat bundling and the GPL-3 relicense carry over.
-            * 549 automated tests; Python 3.8 (Windows 7) to 3.12.
+            * 669 automated tests; Python 3.8 (Windows 7) to 3.12.
 
             ## After install
             * Log in with your own Proton account (credentials stay in your
