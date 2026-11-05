@@ -90,7 +90,13 @@ def quic_varint_get(buf: bytes, off: int) -> Tuple[int, int]:
 # salamander obfuscation (official spec)
 # ---------------------------------------------------------------------------
 class Salamander:
-    """Per-datagram wrapper: ``[8-byte salt][payload ^ BLAKE2b-256(k+s)]``."""
+    """Per-datagram wrapper: ``[8-byte salt][payload ^ BLAKE2b-256(k+s)]``.
+
+    The XOR runs through big-int arithmetic (``int.from_bytes`` → XOR →
+    ``to_bytes``): the whole payload is XOR-ed in one C-level operation
+    instead of a per-byte Python loop, which matters at VPN throughput —
+    the loop form capped out at a few MB/s on every platform, the int
+    form saturates hundreds of MB/s even on low-power ARM."""
 
     def __init__(self, key: str) -> None:
         self._key = (key or "").encode("utf-8")
@@ -99,17 +105,29 @@ class Salamander:
     def _stream(key_bytes: bytes, salt: bytes) -> bytes:
         return hashlib.blake2b(key_bytes + salt, digest_size=32).digest()
 
+    @staticmethod
+    def _xor(data: bytes, ks: bytes) -> bytes:
+        """``data ^ (ks repeated)`` in one C-level big-int operation."""
+        n = len(data)
+        if not n:
+            return b""
+        klen = len(ks)
+        reps = -(-n // klen)
+        mask = ks * reps if reps > 1 else ks
+        return (int.from_bytes(data, "big")
+                ^ int.from_bytes(mask[:n], "big")).to_bytes(n, "big")
+
     def wrap(self, data: bytes) -> bytes:
         salt = os.urandom(8)
         ks = self._stream(self._key, salt)
-        return salt + bytes(a ^ ks[i % 32] for i, a in enumerate(data))
+        return salt + self._xor(data, ks)
 
     def unwrap(self, data: bytes) -> bytes:
         if len(data) < 9:
             raise ProtocolError("salamander datagram too short")
         salt, payload = data[:8], data[8:]
         ks = self._stream(self._key, salt)
-        return bytes(a ^ ks[i % 32] for i, a in enumerate(payload))
+        return self._xor(payload, ks)
 
 
 # ---------------------------------------------------------------------------
@@ -257,12 +275,16 @@ class Hysteria2Protocol(ObfsQuicProtocol):
         addr = "%s:%d" % (host, port)
         self._udp_sessions[session_id] = on_packet
         self._udp_out[session_id] = addr
+        # per-session constants precomputed once — the per-packet path
+        # is one struct.pack and two concatenations (the address used to
+        # be re-encoded twice per datagram)
+        addr_b = addr.encode()
+        addr_hdr = quic_varint_put(len(addr_b)) + addr_b
 
         def send(payload: bytes) -> None:
             self._pkt_seq = (self._pkt_seq + 1) & 0xFFFF
             msg = (struct.pack("!IHBB", session_id, self._pkt_seq, 0, 1)
-                   + quic_varint_put(len(addr.encode())) + addr.encode()
-                   + bytes(payload))
+                   + addr_hdr + payload)
             if len(msg) > 65535:
                 raise ProtocolError("hysteria2 UDP payload too large")
             self._quic.send_datagram_frame(msg)
@@ -271,7 +293,7 @@ class Hysteria2Protocol(ObfsQuicProtocol):
             # defer them (congestion window / padding rules); keep
             # transmitting briefly so a one-shot datagram still leaves
             # the host instead of stranding until the next event.
-            if self._quic._datagrams_pending:
+            if getattr(self._quic, "_datagrams_pending", None):
                 asyncio.ensure_future(self._flush_datagrams())
 
         def close() -> None:

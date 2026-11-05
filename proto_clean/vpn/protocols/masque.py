@@ -104,21 +104,26 @@ class CapsuleParser:
     """
 
     def __init__(self) -> None:
-        self._buf = b""
+        self._buf = bytearray()         # bytearray: feeds append in O(1)
+                                        # (bytes concat copies the whole
+                                        # buffer per feed — O(n²) overall)
 
     def feed(self, data: bytes) -> List[bytes]:
-        self._buf += bytes(data)
+        self._buf += data
+        buf = self._buf
+        n = len(buf)
         out: List[bytes] = []
+        pos = 0
         while True:
             try:
-                ctype, off = varint_get(self._buf, 0)
-                clen, off = varint_get(self._buf, off)
+                ctype, off = varint_get(buf, pos)
+                clen, off = varint_get(buf, off)
             except ValueError:
                 break                       # need more bytes for the header
-            if len(self._buf) < off + clen:
+            if n < off + clen:
                 break                       # capsule body still incomplete
-            value = self._buf[off:off + clen]
-            self._buf = self._buf[off + clen:]
+            value = bytes(buf[off:off + clen])
+            pos = off + clen
             if ctype != CAPSULE_HTTP_DATAGRAM or not value:
                 continue                    # unknown/empty capsule: skip
             try:
@@ -127,6 +132,8 @@ class CapsuleParser:
                 log.debug("dropping malformed http datagram capsule")
                 continue
             out.append(value[coff:])
+        if pos:
+            del buf[:pos]                   # consume parsed capsules
         return out
 
 

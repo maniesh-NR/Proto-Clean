@@ -51,7 +51,9 @@ def build_quic_config(server_name: str, alpn: Tuple[str, ...],
     handshake when the TLS stack exposes the peer certificate.
     """
     cfg = QuicConfiguration(is_client=True, alpn_protocols=list(alpn),
-                            idle_timeout=idle_timeout)
+                            idle_timeout=idle_timeout,
+                            max_data=MAX_DATA,
+                            max_stream_data=MAX_STREAM_DATA)
     cfg.server_name = server_name or None
     cfg.max_datagram_frame_size = max_datagram_frame_size
     if insecure or pin_sha256:
@@ -78,6 +80,14 @@ def check_pin_sha256(peer_cert_der: bytes, pin: str) -> bool:
 #: queue forever. 1350 stays under the common 1500-byte IPv4 MTU while
 #: leaving headroom for the framing of every engine in this package.
 LARGE_DATAGRAM_PACKET_SIZE = 1350
+
+#: QUIC flow-control windows announced to the peer. aioquic's 1 MiB
+#: defaults throttle long-fat links (1 MiB / 150 ms RTT ≈ 7 MB/s ceiling);
+#: these keep a transcontinental or mobile path fed while bounding the
+#: worst-case buffered data per connection when the local consumer stalls
+#: (the window is exactly the maximum the peer may have in flight).
+MAX_DATA = 8 * 1024 * 1024            # connection-wide receive window
+MAX_STREAM_DATA = 2 * 1024 * 1024     # per-stream receive window
 
 
 def enable_large_datagrams(proto, size: int = LARGE_DATAGRAM_PACKET_SIZE) -> None:
@@ -114,7 +124,16 @@ class ObfsQuicProtocol(QuicConnectionProtocol):
     Subclasses of the default protocol that apply ``_wrap``/``_unwrap``
     to every UDP datagram, so the obfuscation layer sits transparently
     under any protocol built on top.
+
+    Also adds an **idle keepalive**: after :data:`KEEPALIVE_IDLE` seconds
+    without an outbound packet a single QUIC PING is sent. Without it a
+    quiet tunnel dies at the 30 s idle timeout (and its NAT mapping
+    expires even earlier on mobile/CGNAT paths) — the next app request
+    then hits a dead connection instead of a live one.
     """
+
+    #: seconds of transmit silence before a keepalive PING is sent
+    KEEPALIVE_IDLE = 15.0
 
     wrap: PacketWrapper = staticmethod(lambda d: d)
     unwrap: PacketWrapper = staticmethod(lambda d: d)
@@ -124,8 +143,40 @@ class ObfsQuicProtocol(QuicConnectionProtocol):
     #: packet, so server-side unwrapping happens one layer earlier
     pre_unwrapped = False
 
+    def connection_made(self, transport) -> None:  # type: ignore[override]
+        super().connection_made(transport)
+        self._last_tx = self._loop.time()
+        self._last_rx = self._last_tx
+        self._keepalive = self._loop.call_later(
+            self.KEEPALIVE_IDLE, self._keepalive_tick)
+
+    def connection_lost(self, exc) -> None:  # type: ignore[override]
+        timer, self._keepalive = getattr(self, "_keepalive", None), None
+        if timer is not None:
+            timer.cancel()
+        super().connection_lost(exc)
+
+    def _keepalive_tick(self) -> None:
+        """PING once when idle; reschedule; give up when the peer is gone."""
+        now = self._loop.time()
+        if now - self._last_tx >= self.KEEPALIVE_IDLE:
+            try:
+                self._quic.send_ping(0)
+                self.transmit()
+            except Exception:                 # pragma: no cover - dead conn
+                pass
+        if now - self._last_rx > 3 * self.KEEPALIVE_IDLE:
+            # three keepalive rounds without a single inbound packet: the
+            # path is dead — stop pinging (the engines observe the
+            # termination/idle timeout on their own)
+            self._keepalive = None
+            return
+        self._keepalive = self._loop.call_later(
+            self.KEEPALIVE_IDLE, self._keepalive_tick)
+
     def transmit(self) -> None:  # type: ignore[override]
         self._transmit_task = None
+        self._last_tx = self._loop.time()
         for data, addr in self._quic.datagrams_to_send(now=self._loop.time()):
             self._transport.sendto(self.wrap(data), addr)
         timer_at = self._quic.get_timer()
@@ -137,9 +188,12 @@ class ObfsQuicProtocol(QuicConnectionProtocol):
         self._timer_at = timer_at
 
     def datagram_received(self, data, addr) -> None:  # type: ignore[override]
+        self._last_rx = self._loop.time()
         if not self.pre_unwrapped:
+            # asyncio delivers ``bytes`` — no defensive copy needed; the
+            # identity (no-obfs) case passes the buffer straight through
             try:
-                data = self.unwrap(bytes(data))
+                data = self.unwrap(data)
             except Exception:
                 log.debug("dropping undecipherable datagram (%d bytes)",
                           len(data))
@@ -201,7 +255,7 @@ class _SendToShim:
         self._send = send
 
     def sendto(self, data: bytes, addr=None) -> None:
-        self._send(bytes(data))
+        self._send(data)
 
     def close(self) -> None:  # pragma: no cover - parity with transports
         pass

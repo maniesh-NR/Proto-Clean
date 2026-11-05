@@ -23,12 +23,17 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from typing import Callable, Dict, List, Optional, Tuple
 
 from ...log import get
 
 log = get("protocols")
+
+#: bytes of child-process output kept for error messages (bounded so a
+#: chatty child cannot grow memory without limit)
+_SPAWN_TAIL = 8192
 
 #: Families: "proxy" engines expose a local proxy, "tunnel" engines take
 #: over the device's network. Tunnel engines may only be the FIRST hop of a
@@ -97,6 +102,8 @@ class ProtocolEngine:
         self.upstream_socks: Tuple[str, int] = ("", 0)
         self._proc: Optional[subprocess.Popen] = None
         self._started_at = 0.0
+        self._log_tail: str = ""        # last child output (drained)
+        self._log_lock = threading.Lock()
 
     # -- lifecycle --------------------------------------------------------
     def start(self, profile: ProtocolProfile, timeout: float = 15.0) -> None:
@@ -138,26 +145,74 @@ class ProtocolEngine:
 
     # -- helpers for subclasses -------------------------------------------
     def spawn(self, argv: List[str], cwd: str = "") -> subprocess.Popen:
-        """Start the external process for this engine."""
+        """Start the external process for this engine.
+
+        The child's stdout/stderr is PIPEd and constantly drained by a
+        daemon thread into a bounded tail buffer: without the drain, a
+        child that logs more than the OS pipe buffer (~64 KiB) blocks on
+        write and the "connection" freezes forever — the classic silent
+        deadlock of piped subprocesses.  The tail feeds :meth:`check_process`
+        error messages."""
         kwargs: dict = {}
         if sys.platform.startswith("win"):
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         self._proc = subprocess.Popen(
             argv, cwd=cwd or None, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, **kwargs)
+        self._drain_output(self._proc)
         self._started_at = time.time()
         return self._proc
+
+    def _drain_output(self, proc: subprocess.Popen) -> None:
+        """Keep the child's pipe empty; retain the last few KB for errors."""
+        out = proc.stdout
+        if out is None:
+            return
+        lock = getattr(self, "_log_lock", None)
+
+        def pump() -> None:
+            tail = getattr(self, "_log_tail", "")
+            try:
+                # read1 = at most one raw read: returns whatever arrived,
+                # never blocks for a full buffer or a newline
+                while True:
+                    chunk = out.read1(65536)
+                    if not chunk:
+                        break
+                    tail = (tail + chunk.decode("utf-8", "replace"))[-_SPAWN_TAIL:]
+                    try:
+                        if lock is not None:
+                            with lock:
+                                self._log_tail = tail
+                        else:
+                            self._log_tail = tail
+                    except AttributeError:      # engine overrode __init__
+                        pass
+            except (OSError, ValueError):     # closed / bad fd at shutdown
+                pass
+
+        threading.Thread(target=pump, daemon=True,
+                         name="proto-clean-engine-log").start()
+
+    def output_tail(self, chars: int = 2000) -> str:
+        """The last ``chars`` of drained child output (for error messages)."""
+        tail = getattr(self, "_log_tail", "") or ""
+        return tail.strip()[-chars:]
 
     def check_process(self) -> None:
         """Raise :class:`ProtocolError` if the external process died."""
         proc = self._proc
         if proc is not None and proc.poll() is not None:
-            tail = ""
-            try:
-                if proc.stdout is not None:
-                    tail = (proc.stdout.read() or b"").decode("utf-8", "replace").strip()[-2000:]
-            except Exception:
-                pass
+            tail = self.output_tail()
+            if not tail:
+                try:
+                    if proc.stdout is not None:
+                        # drained pipes EOF early; a leftover slice may
+                        # still sit in the buffer
+                        tail = (proc.stdout.read() or b"").decode(
+                            "utf-8", "replace").strip()[-2000:]
+                except Exception:
+                    pass
             raise ProtocolError(
                 "%s exited with code %s%s" % (self.proxy_kind, proc.returncode,
                                               (":\n" + tail) if tail else ""))
@@ -218,14 +273,26 @@ def _port_free(port: int, host: str = "127.0.0.1") -> bool:
 
 def wait_port(port: int, timeout: float = 10.0, host: str = "127.0.0.1",
               stop: Optional[Callable[[], bool]] = None) -> None:
-    """Block until a TCP port accepts connections."""
+    """Block until a TCP port ACCEPTS connections.
+
+    Probed by connecting: a successful ``connect`` proves the engine has
+    called ``listen()`` — a bind-only check reports "ready" up to the
+    listen backlog and can race, and a bound-but-not-listening socket
+    used to fail the first client connect.  Also returns as soon as the
+    port is up instead of on the next 100 ms poll tick."""
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if not _port_free(port, host):
-            return
+        with socket.socket(family, socket.SOCK_STREAM) as s:
+            s.settimeout(0.25)
+            try:
+                if s.connect_ex((host, port)) == 0:
+                    return
+            except OSError:
+                pass
         if stop is not None and stop():
             raise ProtocolError("engine exited while waiting for port %d" % port)
-        time.sleep(0.1)
+        time.sleep(0.05)
     raise ProtocolError("timeout waiting for local port %d" % port)
 
 

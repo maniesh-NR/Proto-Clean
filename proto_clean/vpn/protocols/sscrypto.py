@@ -34,7 +34,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import struct
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
@@ -106,10 +106,16 @@ def EVP_BytesToKey(password: bytes, key_len: int) -> bytes:
 # AEAD plumbing
 # ---------------------------------------------------------------------------
 def _seal(method: str, key: bytes, nonce: bytes,
-          plaintext: bytes) -> Tuple[bytes, bytes]:
-    """AEAD-encrypt ``plaintext``; returns ``(ciphertext, tag)``."""
+          plaintext: bytes,
+          aead: Optional[ChaCha20Poly1305] = None) -> Tuple[bytes, bytes]:
+    """AEAD-encrypt ``plaintext``; returns ``(ciphertext, tag)``.
+
+    ``aead``: a pre-built ChaCha20Poly1305 for ``key`` — its key schedule
+    is the expensive part, so sessions reuse one object per direction
+    instead of rebuilding it for every chunk."""
     if method == "chacha20-ietf-poly1305":
-        sealed = ChaCha20Poly1305(key).encrypt(nonce, plaintext, None)
+        cipher = aead or ChaCha20Poly1305(key)
+        sealed = cipher.encrypt(nonce, plaintext, None)
         return sealed[:-_TAG_LEN], sealed[-_TAG_LEN:]
     enc = Cipher(algorithms.AES(key), modes.GCM(nonce)).encryptor()
     ct = enc.update(plaintext) + enc.finalize()
@@ -117,12 +123,13 @@ def _seal(method: str, key: bytes, nonce: bytes,
 
 
 def _open(method: str, key: bytes, nonce: bytes,
-          ciphertext: bytes, tag: bytes) -> bytes:
+          ciphertext: bytes, tag: bytes,
+          aead: Optional[ChaCha20Poly1305] = None) -> bytes:
     """AEAD-decrypt; raises :class:`ProtocolError` when the tag fails."""
     try:
         if method == "chacha20-ietf-poly1305":
-            return ChaCha20Poly1305(key).decrypt(
-                nonce, ciphertext + tag, None)
+            cipher = aead or ChaCha20Poly1305(key)
+            return cipher.decrypt(nonce, ciphertext + tag, None)
         dec = Cipher(algorithms.AES(key), modes.GCM(nonce)).decryptor()
         return dec.update(ciphertext) + dec.finalize_with_tag(tag)
     except InvalidTag:
@@ -149,7 +156,13 @@ class SessionCipher:
         self._key = bytes(subkey)
         self._enc_nonce = bytearray(_NONCE_LEN)
         self._dec_nonce = bytearray(_NONCE_LEN)
-        self._dec_buf = b""                     # append-only raw input buffer
+        # append-only raw input buffer (bytearray: ``+=`` on bytes would
+        # copy the whole stream on every feed — O(n²) over a long
+        # transfer; bytearray append is amortised O(1))
+        self._dec_buf = bytearray()
+        # one key schedule per direction for the ChaCha20 AEAD object
+        self._aead = (ChaCha20Poly1305(self._key)
+                      if method == "chacha20-ietf-poly1305" else None)
 
     @property
     def pending(self) -> int:
@@ -168,47 +181,57 @@ class SessionCipher:
             off += len(piece)
             # one nonce per chunk: the length header and the payload share it
             ct, tag = _seal(self._method, self._key, bytes(self._enc_nonce),
-                            struct.pack("!H", len(piece)))
+                            struct.pack("!H", len(piece)), self._aead)
             out += (ct, tag)
             ct, tag = _seal(self._method, self._key, bytes(self._enc_nonce),
-                            piece)
+                            piece, self._aead)
             out += (ct, tag)
             increment_nonce(self._enc_nonce)
         return b"".join(out)
 
     # -- receiving --------------------------------------------------------
     def decrypt(self, data: bytes) -> bytes:
-        self._dec_buf += bytes(data)
+        self._dec_buf += data
+        buf = self._dec_buf
+        n = len(buf)
         out = []
+        pos = 0
         while True:
-            buf = self._dec_buf
-            if len(buf) < 2 + _TAG_LEN:
+            if n - pos < 2 + _TAG_LEN:
                 break
             try:
                 hdr = _open(self._method, self._key, bytes(self._dec_nonce),
-                            buf[:2], buf[2:2 + _TAG_LEN])
+                            bytes(buf[pos:pos + 2]),
+                            bytes(buf[pos + 2:pos + 2 + _TAG_LEN]),
+                            self._aead)
             except ProtocolError:
-                self._dec_buf = b""             # stream is unrecoverable
-                raise
+                del buf[:]
+                raise                    # stream is unrecoverable
             size = struct.unpack("!H", hdr)[0]
             if size > _MAX_PAYLOAD:
-                self._dec_buf = b""
+                del buf[:]
                 raise ProtocolError(
                     "shadowsocks chunk length %d exceeds the 0x3FFF limit"
                     % size)
             total = 2 + _TAG_LEN + size + _TAG_LEN
-            if len(buf) < total:
+            if n - pos < total:
                 break                            # wait for the rest of the chunk
             try:
-                payload = _open(self._method, self._key, bytes(self._dec_nonce),
-                                buf[2 + _TAG_LEN:2 + _TAG_LEN + size],
-                                buf[2 + _TAG_LEN + size:total])
+                payload = _open(self._method, self._key,
+                                bytes(self._dec_nonce),
+                                bytes(buf[pos + 2 + _TAG_LEN:
+                                          pos + 2 + _TAG_LEN + size]),
+                                bytes(buf[pos + 2 + _TAG_LEN + size:
+                                          pos + total]),
+                                self._aead)
             except ProtocolError:
-                self._dec_buf = b""
+                del buf[:]
                 raise
             increment_nonce(self._dec_nonce)
             out.append(payload)
-            self._dec_buf = buf[total:]
+            pos += total
+        if pos:
+            del buf[:pos]                  # consume parsed chunks (O(rest))
         return b"".join(out)
 
 

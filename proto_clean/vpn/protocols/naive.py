@@ -116,7 +116,11 @@ class NaiveEngine(ProtocolEngine):
 
     @staticmethod
     def _proc_tail(proc: Optional[subprocess.Popen], chars: int = 800) -> str:
-        """Last stdout bytes of an EXITED process (for error messages)."""
+        """Last stdout bytes of an EXITED process (for error messages).
+
+        The shared spawn drain keeps only a bounded tail — leftover bytes
+        still sitting in the pipe buffer when the process died are read
+        here directly."""
         if proc is None or proc.poll() is None or proc.stdout is None:
             return ""
         try:
@@ -160,7 +164,7 @@ class NaiveEngine(ProtocolEngine):
                       stop=lambda: not self.running)
             self.check_process()           # died right after opening the port
         except ProtocolError as e:
-            tail = self._proc_tail(self._proc)
+            tail = self.output_tail(800) or self._proc_tail(self._proc)
             self.stop()
             msg = "naive: %s" % e
             if tail:

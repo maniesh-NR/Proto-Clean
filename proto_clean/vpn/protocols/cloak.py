@@ -292,7 +292,9 @@ class CloakEngine(ProtocolEngine):
                 for raw in iter(proc.stdout.readline, b""):
                     text = raw.decode("utf-8", "replace")
                     with self._buf_lock:
-                        self._out_buf += text
+                        # bounded: a verbose openvpn on a long session
+                        # used to grow this buffer without limit
+                        self._out_buf = (self._out_buf + text)[-16384:]
                     log.debug("openvpn: %s", text.rstrip())
             except Exception:              # noqa: BLE001 — best effort
                 pass
@@ -382,7 +384,7 @@ class CloakEngine(ProtocolEngine):
                       stop=lambda: self.ck_proc is None or
                       self.ck_proc.poll() is not None)
         except ProtocolError as e:
-            tail = self._proc_tail(self.ck_proc)
+            tail = self.output_tail(800) or self._proc_tail(self.ck_proc)
             self.stop()
             msg = "ck-client: %s" % e
             if tail:

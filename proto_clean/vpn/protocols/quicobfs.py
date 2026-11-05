@@ -53,7 +53,12 @@ def _keystream(key: str, salt: bytes, n: int) -> bytes:
 
 
 def _xor(data: bytes, ks: bytes) -> bytes:
-    return bytes(a ^ b for a, b in zip(data, ks))
+    """``data ^ ks`` in one C-level big-int operation (both same length)."""
+    n = len(data)
+    if not n:
+        return b""
+    return (int.from_bytes(data, "big")
+            ^ int.from_bytes(ks[:n], "big")).to_bytes(n, "big")
 
 
 def _fake_long_header(payload: bytes) -> bytes:
@@ -103,20 +108,38 @@ class PacketObfuscator:
         self.key = key
         self._salt: bytes = b""
         self._salt_sent = False
+        self._ks = b""            # keystream cache for the current salt
 
     # -- helpers -----------------------------------------------------------
     @property
     def active(self) -> bool:
         return self.mode != "none"
 
+    def _keystream(self, n: int) -> bytes:
+        """First ``n`` keystream bytes for the current salt.
+
+        Blocks are generated once and cached — the stream only grows, so
+        steady-state whitening costs one slice instead of a SHA-256 per
+        32 bytes per packet."""
+        if len(self._ks) < n:
+            kb = (self.key or "").encode("utf-8")
+            out = bytearray(self._ks)
+            counter = len(out) // 32
+            while len(out) < n:
+                out += hashlib.sha256(
+                    kb + self._salt + struct.pack("!I", counter)).digest()
+                counter += 1
+            self._ks = bytes(out)
+        return self._ks[:n]
+
     def _do_wrap(self, data: bytes) -> bytes:
         if self.mode in ("whitening", "http3+whitening"):
             if not self._salt_sent:
                 self._salt_sent = True
                 self._salt = os.urandom(_SALT_LEN)
-                return self._salt + _xor(data, _keystream(
-                    self.key, self._salt, len(data)))
-            return _xor(data, _keystream(self.key, self._salt, len(data)))
+                return self._salt + _xor(
+                    data, self._keystream(len(data)))
+            return _xor(data, self._keystream(len(data)))
         return data
 
     def _do_unwrap(self, data: bytes) -> bytes:
@@ -125,15 +148,15 @@ class PacketObfuscator:
                 if len(data) <= _SALT_LEN:
                     raise ObfuscationError("first datagram lacks the salt")
                 self._salt, data = data[:_SALT_LEN], data[_SALT_LEN:]
-            return _xor(data, _keystream(self.key, self._salt, len(data)))
+            return _xor(data, self._keystream(len(data)))
         return data
 
     # -- public API --------------------------------------------------------
     def wrap(self, data: bytes) -> bytes:
         """Transform one outgoing datagram."""
         if not self.active:
-            return bytes(data)
-        data = self._do_wrap(bytes(data))
+            return data
+        data = self._do_wrap(data)
         if self.mode in ("http3", "http3+whitening"):
             data = _fake_long_header(data)
         return data
@@ -141,7 +164,6 @@ class PacketObfuscator:
     def unwrap(self, data: bytes) -> bytes:
         """Transform one incoming datagram (raises ObfuscationError on
         garbage — callers drop the datagram)."""
-        data = bytes(data)
         if not self.active:
             return data
         if self.mode in ("http3", "http3+whitening"):

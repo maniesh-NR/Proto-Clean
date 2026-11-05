@@ -249,16 +249,20 @@ class TuicProtocol(ObfsQuicProtocol):
         self._assoc_seq = (self._assoc_seq + 1) & 0xFFFF
         assoc_id = self._assoc_seq
         self._udp_sessions[assoc_id] = on_packet
+        # per-association constants: the address bytes are fixed for the
+        # session (the wire format repeats them in every packet)
+        addr_bytes = parse_addr(host, port)
+        assoc_hdr = struct.pack("!BBH", VER, CMD_PACKET, assoc_id)
 
         def send(payload: bytes) -> None:
-            payload = bytes(payload)
             if len(payload) > 0xFFFF:
                 log.debug("dropping oversize TUIC UDP payload (%d bytes)",
                           len(payload))
                 return
             self._pkt_seq = (self._pkt_seq + 1) & 0xFFFF
-            msg = build_packet_frame(assoc_id, self._pkt_seq, host, port,
-                                     payload)
+            msg = (assoc_hdr
+                   + struct.pack("!HBBH", self._pkt_seq, 1, 0, len(payload))
+                   + addr_bytes + payload)
             self._quic.send_datagram_frame(msg)
             self.transmit()
 

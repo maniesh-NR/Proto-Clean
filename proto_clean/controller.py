@@ -129,6 +129,7 @@ class Controller:
         self.guest_session: Optional["GuestSession"] = None
         self.guest_auth: Optional["GuestAuth"] = None
         self._guest_loop: Optional[asyncio.AbstractEventLoop] = None
+        self._guest_thread: Optional[threading.Thread] = None
 
     # ------------------------------------------------------------- plumbing
     def _set_state(self, state: State, detail: str = "") -> None:
@@ -391,11 +392,17 @@ class Controller:
             loop.run_forever()
         t = threading.Thread(target=_runner, daemon=True,
                              name="proto_clean-guest-loop")
+        self._guest_thread = t
         t.start()
 
     def _stop_guest_loop(self) -> None:
-        """Stop the guest event loop and close the httpx client."""
-        loop = self._guest_loop
+        """Stop the guest event loop and close the httpx client.
+
+        Cancels the loop's pending tasks, stops it, joins the thread and
+        closes the loop — a logout used to abandon the loop (and its
+        sockets) to the garbage collector, leaking one loop per login."""
+        loop, self._guest_loop = self._guest_loop, None
+        thread, self._guest_thread = getattr(self, "_guest_thread", None), None
         auth = self.guest_auth
         if loop is not None and auth is not None:
             try:
@@ -403,11 +410,25 @@ class Controller:
                 fut.result(timeout=5)
             except Exception:  # noqa: BLE001
                 pass
+        if loop is not None:
+            def _halt():
+                for task in asyncio.all_tasks(loop):
+                    task.cancel()
+                loop.call_later(0.1, loop.stop)
             try:
-                loop.call_soon_threadsafe(loop.stop)
+                if thread is None or not thread.is_alive():
+                    loop.call_soon_threadsafe(loop.stop)
+                else:
+                    loop.call_soon_threadsafe(_halt)
             except Exception:  # noqa: BLE001
                 pass
-        self._guest_loop = None
+            if thread is not None:
+                thread.join(3)
+                if not thread.is_alive():
+                    try:
+                        loop.close()
+                    except RuntimeError:
+                        pass
 
     def _after_guest_login(self, fresh: bool) -> None:
         """Mirror of ``_after_login`` for guest mode: marks the session

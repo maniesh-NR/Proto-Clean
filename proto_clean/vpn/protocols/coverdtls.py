@@ -62,6 +62,7 @@ import socket
 import struct
 import threading
 import time
+from collections import OrderedDict
 from typing import Callable, Optional, Set, Tuple
 
 from ...log import get
@@ -122,21 +123,34 @@ def whitening_keystream(psk, salt: bytes, n: int) -> bytes:
 
     ``block_i = blake2b(psk || salt || be32(i), key=psk, digest_size=32,
     person=b"pc-dtls")``.  Deterministic per (psk, salt) pair; the salt must
-    be 8 bytes on the wire.
-    """
+    be 8 bytes on the wire.  Generated blocks are cached per (psk, salt)
+    and only extended on demand — one datagram of a flow costs a slice,
+    not 40+ blake2b calls."""
     key = _psk_bytes(psk)
     if n <= 0:
         return b""
-    blocks = []
-    total = 0
-    counter = 0
-    while total < n:
-        blocks.append(hashlib.blake2b(
-            key + bytes(salt) + struct.pack("!I", counter),
-            key=key, digest_size=32, person=b"pc-dtls").digest())
-        total += 32
-        counter += 1
-    return b"".join(blocks)[:n]
+    ck = (key, bytes(salt))
+    ks = _KS_CACHE.get(ck)
+    if ks is None:
+        ks = bytearray()
+        _KS_CACHE[ck] = ks
+        while len(_KS_CACHE) > _KS_CACHE_MAX:      # FIFO eviction
+            _KS_CACHE.pop(next(iter(_KS_CACHE)))
+    if len(ks) < n:
+        counter = len(ks) // 32
+        while len(ks) < n:
+            ks += hashlib.blake2b(
+                key + bytes(salt) + struct.pack("!I", counter),
+                key=key, digest_size=32, person=b"pc-dtls").digest()
+            counter += 1
+    return bytes(ks[:n])
+
+
+#: per-(psk, salt) keystream cache — a flow reuses its salt for every
+#: datagram; a handful of concurrent flows × a few KB each is the whole
+#: footprint, bounded by _KS_CACHE_MAX entries
+_KS_CACHE: "OrderedDict[Tuple[bytes, bytes], bytearray]" = OrderedDict()
+_KS_CACHE_MAX = 16
 
 
 def cover(psk, salt: bytes, data: bytes) -> bytes:
