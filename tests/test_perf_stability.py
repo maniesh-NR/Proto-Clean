@@ -26,13 +26,14 @@ Guards the optimisation pass across all platforms:
 from __future__ import annotations
 
 import asyncio
+import functools
 import os
 import socket
 import subprocess
 import sys
 import threading
 import time
-from typing import List
+from typing import List, Callable
 
 import pytest
 
@@ -48,6 +49,19 @@ from proto_clean.vpn.protocols.socks_server import (PIPE_CHUNK, SocksServer,
                                                     LoopThread,
                                                     build_socks5_address)
 from proto_clean.servers.store import ServerStore
+
+
+def _aitest(fn: Callable) -> Callable:
+    """Run an ``async def`` test with ``asyncio.run``.
+
+    The suite deliberately avoids the pytest-asyncio dependency (CI and
+    the Windows 7 legacy stack install plain pytest), so async tests are
+    wrapped instead of marked.
+    """
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        return asyncio.run(fn(*args, **kwargs))
+    return wrapper
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +195,7 @@ async def _udp_echo_dialer(host, port, on_packet):
     return send, close
 
 
-@pytest.mark.asyncio
+@_aitest
 async def test_socks_tcp_bulk_relay_uses_large_chunks():
     """A 1 MiB bulk transfer through the SOCKS relay (256 KiB reads)."""
     dial = await _echo_dialer_factory()
@@ -208,7 +222,7 @@ async def test_socks_tcp_bulk_relay_uses_large_chunks():
         await dial.echo_server.wait_closed()
 
 
-@pytest.mark.asyncio
+@_aitest
 async def test_socks_half_close_does_not_stall():
     """Upstream finishing first must tear the client leg down promptly
     (the old code waited for the client to close)."""
@@ -291,7 +305,7 @@ async def _assoc_async(port: int):
     return rd, wr, relay
 
 
-@pytest.mark.asyncio
+@_aitest
 async def test_udp_sessions_close_with_control_connection():
     """Dropping the TCP control conn closes the client's UDP sessions."""
     port = free_port(0)
@@ -333,7 +347,7 @@ async def _unused_dialer(host, port):
     raise AssertionError("TCP CONNECT not expected here")
 
 
-@pytest.mark.asyncio
+@_aitest
 async def test_udp_idle_sessions_are_swept():
     port = free_port(0)
     closed: List[int] = []
@@ -369,7 +383,7 @@ async def test_udp_idle_sessions_are_swept():
         await srv.shutdown()
 
 
-@pytest.mark.asyncio
+@_aitest
 async def test_udp_session_cap_enforced():
     port = free_port(0)
     opened: List[tuple] = []
@@ -401,7 +415,7 @@ async def test_udp_session_cap_enforced():
         await srv.shutdown()
 
 
-@pytest.mark.asyncio
+@_aitest
 async def test_udp_open_race_guarded():
     """Two datagrams from a new client during the (slow) open must not
     create two engine sessions — the second is dropped until the session
@@ -603,7 +617,7 @@ def _keepalive_proto(monkeypatch):
     return proto, quic
 
 
-@pytest.mark.asyncio
+@_aitest
 async def test_quic_keepalive_pings_when_idle(monkeypatch):
     proto, quic = _keepalive_proto(monkeypatch)
     try:
@@ -624,7 +638,7 @@ async def test_quic_keepalive_pings_when_idle(monkeypatch):
         proto._loop.close()
 
 
-@pytest.mark.asyncio
+@_aitest
 async def test_quic_keepalive_gives_up_on_dead_path(monkeypatch):
     proto, quic = _keepalive_proto(monkeypatch)
     try:
@@ -638,7 +652,7 @@ async def test_quic_keepalive_gives_up_on_dead_path(monkeypatch):
         proto._loop.close()
 
 
-@pytest.mark.asyncio
+@_aitest
 async def test_quic_keepalive_silent_when_traffic_flows(monkeypatch):
     proto, quic = _keepalive_proto(monkeypatch)
     try:
