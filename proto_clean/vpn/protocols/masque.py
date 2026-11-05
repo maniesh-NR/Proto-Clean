@@ -43,7 +43,7 @@ from ...log import get
 from . import models as M
 from .base import ProtocolEngine, ProtocolError, free_port
 from .quicbase import (ObfsQuicProtocol, QuicEngineBase, build_quic_config,
-                       connect_quic_via_socks)
+                       connect_quic_via_socks, enable_large_datagrams)
 from .socks_server import LoopThread
 
 log = get("protocols.masque")
@@ -315,6 +315,9 @@ class MasqueProtocol(ObfsQuicProtocol):
                        timeout: Optional[float] = None
                        ) -> Tuple[Callable[[bytes], None], Callable[[], None]]:
         """Open a CONNECT-UDP session; returns ``(send, close)``."""
+        # full-size inner packets (chained hops, 1200-byte UDP datagrams)
+        # need a larger 1-RTT packet budget than the default handshake one
+        enable_large_datagrams(self)
         timeout = timeout or self.dial_timeout
         stream_id = self._quic.get_next_available_stream_id()
         # register before awaiting: the 200 and the first capsules may land

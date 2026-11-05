@@ -159,8 +159,15 @@ def _parse_ss(u: _Url) -> M.ShadowsocksProfile:
 
 
 def _parse_ssr(u: _Url) -> M.ShadowsocksrProfile:
-    body = _b64decode(u.userinfo + (u.host and "@" + u.host or ""),
-                      urlsafe=False).decode("utf-8", "replace")
+    # The whole payload after ssr:// is ONE base64 blob. Community clients
+    # use the standard alphabet; our share_url the url-safe one — the
+    # url-safe decoder accepts both ('+' and '/' pass through untouched).
+    # A '/' inside a standard blob was split into host/path by _Url, so
+    # the blob is rebuilt verbatim before decoding.
+    blob = u.userinfo + ("@" + u.host if u.userinfo else u.host or "")
+    if u.path:
+        blob += "/" + u.path
+    body = _b64decode(blob).decode("utf-8", "replace")
     main, _, tail = body.partition("/?")
     parts = main.split(":")
     if len(parts) < 6:
@@ -170,11 +177,21 @@ def _parse_ssr(u: _Url) -> M.ShadowsocksrProfile:
     for part in tail.split("&"):
         k, _, v = part.partition("=")
         q[k] = _up.unquote_plus(v)
+
+    def _ssr_field(text: str) -> str:
+        text = (text or "").strip()
+        if not text:
+            return ""
+        try:
+            return _b64decode(text).decode("utf-8", "replace")
+        except ProtocolError:
+            return ""
+
     return M.ShadowsocksrProfile(
         server=server, port=int(port or 8388), protocol=protocol, method=method,
-        obfs=obfs, password=_b64decode(pass_b64, urlsafe=False).decode("utf-8", "replace"),
-        obfs_param=_b64decode(q.get("obfsparam", ""), urlsafe=False).decode("utf-8", "replace"),
-        protocol_param=_b64decode(q.get("protoparam", ""), urlsafe=False).decode("utf-8", "replace"),
+        obfs=obfs, password=_ssr_field(pass_b64),
+        obfs_param=_ssr_field(q.get("obfsparam", "")),
+        protocol_param=_ssr_field(q.get("protoparam", "")),
         tag=u.fragment)
 
 
@@ -249,10 +266,14 @@ def _parse_cloak(u: _Url) -> M.CloakProfile:
 
 
 _AWG_KEYS = ("jc", "jmin", "jmax", "s1", "s2", "h1", "h2", "h3", "h4")
+#: canonical AmneziaWG spellings for the junk params (the parser accepts
+#: any casing in links, but the profile carries the official names)
+_AWG_CANON = {"jc": "Jc", "jmin": "Jmin", "jmax": "Jmax", "s1": "S1",
+              "s2": "S2", "h1": "H1", "h2": "H2", "h3": "H3", "h4": "H4"}
 
 
 def _parse_awg(u: _Url) -> M.AwgProfile:
-    junk = {k.upper(): int(u.first(k)) for k in _AWG_KEYS if u.first(k)}
+    junk = {_AWG_CANON[k]: int(u.first(k)) for k in _AWG_KEYS if u.first(k)}
     extra = {k[2:]: v for k, v in u.query.items() if k.startswith("x_")}
     addrs = [a for a in u.first("address").split(",") if a]
     dns = [a for a in u.first("dns").split(",") if a]

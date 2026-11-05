@@ -48,7 +48,8 @@ from ...log import get
 from . import models as M
 from .base import ProtocolEngine, ProtocolError, free_port
 from .quicbase import (ObfsQuicProtocol, QuicEngineBase, build_quic_config,
-                       check_pin_sha256, connect_quic_via_socks)
+                       check_pin_sha256, connect_quic_via_socks,
+                       enable_large_datagrams)
 from .socks_server import LoopThread
 
 log = get("protocols.hysteria2")
@@ -248,6 +249,9 @@ class Hysteria2Protocol(ObfsQuicProtocol):
         """Register a UDP session; returns ``(send, close)``."""
         if not self.udp_enabled:
             raise ProtocolError("hysteria2 server has UDP disabled")
+        # full-size inner packets (chained hops, 1200-byte UDP datagrams)
+        # need a larger 1-RTT packet budget than the default handshake one
+        enable_large_datagrams(self)
         self._session_seq += 1
         session_id = self._session_seq & 0xFFFFFFFF
         addr = "%s:%d" % (host, port)
@@ -282,16 +286,6 @@ class Hysteria2Protocol(ObfsQuicProtocol):
                 return
             self.transmit()
             await asyncio.sleep(0.05)
-            print("DBG-HY2-SENT sess=%d pending=%d" % (
-                session_id, len(self._quic._datagrams_pending)), flush=True)
-
-        def close() -> None:
-            self._udp_sessions.pop(session_id, None)
-            self._udp_out.pop(session_id, None)
-
-        print("DBG-OPEN-UDP-REGISTERED sess=%d udp=%s" % (session_id,
-              self.udp_enabled), flush=True)
-        return send, close
 
     def _handle_udp_datagram(self, data: bytes) -> None:
         try:

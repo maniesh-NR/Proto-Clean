@@ -418,6 +418,10 @@ class TuicServerProtocol(ObfsQuicProtocol):
                       and self._auth_buf[18:50] == self._token)
                 self._authed = ok
                 self.stats["auth"] = ok
+                if ok:
+                    # full-size relayed packets (chained hops) need a larger
+                    # 1-RTT packet budget; Initial/Handshake stayed at 1200
+                    self._quic._max_datagram_size = 1350
                 if not ok:
                     self._quic.close(error_code=0x101,
                                      reason_phrase="auth failed")

@@ -290,6 +290,7 @@ class AwgProfile(ProtocolProfile):
     keepalive: int = 25
     junk: Dict[str, int] = field(default_factory=dict)   # Jc Jmin Jmax S1 S2 H1-H4
     extra: Dict[str, str] = field(default_factory=dict)  # AWG 2.0 passthrough
+    tag: str = ""                 # display name (e.g. the imported file name)
 
     def share_url(self) -> str:
         q = _qs({"private_key": self.private_key,

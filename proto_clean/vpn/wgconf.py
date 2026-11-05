@@ -73,7 +73,9 @@ class WgQuickConf:
 
     @property
     def addresses(self) -> List[str]:
-        return [a for line in self.interface.get("Address", []) for a in line.split(",")]
+        return [a.strip() for a in
+                (addr for line in self.interface.get("Address", [])
+                 for addr in line.split(",")) if a.strip()]
 
     @property
     def tunnel_ip(self) -> Optional[str]:
@@ -195,3 +197,50 @@ class WgQuickConf:
         if kept_all:
             self.peer["AllowedIPs"] = [", ".join(kept_all)]
         return self
+
+
+def parse_wg_config(text: str) -> List[Dict[str, str]]:
+    """Split a wg-quick / AmneziaWG config into flat section dicts.
+
+    Returns ``[interface, peer, peer, ...]`` — one ``{key: value}`` dict
+    per section in file order, values comma-joined when a key repeats.
+    The first section must be ``[Interface]``; later ``[Peer]`` sections
+    follow. This is the lenient shape the protocol importers consume
+    (they validate the fields they need themselves); use
+    :meth:`WgQuickConf.parse` for the strict single-tunnel validation.
+
+    Raises :class:`WgConfigError` on text that is not a wg-quick file.
+    """
+    sections: List[Dict[str, str]] = []
+    labels: List[str] = []
+    current: Optional[Dict[str, str]] = None
+    for lineno, raw in enumerate(text.splitlines(), 1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if line in ("[Interface]", "[Peer]"):
+            current = {}
+            sections.append(current)
+            labels.append(line[1:-1])
+            continue
+        if "=" not in line:
+            raise WgConfigError(f"line {lineno}: cannot parse {line!r}")
+        if current is None:
+            raise WgConfigError(
+                f"line {lineno}: key before any [Interface]/[Peer] section")
+        key, value = line.split("=", 1)
+        key, value = key.strip(), value.strip()
+        if not key:
+            raise WgConfigError(f"line {lineno}: empty key")
+        if key in current:
+            current[key] = current[key] + ", " + value
+        else:
+            current[key] = value
+    if not sections:
+        raise WgConfigError("no [Interface] section")
+    if labels[0] != "Interface":
+        raise WgConfigError("the first section must be [Interface]")
+    # keep the documented shape: interface first, then the peers in order
+    interface = sections[0]
+    peers = [s for s, lbl in zip(sections, labels) if lbl == "Peer"]
+    return [interface] + peers

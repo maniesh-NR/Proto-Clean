@@ -47,7 +47,7 @@ from ...log import get
 from . import models as M
 from .base import ProtocolEngine, ProtocolError, free_port
 from .quicbase import (ObfsQuicProtocol, QuicEngineBase, build_quic_config,
-                       connect_quic_via_socks)
+                       connect_quic_via_socks, enable_large_datagrams)
 from .socks_server import LoopThread
 
 log = get("protocols.tuic")
@@ -243,6 +243,9 @@ class TuicProtocol(ObfsQuicProtocol):
                  on_packet: Callable[[bytes], None]
                  ) -> Tuple[Callable[[bytes], None], Callable[[], None]]:
         """Register a UDP association; returns ``(send, close)``."""
+        # full-size inner packets (chained hops, 1200-byte UDP datagrams)
+        # need a larger 1-RTT packet budget than the default handshake one
+        enable_large_datagrams(self)
         self._assoc_seq = (self._assoc_seq + 1) & 0xFFFF
         assoc_id = self._assoc_seq
         self._udp_sessions[assoc_id] = on_packet

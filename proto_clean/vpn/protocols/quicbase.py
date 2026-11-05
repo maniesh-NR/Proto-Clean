@@ -71,6 +71,43 @@ def check_pin_sha256(peer_cert_der: bytes, pin: str) -> bool:
     return len(want) == 32 and hashlib.sha256(peer_cert_der).digest() == want
 
 
+#: 1-RTT packet budget once UDP relay is active. A full-size inner QUIC
+#: packet (1200 B, spec-padded Initial) plus the tunnel framing does not
+#: fit aioquic's default 1200-byte budget — and RFC 9221 forbids
+#: fragmenting DATAGRAM frames, so an oversized one strands in the send
+#: queue forever. 1350 stays under the common 1500-byte IPv4 MTU while
+#: leaving headroom for the framing of every engine in this package.
+LARGE_DATAGRAM_PACKET_SIZE = 1350
+
+
+def enable_large_datagrams(proto, size: int = LARGE_DATAGRAM_PACKET_SIZE) -> None:
+    """Grow the connection's 1-RTT packet budget (after the handshake).
+
+    Called when a UDP relay session opens: from then on the connection may
+    carry full-size inner packets (a chained hop's QUIC Initial, an
+    application's 1200-byte UDP datagram). Initial/Handshake packets were
+    already sent at the spec-safe 1200 bytes; only post-handshake 1-RTT
+    packets grow, so the anti-amplification and MTU rules for the
+    handshake are untouched. Defensive by design: if the private layout
+    of aioquic changes, this becomes a no-op instead of breaking.
+    """
+    quic = getattr(proto, "_quic", None)
+    if quic is None:
+        return
+    try:
+        if size > getattr(quic, "_max_datagram_size", 0):
+            quic._max_datagram_size = size
+    except Exception:                                 # pragma: no cover
+        pass
+    # keep the pacer's rate math in sync with the new packet size
+    pacer = getattr(getattr(quic, "_loss", None), "_pacer", None)
+    if pacer is not None:
+        try:
+            pacer._max_datagram_size = size
+        except Exception:                             # pragma: no cover
+            pass
+
+
 class ObfsQuicProtocol(QuicConnectionProtocol):
     """QuicConnectionProtocol with packet-level obfuscation hooks.
 
@@ -154,14 +191,6 @@ class QuicEngineBase:
             thread.stop()
 
     # -- upstream SOCKS5 ----------------------------------------------------
-    async def _upstream_endpoint(self):
-        """Datagram endpoint factory that tunnels UDP through the upstream
-        SOCKS5 (UDP ASSOCIATE), for QUIC engines sitting behind another
-        engine in a chain. Raises ProtocolError when no upstream is set."""
-        up_host, up_port = self.upstream_socks
-        if not up_port:
-            raise ProtocolError("engine has no upstream SOCKS5 configured")
-        return await udp_associate(up_host, up_port)
 
 
 class _SendToShim:
@@ -204,6 +233,7 @@ async def connect_quic_via_socks(config: QuicConfiguration, protocol_factory,
 
     send, close_relay = await udp_associate(
         upstream[0], upstream[1],
+        target=server_addr,
         on_packet=lambda d: (proto.datagram_received(d, server_addr)
                              if not state["closed"] else None))
     proto._transport = _SendToShim(send)       # type: ignore[assignment]
@@ -230,8 +260,10 @@ async def connect_quic_via_socks(config: QuicConfiguration, protocol_factory,
 class _SocksUdpProtocol(asyncio.DatagramProtocol):
     """SOCKS5-UDP wrapped datagram endpoint (RFC 1928 UDP ASSOCIATE)."""
 
-    def __init__(self, on_packet: Callable[[bytes], None]):
+    def __init__(self, on_packet: Callable[[bytes], None],
+                 target: Tuple[str, int] = ("", 0)):
         self.on_packet = on_packet
+        self.target = target
         self.transport: Optional[asyncio.DatagramTransport] = None
         self.relay_addr: Tuple[str, int] = ("", 0)
 
@@ -259,10 +291,13 @@ class _SocksUdpProtocol(asyncio.DatagramProtocol):
 
     def send_quic(self, data: bytes) -> None:
         if self.transport is not None:
-            # each datagram carries its own SOCKS5 target header; the
-            # associate was made for 0.0.0.0:0 so servers accept any target
+            # each datagram carries its own SOCKS5 target header naming
+            # the QUIC server (the associate was made for 0.0.0.0:0 so
+            # servers accept any target per datagram)
+            host, port = self.target if self.target[1] else \
+                (self.relay_addr[0], 0)
             self.transport.sendto(
-                b"\x00\x00\x00" + _udp_header(self.relay_addr[0], 0) + data)
+                b"\x00\x00\x00" + _udp_header(host, port) + data)
 
 
 def _udp_header(host: str, port: int) -> bytes:
@@ -271,15 +306,17 @@ def _udp_header(host: str, port: int) -> bytes:
 
 
 async def udp_associate(host: str, port: int,
-                        on_packet: Callable[[bytes], None]):
+                        on_packet: Callable[[bytes], None],
+                        target: Tuple[str, int] = ("", 0)):
     """SOCKS5 UDP ASSOCIATE (RFC 1928 §7). Returns ``(send, close)``.
 
-    ``send`` wraps each datagram in the SOCKS5 UDP header; incoming
-    datagrams are delivered unwrapped to ``on_packet``.
+    ``send`` wraps each datagram in a SOCKS5 UDP header addressed to
+    ``target`` (the QUIC server this association tunnels towards);
+    incoming datagrams are delivered unwrapped to ``on_packet``.
     """
     rd, wr = await _raw_associate(host, port)
     relay_host, relay_port = rd.bnd_addr  # type: ignore[attr-defined]
-    proto = _SocksUdpProtocol(on_packet)
+    proto = _SocksUdpProtocol(on_packet, target)
     loop = asyncio.get_event_loop()
     transport, _ = await loop.create_datagram_endpoint(
         lambda: proto, remote_addr=(relay_host, relay_port))

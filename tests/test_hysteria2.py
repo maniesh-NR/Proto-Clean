@@ -205,6 +205,9 @@ class Hy2ServerProtocol(ObfsQuicProtocol):
         if ok:
             self._authed = True
             self._pending.pop(sid, None)
+            # full-size relayed packets (chained hops) need a larger 1-RTT
+            # packet budget; Initial/Handshake stayed at the spec minimum
+            self._quic._max_datagram_size = 1350
         self.transmit()
 
     def _parse_tcp_request(self, buf: bytes):
@@ -271,7 +274,6 @@ class Hy2ServerProtocol(ObfsQuicProtocol):
         asyncio.ensure_future(dial())
 
     def _on_datagram(self, data: bytes) -> None:
-        print("DBG-SRV-DG", flush=True)
         try:
             session_id, pkt_id, frag_id, frag_count = struct.unpack_from(
                 "!IHBB", data, 0)
@@ -311,7 +313,6 @@ class Hy2ServerProtocol(ObfsQuicProtocol):
 
     def _send_udp(self, data: bytes) -> None:
         """Server -> client UDP datagram (QUIC DATAGRAM frame)."""
-        print("DBG-SRV-SEND-UDP sess-data=%d" % len(data), flush=True)
         self._quic.send_datagram_frame(data)
         self.transmit()
 
