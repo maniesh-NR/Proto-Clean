@@ -813,7 +813,8 @@ class TestGuestWgInterop:
                             "-----END CERTIFICATE-----\n",
             server_status={}, refresh_time=int(time.time()) + 86400,
             ipv4="10.2.0.5", ipv6="2001:db8::5",
-            dns_ips=["10.140.0.1"], client_public_key_b64="cHVi==")
+            dns_ips=["10.140.0.1"],
+            client_public_key_pem="-----BEGIN PUBLIC KEY-----\nY2hViQ==\n-----END PUBLIC KEY-----\n")
 
     def _logical(self):
         from proto_clean.proton.guest import GuestLogicalServer

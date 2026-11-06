@@ -33,10 +33,11 @@ import java.util.UUID
  *  3. [genX25519KeypairProducesValid32ByteKeys]
  *  4. [loginCallsBothEndpointsInOrder]
  *  5. [fetchLogicalsParsesServersAndFiltersPaid]
- *  6. [fetchCertificateParsesResponse]
- *  7. [apiErrorCodeRaisesGuestAuthError]
- *  8. [guestSessionStorageRoundTrips]
- *  9. [buildWgQuickConfigProducesExpectedText]
+ *  6. [fetchLogicalsFallsBackToV2AndMergesLoads]
+ *  7. [fetchCertificateSendsPkixPemAndDerivesWgKey]
+ *  8. [apiErrorCodeRaisesGuestAuthError]
+ *  9. [guestSessionStorageRoundTrips]
+ * 10. [buildWgQuickConfigProducesExpectedText]
  */
 class GuestApiTest {
 
@@ -173,13 +174,13 @@ class GuestApiTest {
     }
 
     // ------------------------------------------------------------------
-    // 5. fetchLogicals filters paid servers
+    // 5. fetchLogicals (v1 primary) filters paid servers, keeps loads
     // ------------------------------------------------------------------
 
     @Test fun fetchLogicalsParsesServersAndFiltersPaid() = runBlocking {
         val api = StubApi()
         val logicals = JSONArray()
-        logicals.put(serverJson("s-free-1", "US-FREE#1", "US", 0))
+        logicals.put(serverJson("s-free-1", "US-FREE#1", "US", 0, load = 33.0))
         // Tier 2 (Plus) — must be filtered out.
         logicals.put(serverJson("s-plus-1", "US-PLUS#1", "US", 2, physical = JSONObject().apply {
             put("Domain", "us-plus-01.protonvpn.com")
@@ -202,7 +203,9 @@ class GuestApiTest {
                 },
             ),
         )
-        api.setEnvelope("GET", "/vpn/v2/logicals", JSONObject().apply {
+        // v1 endpoint (primary) — the official Linux client's URL,
+        // carrying real per-logical loads inline.
+        api.setEnvelope("GET", "/vpn/v1/logicals", JSONObject().apply {
             put("LogicalServers", logicals)
         })
 
@@ -224,6 +227,8 @@ class GuestApiTest {
         assertNull(free1.city)
         assertEquals(0, free1.tier)
         assertEquals(1, free1.status)
+        // Live loads from the v1 payload (not zeros).
+        assertEquals(33.0f, free1.load)
 
         val free2 = servers.first { it.serverId == "s-free-2" }
         assertEquals("Tokyo", free2.city)
@@ -232,17 +237,59 @@ class GuestApiTest {
         assertEquals(42.0f, free2.load)
         assertEquals(2.0f, free2.score)
 
-        // Auth headers used.
-        val headers = api.find("GET", "/vpn/v2/logicals").headers
+        // Auth headers used on the v1 call.
+        val headers = api.find("GET", "/vpn/v1/logicals").headers
         assertEquals("Bearer guest-tok", headers["authorization"])
         assertEquals("guest-uid", headers["x-pm-uid"])
     }
 
     // ------------------------------------------------------------------
-    // 6. fetchCertificate parses response
+    // 6. v1 unavailable -> v2 fallback + /vpn/v1/loads merge
     // ------------------------------------------------------------------
 
-    @Test fun fetchCertificateParsesResponse() = runBlocking {
+    @Test fun fetchLogicalsFallsBackToV2AndMergesLoads() = runBlocking {
+        val api = StubApi()
+        // v1 is gone (unknown route -> Code 4040 -> GuestAuthError).
+        // v2 responds but — as the real endpoint does — reports loads
+        // as ZERO (official clients compute them from the binary status).
+        val logicals = JSONArray()
+        logicals.put(serverJson("s-free-1", "US-FREE#1", "US", 0, load = 0.0))
+        logicals.put(serverJson("s-free-2", "NL-FREE#1", "NL", 0, load = 0.0))
+        api.setEnvelope("GET", "/vpn/v2/logicals", JSONObject().apply {
+            put("LogicalServers", logicals)
+        })
+        // The loads endpoint carries the live values.
+        api.setEnvelope("GET", "/vpn/v1/loads", JSONObject().apply {
+            put("LogicalServers", JSONArray()
+                .put(JSONObject().put("ID", "s-free-1").put("Load", 71.5))
+                .put(JSONObject().put("ID", "s-free-2").put("Load", 12.0)))
+        })
+
+        val auth = GuestAuth(api.client())
+        val servers = auth.fetchLogicals(testSession())
+
+        assertEquals(2, servers.size)
+        val us = servers.first { it.serverId == "s-free-1" }
+        val nl = servers.first { it.serverId == "s-free-2" }
+        // Loads merged from /vpn/v1/loads — NOT the v2 zeros.
+        assertEquals(71.5f, us.load)
+        assertEquals(12.0f, nl.load)
+        // Both endpoints were hit with bearer auth.
+        assertEquals(
+            "Bearer guest-tok",
+            api.find("GET", "/vpn/v2/logicals").headers["authorization"],
+        )
+        assertEquals(
+            "Bearer guest-tok",
+            api.find("GET", "/vpn/v1/loads").headers["authorization"],
+        )
+    }
+
+    // ------------------------------------------------------------------
+    // 7. fetchCertificate: official key flow
+    // ------------------------------------------------------------------
+
+    @Test fun fetchCertificateSendsPkixPemAndDerivesWgKey() = runBlocking {
         val api = StubApi()
         val certPem = "-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----\n"
         // Official CertificateResponse: only the PEM + timestamps (the
@@ -254,7 +301,7 @@ class GuestApiTest {
         })
         val auth = GuestAuth(api.client())
         val sess = testSession()
-        val cert = auth.fetchCertificate(sess, "wgpub==")
+        val cert = auth.fetchCertificate(sess)
         assertEquals(certPem, cert.certificatePem)
         // Fixed tunnel constants from Constants.kt.
         assertEquals("10.2.0.2", cert.ipv4)
@@ -262,21 +309,36 @@ class GuestApiTest {
         assertEquals(listOf("10.2.0.1", "2a07:b944::2:1"), cert.dnsIps)
         assertEquals(1735689600L, cert.refreshTime)
         assertEquals(1735786000L, cert.expirationTime)
-        assertEquals("wgpub==", cert.clientPublicKeyB64)
-        // Body matches CertificateRequestBody from the official app.
+        // Body matches CertificateRequestBody from the official app —
+        // with ClientPublicKey as the Ed25519 device key in PKIX PEM
+        // form (NOT a raw X25519 base64 key).
         val body = api.find("POST", "/vpn/v1/certificate").bodyJson!!
-        assertEquals("wgpub==", body.getString("ClientPublicKey"))
+        val sentPem = body.getString("ClientPublicKey")
+        assertTrue(
+            "ClientPublicKey must be a PKIX PEM: $sentPem",
+            sentPem.startsWith("-----BEGIN PUBLIC KEY-----") &&
+                sentPem.trimEnd().endsWith("-----END PUBLIC KEY-----"),
+        )
+        val expectedPem = GuestApi.ed25519PubPem(
+            GuestApi.decodeB64(sess.deviceEd25519PrivB64))
+        assertEquals(expectedPem, sentPem)
         assertEquals("EC", body.getString("ClientPublicKeyMode"))
         assertTrue(body.getString("DeviceName").isNotEmpty())
         assertEquals("session", body.getString("Mode"))
         assertEquals(0, body.getJSONArray("Features").length())
+        // The WG private key is derived from the same session keypair.
+        assertEquals(
+            GuestApi.ed25519ToX25519PrivB64(
+                GuestApi.decodeB64(sess.deviceEd25519PrivB64)),
+            cert.wgPrivateKeyB64,
+        )
         // Bearer auth used.
         val headers = api.find("POST", "/vpn/v1/certificate").headers
         assertEquals("Bearer guest-tok", headers["authorization"])
     }
 
     // ------------------------------------------------------------------
-    // 7. API error code raises GuestAuthError
+    // 8. API error code raises GuestAuthError
     // ------------------------------------------------------------------
 
     @Test fun apiErrorCodeRaisesGuestAuthError() {
@@ -303,7 +365,7 @@ class GuestApiTest {
     }
 
     // ------------------------------------------------------------------
-    // 8. GuestSession storage round-trip
+    // 9. GuestSession storage round-trip
     // ------------------------------------------------------------------
 
     @Test fun guestSessionStorageRoundTrips() {
@@ -345,7 +407,7 @@ class GuestApiTest {
     }
 
     // ------------------------------------------------------------------
-    // 9. buildWgQuickConfig
+    // 10. buildWgQuickConfig
     // ------------------------------------------------------------------
 
     @Test fun buildWgQuickConfigProducesExpectedText() {
@@ -370,7 +432,7 @@ class GuestApiTest {
             ipv4 = "10.2.0.5",
             ipv6 = null,
             dnsIps = listOf("10.64.0.1"),
-            clientPublicKeyB64 = "wgpub==",
+            clientPublicKeyPem = "-----BEGIN PUBLIC KEY-----\nX\n-----END PUBLIC KEY-----\n",
         )
         val config = buildWgQuickConfig(server, cert, "privB64", dnsServer = "127.0.0.1")
         assertTrue("missing [Interface] section: $config", config.contains("[Interface]"))

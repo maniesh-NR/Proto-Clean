@@ -8,5 +8,5 @@ alternative), split tunneling, a kill switch, NAT-PMP port forwarding
 and VPN Accelerator support.
 """
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 APP_NAME = "ProtoClean"

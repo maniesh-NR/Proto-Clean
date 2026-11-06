@@ -590,7 +590,7 @@ Ready-made installers are on the
 | LMDE 6 / Debian 12 | `proto-clean_…-debian12_amd64.deb` | same |
 | Linux (portable) | `Proto-Clean-…-linux-x86_64-portable.tar.gz` | untar, run `proto-clean/proto-clean` |
 | Linux (Flatpak) | `Proto-Clean-…-x86_64.flatpak` | `flatpak install --user Proto-Clean-….flatpak` |
-| Android 8.0+ (armv7) | `Proto-Clean-…-android-armeabi-v7a.apk` | debug-signed APK; allow "install unknown apps" |
+| Android 8.0+ (armv7) | `Proto-Clean-…-android-armeabi-v7a.apk` | release-signed APK; allow "install unknown apps" |
 | Android 8.0+ (arm64) | `Proto-Clean-…-android-arm64-v8a.apk` | same |
 
 The Linux portable/deb binaries are built on Ubuntu 22.04 so they run

@@ -1,7 +1,12 @@
 import pytest
 
 from proto_clean.servers.models import LogicalServer, parse_logical_servers
-from proto_clean.servers.selection import fastest_server, rank_servers, score_of
+from proto_clean.servers.selection import (
+    fastest_server,
+    rank_servers,
+    region_of,
+    score_of,
+)
 
 SAMPLE = {
     "ID": "abc-1",
@@ -22,9 +27,11 @@ SAMPLE = {
 }
 
 
-def _mk(name, tier=0, load=10.0, score=1.0, status=1, features=0):
+def _mk(name, tier=0, load=10.0, score=1.0, status=1, features=0,
+        exit_country="US"):
     return LogicalServer(
-        id=name, name=name, entry_country="US", exit_country="US",
+        id=name, name=name, entry_country=exit_country,
+        exit_country=exit_country,
         domain=f"{name}.protonvpn.net", tier=tier, features=features,
         load=load, score=score, status=status, physical=[])
 
@@ -109,3 +116,41 @@ def test_store_free_servers_filters_paid(tmp_path, monkeypatch):
     # and it survives a reload from disk
     st2 = store_mod.ServerStore()
     assert {s.name for s in st2.free_servers()} == {"US-FREE#1", "JP-FREE#2"}
+
+
+# ---------------------------------------------------------------------------
+# region_of — the collapsible server-list grouping key
+# ---------------------------------------------------------------------------
+
+def test_region_of_free_servers_group_under_country():
+    # Free-tier names ("US-FREE#1..N") fold under the country itself.
+    assert region_of(_mk("US-FREE#1", exit_country="US")) == "US"
+    assert region_of(_mk("US-FREE#12", exit_country="US")) == "US"
+    assert region_of(_mk("JP-FREE#3", exit_country="JP")) == "JP"
+
+
+def test_region_of_city_servers_keep_city_region():
+    # Non-free city servers keep their country-city region code.
+    assert region_of(_mk("US-NY#1", exit_country="US")) == "US-NY"
+    assert region_of(_mk("SE-STA#4", exit_country="SE")) == "SE-STA"
+
+
+def test_region_of_plain_country_names_and_fallbacks():
+    assert region_of(_mk("SE#2", exit_country="SE")) == "SE"
+    # No "#" in the name -> whole name is the region.
+    assert region_of(_mk("NL", exit_country="NL")) == "NL"
+    # Empty name -> fall back to the exit country.
+    assert region_of(_mk("", exit_country="DE")) == "DE"
+
+
+def test_region_of_matches_the_android_implementation():
+    """The Kotlin `LogicalServer.regionOf` mirrors this logic — keep the
+    two in sync (same seeds in /android .../Models.kt)."""
+    for name, country, expected in (
+        ("US-FREE#1", "US", "US"),
+        ("US-NY#1", "US", "US-NY"),
+        ("SE#2", "SE", "SE"),
+        ("jp-free#7", "JP", "jp"),
+        ("", "DE", "DE"),
+    ):
+        assert region_of(_mk(name, exit_country=country)) == expected, name

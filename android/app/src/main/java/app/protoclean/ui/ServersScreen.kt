@@ -117,7 +117,7 @@ fun ServersScreen(vm: AppViewModel, onNeedLogin: () -> Unit) {
             OutlinedButton(onClick = { vm.refreshServers() }) { Text("Refresh") }
         }
 
-        // ---- free server list ------------------------------------------
+        // ---- free server list: regions as collapsible headers ----------
         if (servers.isEmpty()) {
             Column(
                 Modifier.fillMaxSize().padding(24.dp),
@@ -131,20 +131,52 @@ fun ServersScreen(vm: AppViewModel, onNeedLogin: () -> Unit) {
                 )
             }
         } else {
+            // Group by region (US-FREE#1..N -> "US", US-NY#1 -> "US-NY"),
+            // regions sorted by country then region code, servers inside
+            // a region keeping the fastest-first ranking order.
+            val groups = remember(servers) {
+                servers.groupBy { it.regionOf }
+                    .toList()
+                    .sortedWith(
+                        compareBy(
+                            { (_, list) -> list.firstOrNull()?.exitCountry ?: "" },
+                            { (region, _) -> region },
+                        )
+                    )
+            }
+            var expanded by remember { mutableStateOf(setOf<String>()) }
+
             LazyColumn(
                 contentPadding = PaddingValues(vertical = 8.dp),
                 modifier = Modifier.weight(1f),
             ) {
-                items(servers, key = { it.id }) { server ->
-                    ServerRow(
-                        server = server,
-                        selected = ui.currentServer?.id == server.id,
-                        onClick = {
-                            vm.updateSettings { it.copy(autoconnectFastest = false) }
-                            vm.connect(server.id)
-                        },
-                    )
-                    HorizontalDivider()
+                groups.forEach { (region, list) ->
+                    item(key = "hdr-$region") {
+                        RegionHeader(
+                            region = region,
+                            servers = list,
+                            expanded = region in expanded,
+                            onClick = {
+                                expanded = if (region in expanded)
+                                    expanded - region else expanded + region
+                            },
+                        )
+                    }
+                    if (region in expanded) {
+                        items(list, key = { it.id }) { server ->
+                            ServerRow(
+                                server = server,
+                                selected = ui.currentServer?.id == server.id,
+                                onClick = {
+                                    vm.updateSettings {
+                                        it.copy(autoconnectFastest = false)
+                                    }
+                                    vm.connect(server.id)
+                                },
+                            )
+                            HorizontalDivider()
+                        }
+                    }
                 }
             }
         }
@@ -152,6 +184,53 @@ fun ServersScreen(vm: AppViewModel, onNeedLogin: () -> Unit) {
             "Free (tier-0) servers only — paid servers are excluded.",
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(8.dp).align(Alignment.CenterHorizontally),
+        )
+    }
+}
+
+@Composable
+private fun RegionHeader(
+    region: String,
+    servers: List<LogicalServer>,
+    expanded: Boolean,
+    onClick: () -> Unit,
+) {
+    val avgLoad = servers.map { it.load }.average().toFloat()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Text(
+            region,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            "${servers.size} server${if (servers.size != 1) "s" else ""}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            modifier = Modifier.padding(end = 12.dp),
+        )
+        Surface(
+            color = loadColor(avgLoad).copy(alpha = 0.18f),
+            shape = MaterialTheme.shapes.small,
+        ) {
+            Text(
+                "${avgLoad.toInt()}%",
+                color = loadColor(avgLoad),
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        }
+        Text(
+            if (expanded) " ▾" else " ▸",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            modifier = Modifier.padding(start = 8.dp),
         )
     }
 }

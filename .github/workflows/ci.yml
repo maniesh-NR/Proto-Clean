@@ -132,10 +132,13 @@ jobs:
       - name: Compile, assemble + unit tests
         working-directory: android
         # testDebugUnitTest runs the JVM test sources (GuestApiTest,
-        # X25519Test with RFC 7748 vectors, ImportParserTest) - this
-        # would have caught the broken X25519 port that slipped through
-        # a compile-only check.
-        run: gradle assembleDebug testDebugUnitTest --no-daemon --stacktrace
+        # X25519Test with RFC 7748 vectors, Ed25519Test with
+        # Python-cryptography vectors, ImportParserTest) - this would
+        # have caught the broken X25519 port that slipped through a
+        # compile-only check. compileReleaseSources also exercises the
+        # release build type (signing config resolution) without
+        # needing the release keystore.
+        run: gradle assembleDebug compileReleaseSources testDebugUnitTest --no-daemon --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:

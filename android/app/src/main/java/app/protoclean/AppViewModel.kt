@@ -14,7 +14,6 @@ import app.protoclean.bond.BondVpnService
 import app.protoclean.bond.SamizdatManager
 import app.protoclean.dns.DnsFilterVpnService
 import app.protoclean.proton.ConfigOptions
-import app.protoclean.proton.GuestApi
 import app.protoclean.proton.GuestAuth
 import app.protoclean.proton.GuestLogicalServer
 import app.protoclean.proton.GuestSession
@@ -456,11 +455,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _ui.value = _ui.value.copy(currentServer = ls)
             val cfg = s()
 
-            // 2. generate a fresh X25519 keypair (the WireGuard tunnel key)
+            // 2. fetch the WireGuard certificate — the official key flow:
+            //    the request carries the session's Ed25519 device public
+            //    key (PKIX PEM) and the WG private key is derived from the
+            //    same keypair (returned as cert.wgPrivateKeyB64); a raw
+            //    X25519 key is rejected with Code 2001.
             setVpnState(VpnState.CONNECTING, "fetching certificate for ${ls.name}…")
-            val (pubB64, privB64) = GuestApi.genX25519Keypair()
 
-            // 3. fetch the WireGuard certificate (tunnel IP + DNS + PEM)
             val sess = guestSession ?: run {
                 setVpnState(VpnState.ERROR, "no guest session")
                 return@launch say("guest session lost", "error")
@@ -470,14 +471,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 return@launch say("guest auth lost", "error")
             }
             val cert = try {
-                auth.fetchCertificate(sess, pubB64)
+                auth.fetchCertificate(sess)
             } catch (e: Exception) {
                 setVpnState(VpnState.ERROR, "cert fetch failed")
                 return@launch say("Guest cert fetch failed: ${e.message}", "error")
             }
+            val privB64 = cert.wgPrivateKeyB64
 
             // 4. build the wg-quick config text (no PEM — Proton's
-            //    server-side validator sees the X25519 pubkey we sent)
+            //    server-side validator sees the derived X25519 pubkey)
             val text = buildWgQuickConfig(gs, cert, privB64)
 
             // 5. bring up the tunnel — same path as the WebView connect()

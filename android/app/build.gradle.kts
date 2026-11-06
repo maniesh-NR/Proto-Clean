@@ -11,8 +11,8 @@ android {
         applicationId = "app.protoclean"
         minSdk = 26            // Android 8.0 Oreo
         targetSdk = 34
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = 7
+        versionName = "0.6.1"
     }
 
     // Per-ABI APKs (armv7 + arm64) as requested for the release matrix.
@@ -25,6 +25,35 @@ android {
         }
     }
 
+    // Release signing: CI decodes the release keystore (GitHub Actions
+    // secrets PROTO_ANDROID_KEYSTORE_*) and points PC_KEYSTORE_FILE at
+    // it. A release-signed, non-debuggable APK is what Google Play
+    // Protect expects from a sideloaded app — debug-signed APKs get the
+    // scary "unsafe app" biometric confirmation. When the keystore is
+    // absent (local builds, forks without the secrets) we fall back to
+    // the debug key so assembleRelease still produces installable APKs.
+    val keystoreFile = providers.environmentVariable("PC_KEYSTORE_FILE").orNull
+    val keystorePassword = providers.environmentVariable("PC_KEYSTORE_PASSWORD").orNull
+    val keyAlias = providers.environmentVariable("PC_KEY_ALIAS").orNull
+    val keyPassword = providers.environmentVariable("PC_KEY_PASSWORD").orNull
+    val releaseKeystore = keystoreFile?.let { file(it) }?.takeIf { it.exists() }
+
+    signingConfigs {
+        if (releaseKeystore != null && keystorePassword != null && keyAlias != null &&
+            keyPassword != null
+        ) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -32,6 +61,19 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            val releaseSigning = signingConfigs.findByName("release")
+            if (releaseSigning != null) {
+                signingConfig = releaseSigning
+            } else {
+                // No release keystore available — sign with the debug key
+                // so the artifact is at least installable (CI logs make
+                // this visible).
+                logger.warn(
+                    "PC_KEYSTORE_FILE not set or missing: release APK " +
+                        "will be DEBUG-signed (fine for local builds, " +
+                        "not for distribution)")
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
     }
 

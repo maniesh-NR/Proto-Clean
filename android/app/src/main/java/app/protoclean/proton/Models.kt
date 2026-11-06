@@ -53,6 +53,19 @@ data class LogicalServer(
     val isTor: Boolean get() = features and 2 != 0
     val isSecureCore: Boolean get() = features and 1 != 0
 
+    /** Region grouping key for the collapsible server list — the
+     *  server-name prefix before `#` with the free-tier `-FREE` marker
+     *  stripped (`US-FREE#3` -> "US", `US-NY#1` -> "US-NY", `SE#2` ->
+     *  "SE"); falls back to the exit country. Mirrors the desktop
+     *  `proto_clean.servers.selection.region_of`. */
+    val regionOf: String
+        get() {
+            val base = name.substringBefore("#").trim()
+            val stripped = if (base.uppercase().endsWith("-FREE"))
+                base.dropLast("-FREE".length).trim() else base
+            return stripped.ifBlank { exitCountry }
+        }
+
     companion object {
         fun fromJson(o: JSONObject): LogicalServer? = runCatching {
             val loc = o.optJSONObject("Location")
