@@ -160,6 +160,15 @@ redirect off → kill switch off → IPv6 leak protection off.
 
 - Sources live in `settings.json` as `netshield.blocklists:
   [{name, url, enabled}]`; legacy plain-URL `sources` migrate on load.
+- The default set is exactly uBlock Origin's out-of-the-box filter lists
+  (5 built-in uBlock filters, EasyList, EasyPrivacy, Online Malicious URL
+  Blocklist, Peter Lowe's); settings still holding the old single-list
+  StevenBlack default are migrated to it on load. Lists come in hosts,
+  domain-per-line or Adblock/uBlock syntax — `parse_filters` extracts
+  `||domain^` network rules (blocked) and `@@||domain^` exceptions
+  (allowed); browser-context rules ($options, cosmetic, scriptlets) are
+  skipped. Exceptions win over blocks when they match the more specific
+  (longer) name.
 - Each list downloads to `~/.cache/proto-clean/blocklists/<sha1(url)[:16]>.txt`
   with a `.json` metadata sidecar (domain count, timestamp, last error).
 - Enabled lists are merged (set union) into `merged.json` → `DomainFilter`.

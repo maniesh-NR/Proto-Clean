@@ -33,7 +33,8 @@ fun BlocklistsScreen(vm: AppViewModel) {
         Text("Blocklists", style = MaterialTheme.typography.headlineSmall,
              fontWeight = FontWeight.Bold)
         Text(
-            "Ad & malware domains (StevenBlack, HaGeZi, …). Filter matches any " +
+            "Ad & malware domains (EasyList, EasyPrivacy, uBlock filters, … — " +
+            "the same lists uBlock Origin enables by default). Filter matches any " +
             "subdomain of a listed name.",
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(vertical = 8.dp))

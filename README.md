@@ -99,8 +99,11 @@ Android** — built around your own Proton account:
 - **Local NetShield (ad/malware blocking)** — an in-process DNS server
   filters every DNS query against locally-maintained blocklists. The
   **Blocklists ▾ menu** (and the full manager dialog) lets you add, remove,
-  enable/disable and update lists — StevenBlack by default, with HaGeZi,
-  OISD, 1Hosts and Peter Lowe as one-click presets. No Proton DNS feature
+  enable/disable and update lists — by default exactly the filter lists
+  uBlock Origin enables out of the box (uBlock filters Ads / Badware
+  risks / Privacy / Unbreak / Quick fixes, EasyList, EasyPrivacy, Online
+  Malicious URL Blocklist and Peter Lowe's), with StevenBlack, HaGeZi,
+  OISD and 1Hosts as one-click presets. No Proton DNS feature
   needed — works on the free plan.
 - **Split tunneling** — excluded **IP ranges** work on every platform
   (they are carved out of the tunnel's AllowedIPs); excluded **apps** run

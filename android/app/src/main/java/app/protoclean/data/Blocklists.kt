@@ -26,15 +26,21 @@ data class UpdateResult(
     val error: String = "",
 )
 
+/** Result of parsing one blocklist, in any supported format. */
+data class ParsedList(
+    val blocked: Set<String>,
+    val allowed: Set<String> = emptySet(),
+)
+
 /**
  * Suffix-matching domain filter — identical semantics to the desktop
- * DomainFilter: a listed domain also blocks all its subdomains.
+ * DomainFilter: a listed domain also blocks all its subdomains. `exceptions`
+ * (from @@||domain^ rules) never block; when both a block and an exception
+ * match, the more specific (longer) name wins.
  */
-class DomainFilter(domains: Set<String>) {
-    private val exact: Set<String> = domains
-        .map { it.trim().lowercase().trimEnd('.') }
-        .filter { it.isNotEmpty() && it !in WHITELIST }
-        .toSet()
+class DomainFilter(domains: Set<String>, exceptions: Set<String> = emptySet()) {
+    private val exact: Set<String> = normalize(domains)
+    private val allowed: Set<String> = normalize(exceptions)
 
     val size: Int get() = exact.size
 
@@ -43,7 +49,9 @@ class DomainFilter(domains: Set<String>) {
         if (name.isEmpty() || name in WHITELIST) return false
         var i = 0
         while (i < name.length) {
-            if (name.substring(i) in exact) return true
+            val suffix = name.substring(i)
+            if (suffix in allowed) return false
+            if (suffix in exact) return true
             i = name.indexOf('.', i).let { if (it < 0) name.length else it + 1 }
         }
         return false
@@ -54,26 +62,93 @@ class DomainFilter(domains: Set<String>) {
         private val WHITELIST = setOf(
             "protonvpn.com", "proton.me", "protonmail.com", "account.protonvpn.com",
             "api.protonvpn.ch", "doh.protonvpn.ch", "protonstatus.com",
+            "localhost", "localhost.localdomain", "local", "broadcasthost",
+            "0.0.0.0", "127.0.0.1", "::1",
         )
 
-        /** Parse hosts-format (and plain domain-per-line) content. */
-        fun parseHosts(text: String): Set<String> {
-            val out = HashSet<String>()
+        private fun normalize(domains: Set<String>): Set<String> = domains
+            .map { it.trim().lowercase().trimEnd('.') }
+            .filter { it.isNotEmpty() && it !in WHITELIST }
+            .toSet()
+
+        /** Cosmetic-filter marker in Adblock/uBlock lists (##, #@#, #$#, …). */
+        private val COSMETIC = Regex("#[@\$%?^]*#")
+
+        /** $options that still express a domain-level verdict at DNS level.
+         * Everything else (script, image, 3p/1p, domain=, popup, redirect=,
+         * removeparam, replace=, …) depends on browser context a DNS
+         * filter does not have and the rule is skipped. */
+        private val DNS_SAFE_OPTIONS = setOf("all", "document", "doc", "important")
+
+        private fun dnsSafeOptions(line: String): Boolean {
+            if (!line.contains('$')) return true
+            // options end at the first whitespace
+            val options = line.substringAfter('$').split(Regex("\\s"), 2)[0]
+            return options.split(',').all { it.trim() in DNS_SAFE_OPTIONS }
+        }
+
+        /**
+         * Parse hosts-format, plain domain-per-line or Adblock/uBlock
+         * network-filter content (the formats of the default lists, which
+         * match uBlock Origin's out-of-the-box set):
+         * - `||domain^` / `||domain` → blocked
+         * - `@@||domain^`            → exception (never blocked)
+         * - rules whose $options are all all/document/doc/important stay
+         *   applied; any other option, wildcards, URL patterns, URL-specific
+         *   rules (||host/path) and cosmetic/scriptlet rules are skipped —
+         *   they depend on browser context a DNS filter does not have.
+         */
+        fun parseList(text: String): ParsedList {
+            val blocked = HashSet<String>()
+            val allowed = HashSet<String>()
             for (raw in text.lineSequence()) {
-                val line = raw.substringBefore("#").trim()
-                if (line.isEmpty()) continue
+                var line = raw.trim()
+                if (line.isEmpty() || line.startsWith("!") || line.startsWith("[")) {
+                    continue                                   // ABP/uBO comments
+                }
+                if (!line.startsWith("#") &&
+                    (COSMETIC.containsMatchIn(line) || line.contains("\$\$"))) {
+                    continue                                   // cosmetic / HTML rule
+                }
+                line = line.substringBefore("#").trim()        // hosts comment
+                if (line.isEmpty() || !dnsSafeOptions(line)) {
+                    continue                       // context-dependent $options
+                }
+                val exception = line.startsWith("@@")
+                if (exception) {
+                    line = line.substring(2).trim()
+                    if (line.isEmpty()) continue
+                }
+                if (line.startsWith("||")) {
+                    var host = line.substring(2).substringBefore("$").substringBefore("^")
+                    if (host.contains('/')) {
+                        // URL-specific rule — collapsing it to the bare domain
+                        // would block the whole (shared) host
+                        continue
+                    }
+                    host = host.trim('.').lowercase()
+                    if (valid(host)) {
+                        (if (exception) allowed else blocked).add(host)
+                    }
+                    continue
+                }
+                if (exception) continue                        // non-domain exception
                 val parts = line.split(Regex("\\s+"))
                 if (parts.size == 1) {
-                    parts[0].lowercase().trim('.').let { if (valid(it)) out.add(it) }
+                    parts[0].lowercase().trim('.').let { if (valid(it)) blocked.add(it) }
                 } else {
                     for (cand in parts.drop(1)) {
-                        cand.lowercase().trim('.').let { if (valid(it)) out.add(it) }
+                        cand.lowercase().trim('.').let { if (valid(it)) blocked.add(it) }
                     }
                 }
             }
-            out.removeAll(WHITELIST)
-            return out
+            blocked.removeAll(WHITELIST)
+            allowed.removeAll(WHITELIST)
+            return ParsedList(blocked, allowed)
         }
+
+        /** Backward-compatible alias: just the blocked set. */
+        fun parseHosts(text: String): Set<String> = parseList(text).blocked
 
         private fun valid(name: String): Boolean =
             name.length in 4..253 && name.contains('.') &&
@@ -153,12 +228,12 @@ class Blocklists(
                     if (!resp.isSuccessful) error("HTTP ${resp.code}")
                     resp.body?.string() ?: error("empty body")
                 }
-            val domains = DomainFilter.parseHosts(body)
-            if (domains.isEmpty()) error("no domains parsed")
+            val parsed = DomainFilter.parseList(body)
+            if (parsed.blocked.isEmpty() && parsed.allowed.isEmpty()) error("no domains parsed")
             cacheFile(src.url).writeText(body)
             val meta = loadMeta()
             meta.put(src.url, JSONObject().apply {
-                put("domains", domains.size)
+                put("domains", parsed.blocked.size)
                 put("updated_at", stamp())
                 put("error", "")
             })
@@ -190,14 +265,17 @@ class Blocklists(
     /** Merge the cached files of all *enabled* lists into the live filter. */
     suspend fun rebuild() = withContext(Dispatchers.IO) {
         val merged = HashSet<String>()
+        val mergedAllowed = HashSet<String>()
         for (src in sources()) {
             if (!src.enabled) continue
             val f = cacheFile(src.url)
             if (f.isFile) {
-                merged.addAll(DomainFilter.parseHosts(f.readText()))
+                val parsed = DomainFilter.parseList(f.readText())
+                merged.addAll(parsed.blocked)
+                mergedAllowed.addAll(parsed.allowed)
             }
         }
-        filter = DomainFilter(merged)
+        filter = DomainFilter(merged, mergedAllowed)
         filter.size
     }
 

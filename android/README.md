@@ -34,8 +34,9 @@ library (wireguard-go).
   (`DnsFilterVpnService`): a virtual DNS address whose /32 route is the
   only thing entering the tun; blocked names get NXDOMAIN / 0.0.0.0,
   everything else is forwarded over DoH (pinned `https://1.1.1.1/dns-query`).
-  Blocklists are managed in-app (add / remove / enable / update, with the
-  same presets as desktop: StevenBlack, HaGeZi, OISD, 1Hosts, Peter Lowe).
+  Blocklists are managed in-app (add / remove / enable / update) and
+  default to the same lists uBlock Origin enables by default, with the
+  same presets as desktop (StevenBlack, HaGeZi, OISD, 1Hosts, Peter Lowe).
   Android allows one VpnService per app, so this runs when the WireGuard
   tunnel is down and is switched off automatically when you connect.
 

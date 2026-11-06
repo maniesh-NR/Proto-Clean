@@ -3,6 +3,7 @@ from .blocklists import (  # noqa: F401
     BlocklistManager,
     DomainFilter,
     UpdateResult,
+    parse_filters,
     parse_hosts,
 )
 from .dns_server import DnsBlocker  # noqa: F401
