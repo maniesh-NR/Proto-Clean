@@ -8,8 +8,9 @@ def test_defaults_roundtrip(tmp_path, monkeypatch):
     s = S.load_settings()
     assert s.autoconnect_fastest is True
     assert s.netshield.enabled is True
-    assert "StevenBlack" in s.netshield.blocklists[0].url
-    assert s.netshield.blocklists[0].enabled is True
+    assert len(s.netshield.blocklists) == 9            # uBlock Origin defaults
+    assert "easylist.txt" in s.netshield.blocklists[5].url
+    assert all(b.enabled for b in s.netshield.blocklists)
     assert s.cache_configs is True
     assert s.vpn_options.vpn_accelerator is True
     assert s.port_forward.request_in_config is True
@@ -22,6 +23,42 @@ def test_defaults_roundtrip(tmp_path, monkeypatch):
     assert s2.vpn_options.vpn_accelerator is False
     assert s2.netshield.block_nxdomain is True      # untouched nested default
     assert (tmp_path / "settings.json").exists()
+
+
+def test_untouched_legacy_default_migrates_to_ublock_set(tmp_path, monkeypatch):
+    monkeypatch.setattr(S, "SETTINGS_FILE", tmp_path / "settings.json")
+    (tmp_path / "settings.json").write_text(json.dumps({
+        "netshield": {
+            "enabled": True,
+            "blocklists": [{
+                "name": "StevenBlack unified (ads + malware)",
+                "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+                "enabled": True,
+            }],
+        },
+    }))
+    s = S.load_settings()
+    names = [b.name for b in s.netshield.blocklists]
+    assert len(names) == 9 and "EasyList" in names and "EasyPrivacy" in names
+
+
+def test_customized_blocklists_are_never_migrated(tmp_path, monkeypatch):
+    monkeypatch.setattr(S, "SETTINGS_FILE", tmp_path / "settings.json")
+    mine = [{"name": "Mine", "url": "https://example.com/my.txt",
+             "enabled": True}]
+    (tmp_path / "settings.json").write_text(json.dumps({"netshield": {
+        "blocklists": mine}}))
+    s = S.load_settings()
+    assert [b.url for b in s.netshield.blocklists] == ["https://example.com/my.txt"]
+    # ... even when the user deliberately kept only the old StevenBlack list
+    # under a custom name (name differs from the shipped default)
+    steven = [{"name": "My StevenBlack",
+               "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+               "enabled": True}]
+    (tmp_path / "settings.json").write_text(json.dumps({"netshield": {
+        "blocklists": steven}}))
+    s = S.load_settings()
+    assert [b.name for b in s.netshield.blocklists] == ["My StevenBlack"]
 
 
 def test_protocol_defaults_and_normalization(tmp_path, monkeypatch):

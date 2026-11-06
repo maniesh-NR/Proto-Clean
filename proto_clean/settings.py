@@ -42,17 +42,60 @@ def _name_from_url(url: str) -> str:
     return f"{base} · {tail}" if tail else base
 
 
+# The blocklists enabled by default — kept identical to the filter lists
+# uBlock Origin enables out of the box (gorhill/uBlock assets.json, the
+# entries without "off": true). uBO auto-enables extra *regional* lists
+# based on the browser locale; a VPN DNS filter has no browser locale, so
+# those are not part of our defaults (they remain one click away).
+UBLOCK_ORIGIN_DEFAULT_LISTS: List = [
+    # Built-in "uBlock filters" group (group: "default" in assets.json)
+    ("uBlock filters – Ads",
+     "https://ublockorigin.github.io/uAssets/filters/filters.txt"),
+    ("uBlock filters – Badware risks",
+     "https://ublockorigin.github.io/uAssets/filters/badware.txt"),
+    ("uBlock filters – Privacy",
+     "https://ublockorigin.github.io/uAssets/filters/privacy.txt"),
+    ("uBlock filters – Unbreak",
+     "https://ublockorigin.github.io/uAssets/filters/unbreak.txt"),
+    ("uBlock filters – Quick fixes",
+     "https://ublockorigin.github.io/uAssets/filters/quick-fixes.txt"),
+    # Ads / Privacy / Malware / Multipurpose defaults
+    ("EasyList",
+     "https://ublockorigin.github.io/uAssets/thirdparties/easylist.txt"),
+    ("EasyPrivacy",
+     "https://ublockorigin.github.io/uAssets/thirdparties/easyprivacy.txt"),
+    ("Online Malicious URL Blocklist",
+     "https://malware-filter.gitlab.io/urlhaus-filter/urlhaus-filter-vivaldi-online.txt"),
+    ("Peter Lowe's Ad and tracking server list",
+     "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext"),
+]
+
+# The single default list shipped before the uBlock Origin parity release.
+# Settings that still hold exactly this set are migrated to the new
+# defaults on load (users who customized their lists keep them).
+LEGACY_DEFAULT_BLOCKLIST = BlocklistSource(
+    name="StevenBlack unified (ads + malware)",
+    url="https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+)
+LEGACY_DEFAULT_BLOCKLIST_URL = LEGACY_DEFAULT_BLOCKLIST.url
+
+
 def default_blocklists() -> List[BlocklistSource]:
-    return [
-        BlocklistSource(
-            name="StevenBlack unified (ads + malware)",
-            url="https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
-        ),
-    ]
+    return [BlocklistSource(name=name, url=url)
+            for name, url in UBLOCK_ORIGIN_DEFAULT_LISTS]
 
 
-# Well-known lists offered as presets in the "Add blocklist" dialog.
-BLOCKLIST_PRESETS = [
+def _is_legacy_default(lists: List[BlocklistSource]) -> bool:
+    """True when the saved set is exactly the pre-parity default."""
+    return (len(lists) == 1 and lists[0].enabled
+            and lists[0].name == LEGACY_DEFAULT_BLOCKLIST.name
+            and lists[0].url == LEGACY_DEFAULT_BLOCKLIST.url)
+
+
+# Well-known lists offered as presets in the "Add blocklist" dialog:
+# the uBlock Origin defaults first (so a removed default can be re-added),
+# then popular aggregated hosts lists.
+BLOCKLIST_PRESETS = list(UBLOCK_ORIGIN_DEFAULT_LISTS) + [
     ("StevenBlack unified (ads + malware)",
      "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"),
     ("HaGeZi Pro — ads, tracking, malware",
@@ -63,8 +106,6 @@ BLOCKLIST_PRESETS = [
      "https://hosts.oisd.nl/big"),
     ("1Hosts Lite",
      "https://badmojr.github.io/1hosts/Lite/hosts"),
-    ("Peter Lowe's ad servers",
-     "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext"),
 ]
 
 
@@ -498,6 +539,10 @@ def _netshield_from_json(raw: dict) -> NetShieldSettings:
         # migrate legacy plain-URL sources to named, enabled entries
         lists = [BlocklistSource.from_json(u) for u in legacy if u]
     else:
+        lists = default_blocklists()
+    if _is_legacy_default(lists):
+        # untouched pre-parity default (single StevenBlack entry) —
+        # upgrade in place to the uBlock Origin default set
         lists = default_blocklists()
     return NetShieldSettings(blocklists=lists, **base)
 

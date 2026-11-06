@@ -43,8 +43,49 @@ data class BlocklistSource(
     }
 }
 
-/** Well-known lists offered as presets (same set as the desktop app). */
-val BLOCKLIST_PRESETS = listOf(
+/**
+ * The blocklists enabled by default — identical to the filter lists uBlock
+ * Origin enables out of the box (gorhill/uBlock assets.json). uBO's extra
+ * locale-based regional lists are not part of a fixed default set.
+ * Must stay in sync with desktop `UBLOCK_ORIGIN_DEFAULT_LISTS`.
+ */
+fun defaultBlocklists(): List<BlocklistSource> = listOf(
+    BlocklistSource("uBlock filters – Ads",
+        "https://ublockorigin.github.io/uAssets/filters/filters.txt"),
+    BlocklistSource("uBlock filters – Badware risks",
+        "https://ublockorigin.github.io/uAssets/filters/badware.txt"),
+    BlocklistSource("uBlock filters – Privacy",
+        "https://ublockorigin.github.io/uAssets/filters/privacy.txt"),
+    BlocklistSource("uBlock filters – Unbreak",
+        "https://ublockorigin.github.io/uAssets/filters/unbreak.txt"),
+    BlocklistSource("uBlock filters – Quick fixes",
+        "https://ublockorigin.github.io/uAssets/filters/quick-fixes.txt"),
+    BlocklistSource("EasyList",
+        "https://ublockorigin.github.io/uAssets/thirdparties/easylist.txt"),
+    BlocklistSource("EasyPrivacy",
+        "https://ublockorigin.github.io/uAssets/thirdparties/easyprivacy.txt"),
+    BlocklistSource("Online Malicious URL Blocklist",
+        "https://malware-filter.gitlab.io/urlhaus-filter/urlhaus-filter-vivaldi-online.txt"),
+    BlocklistSource("Peter Lowe's Ad and tracking server list",
+        "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext"),
+)
+
+/** The single default list shipped before the uBlock Origin parity release. */
+private val LEGACY_DEFAULT_BLOCKLIST = BlocklistSource(
+    "StevenBlack unified (ads + malware)",
+    "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts")
+
+/** True when the stored set is exactly the pre-parity default (the single
+ * StevenBlack entry) — such settings are upgraded to the uBlock Origin
+ * defaults on load; customized lists are kept as they are. */
+private fun List<BlocklistSource>.isLegacyDefault(): Boolean =
+    size == 1 && this[0].enabled &&
+        this[0].name == LEGACY_DEFAULT_BLOCKLIST.name &&
+        this[0].url == LEGACY_DEFAULT_BLOCKLIST.url
+
+/** Well-known lists offered as presets (same set as the desktop app): the
+ * uBlock Origin defaults first, then popular aggregated hosts lists. */
+val BLOCKLIST_PRESETS = defaultBlocklists().map { it.name to it.url } + listOf(
     "StevenBlack unified (ads + malware)" to
         "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
     "HaGeZi Pro — ads, tracking, malware" to
@@ -53,8 +94,6 @@ val BLOCKLIST_PRESETS = listOf(
         "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/hosts/multipro.txt",
     "OISD Big — aggregated ads/tracking" to "https://hosts.oisd.nl/big",
     "1Hosts Lite" to "https://badmojr.github.io/1hosts/Lite/hosts",
-    "Peter Lowe's ad servers" to
-        "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=hosts&showintro=0&mimetype=plaintext",
 )
 
 data class AppSettings(
@@ -204,15 +243,15 @@ class SettingsStore(private val context: Context) {
         context.dataStore.data.map { p ->
             val raw = p[Keys.blocklists]
             if (raw.isNullOrBlank()) {
-                listOf(BlocklistSource(
-                    "StevenBlack unified (ads + malware)",
-                    "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"))
+                defaultBlocklists()
             } else {
                 runCatching {
                     JSONArray(raw).let { arr ->
                         (0 until arr.length()).map { BlocklistSource.fromJson(arr.getJSONObject(it)) }
                     }
-                }.getOrDefault(emptyList())
+                }.getOrDefault(emptyList()).let { lists ->
+                    if (lists.isLegacyDefault()) defaultBlocklists() else lists
+                }
             }
         }
 
