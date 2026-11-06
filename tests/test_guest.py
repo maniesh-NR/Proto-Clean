@@ -26,6 +26,8 @@ from proto_clean.proton.guest import (
     GuestLogicalServer,
     GuestSession,
     default_headers,
+    ed25519_pub_pem,
+    ed25519_to_x25519_priv_b64,
     gen_device_keypair,
     make_challenge_payload,
 )
@@ -313,7 +315,7 @@ def test_login_end_to_end():
 
 
 # ---------------------------------------------------------------------------
-# 8. fetch_logicals filters paid servers
+# 8. fetch_logicals (v1 primary) filters paid servers, keeps loads
 # ---------------------------------------------------------------------------
 
 
@@ -325,7 +327,7 @@ def _logical_server(server_id, name, country, tier, **kw):
         "X25519PublicKey": "abcPubKeyBase64==",
         "Status": 1,
     })
-    return {
+    out = {
         "ID": server_id,
         "Name": name,
         "ExitCountry": country,
@@ -336,12 +338,27 @@ def _logical_server(server_id, name, country, tier, **kw):
         "Score": kw.get("score", 1.05),
         "Servers": [physical] if kw.get("physical") is not False else [],
     }
+    if kw.get("logical_status") is not None:
+        out["Status"] = kw["logical_status"]
+    return out
+
+
+def _guest_session(**kw):
+    kw.setdefault("device_ed25519_priv", bytes(32))
+    return GuestSession(
+        access_token="guest-tok", refresh_token="guest-refresh",
+        uid="guest-uid", expires_at=time.time() + 3600,
+        refresh_expires_at=time.time() + 9999, scope="self vpn",
+        device_ed25519_pub_b64=kw.get("device_ed25519_pub_b64", "devpub"),
+        device_ed25519_priv=kw["device_ed25519_priv"],
+    )
 
 
 def test_fetch_logicals_filters_paid_servers():
+    """The v1 endpoint is primary — real per-logical loads inline."""
     api = _FakeApi()
     logicals = [
-        _logical_server("s-free-1", "US-FREE#1", "US", tier=0),
+        _logical_server("s-free-1", "US-FREE#1", "US", tier=0, load=33.0),
         _logical_server("s-plus-1", "US-PLUS#1", "US", tier=2,
                         physical={
                             "Domain": "us-plus-01.protonvpn.com",
@@ -360,15 +377,10 @@ def test_fetch_logicals_filters_paid_servers():
                             "Status": 1,
                         }),
     ]
-    api.set("GET", "/vpn/v2/logicals",
+    api.set("GET", "/vpn/v1/logicals",
             _ok({"LogicalServers": logicals}))
     auth = GuestAuth(client=api.client())
-    sess = GuestSession(
-        access_token="guest-tok", refresh_token="guest-refresh",
-        uid="guest-uid", expires_at=time.time() + 3600,
-        refresh_expires_at=time.time() + 9999, scope="self vpn",
-        device_ed25519_pub_b64="devpub", device_ed25519_priv=bytes(32),
-    )
+    sess = _guest_session()
 
     async def go():
         return await auth.fetch_logicals(sess)
@@ -388,20 +400,105 @@ def test_fetch_logicals_filters_paid_servers():
     assert free1.city is None
     assert free1.tier == 0
     assert free1.status == 1
+    # Live loads from the v1 payload — NOT zeros.
+    assert free1.load == 33.0
     free2 = next(s for s in out if s.server_id == "s-free-2")
     assert free2.city == "Tokyo"
     assert free2.exit_country == "JP"
     assert free2.features == 1
     assert free2.load == 42.0
     assert free2.score == 2.0
+    # Bearer-authenticated v1 call.
+    _, headers = api.find("GET", "/vpn/v1/logicals")
+    assert headers["authorization"] == "Bearer guest-tok"
+    assert headers["x-pm-uid"] == "guest-uid"
+
+
+def test_fetch_logicals_v2_fallback_merges_loads():
+    """v1 unavailable -> v2 (zero loads) + /vpn/v1/loads merge."""
+    api = _FakeApi()
+    # v1 is NOT programmed -> 404 -> the code falls back to v2. The v2
+    # payload reports loads as ZERO (the official clients compute them
+    # from the binary status blob instead).
+    logicals = [
+        _logical_server("s-free-1", "US-FREE#1", "US", tier=0, load=0.0),
+        _logical_server("s-free-2", "NL-FREE#1", "NL", tier=0, load=0.0),
+    ]
+    api.set("GET", "/vpn/v2/logicals",
+            _ok({"LogicalServers": logicals}))
+    api.set("GET", "/vpn/v1/loads",
+            _ok({"LogicalServers": [
+                {"ID": "s-free-1", "Load": 71.5},
+                {"ID": "s-free-2", "Load": 12.0},
+            ]}))
+    auth = GuestAuth(client=api.client())
+
+    async def go():
+        return await auth.fetch_logicals(_guest_session())
+
+    out = asyncio.run(go())
+    assert len(out) == 2
+    us = next(s for s in out if s.server_id == "s-free-1")
+    nl = next(s for s in out if s.server_id == "s-free-2")
+    # Loads merged from /vpn/v1/loads — NOT the v2 zeros.
+    assert us.load == 71.5
+    assert nl.load == 12.0
+    # Both endpoints were hit with bearer auth.
+    _, h2 = api.find("GET", "/vpn/v2/logicals")
+    _, hl = api.find("GET", "/vpn/v1/loads")
+    assert h2["authorization"] == "Bearer guest-tok"
+    assert hl["authorization"] == "Bearer guest-tok"
+
+
+def test_fetch_logicals_v2_fallback_without_loads_endpoint():
+    """v2 + loads endpoint BOTH gone -> list still parses, loads 0."""
+    api = _FakeApi()
+    logicals = [_logical_server("s-free-1", "US-FREE#1", "US", tier=0,
+                                load=0.0)]
+    api.set("GET", "/vpn/v2/logicals",
+            _ok({"LogicalServers": logicals}))
+    auth = GuestAuth(client=api.client())
+
+    async def go():
+        return await auth.fetch_logicals(_guest_session())
+
+    out = asyncio.run(go())
+    assert len(out) == 1
+    assert out[0].load == 0.0   # graceful degradation, no crash
+
+
+def test_fetch_logicals_logical_status_bool_or_int():
+    """Status parses from the logical level in both v1 (int) and
+    v2 (bool) shapes."""
+    api = _FakeApi()
+    logicals = [
+        _logical_server("s-int", "US-FREE#1", "US", tier=0,
+                        logical_status=1),
+        _logical_server("s-bool", "JP-FREE#1", "JP", tier=0,
+                        logical_status=True),
+        _logical_server("s-off", "NL-FREE#1", "NL", tier=0,
+                        logical_status=False),
+    ]
+    api.set("GET", "/vpn/v1/logicals",
+            _ok({"LogicalServers": logicals}))
+    auth = GuestAuth(client=api.client())
+
+    async def go():
+        return await auth.fetch_logicals(_guest_session())
+
+    out = asyncio.run(go())
+    by_id = {s.server_id: s for s in out}
+    assert by_id["s-int"].status == 1
+    assert by_id["s-bool"].status == 1
+    assert by_id["s-off"].status == 0
 
 
 # ---------------------------------------------------------------------------
-# 9. fetch_certificate parses response
+# 9. fetch_certificate: official key flow (Ed25519 PKIX PEM + derived WG key)
 # ---------------------------------------------------------------------------
 
 
-def test_fetch_certificate_parses_response():
+def test_fetch_certificate_sends_pkix_pem_and_derives_wg_key():
     api = _FakeApi()
     cert_pem = "-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----\n"
     # Official response shape (CertificateResponseBody): only the PEM
@@ -414,15 +511,12 @@ def test_fetch_certificate_parses_response():
                 "RefreshTime": 1735689600,
             }))
     auth = GuestAuth(client=api.client())
-    sess = GuestSession(
-        access_token="guest-tok", refresh_token="guest-refresh",
-        uid="guest-uid", expires_at=time.time() + 3600,
-        refresh_expires_at=time.time() + 9999, scope="self vpn",
-        device_ed25519_pub_b64="devpub", device_ed25519_priv=bytes(32),
-    )
+    # A REAL Ed25519 seed — the request key is derived from it.
+    seed = bytes(range(32))
+    sess = _guest_session(device_ed25519_priv=seed)
 
     async def go():
-        return await auth.fetch_certificate(sess, "wgpub==")
+        return await auth.fetch_certificate(sess)
 
     cert = asyncio.run(go())
     assert isinstance(cert, GuestCertificate)
@@ -433,16 +527,80 @@ def test_fetch_certificate_parses_response():
     assert cert.dns_ips == ["10.2.0.1", "2a07:b944::2:1"]
     assert cert.refresh_time == 1735689600
     assert cert.expiration_time == 1735786000
-    assert cert.client_public_key_b64 == "wgpub=="
-    # Body matches CertificateRequestBody from the official app.
+    # Body matches CertificateRequestBody from the official app — with
+    # ClientPublicKey as the Ed25519 device public key in PKIX PEM form
+    # (NOT a raw base64 X25519 key, which the API rejects with Code
+    # 2001 "unable to read the key, please provide valid EC key").
     body, headers = api.find("POST", "/vpn/v1/certificate")
-    assert body["ClientPublicKey"] == "wgpub=="
+    sent_pem = body["ClientPublicKey"]
+    assert sent_pem.startswith("-----BEGIN PUBLIC KEY-----")
+    assert sent_pem.rstrip().endswith("-----END PUBLIC KEY-----")
+    assert sent_pem == ed25519_pub_pem(seed)
     assert body["ClientPublicKeyMode"] == "EC"
     assert body["DeviceName"]
     assert body["Mode"] == "session"
     assert body["Features"] == []
+    # The WG private key is DERIVED from the same session keypair —
+    # it pairs with the public key sent above.
+    assert cert.wg_private_key_b64 == ed25519_to_x25519_priv_b64(seed)
     # Bearer auth used.
     assert headers["authorization"] == "Bearer guest-tok"
+
+
+def test_ed25519_pub_pem_matches_official_form():
+    """The PEM is byte-identical to what Python `cryptography` (and thus
+    the official Linux client's KeyHandler) produces for the same seed."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PrivateKey,
+    )
+    for seed in (bytes(32), bytes(range(32)), b"\x07" * 32):
+        expected = Ed25519PrivateKey.from_private_bytes(seed) \
+            .public_key().public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            ).decode("ascii")
+        assert ed25519_pub_pem(seed) == expected
+
+
+def test_ed25519_to_x25519_matches_curve25519_form():
+    """The derived X25519 scalar's public key equals the Montgomery form
+    of the Ed25519 public point (the birational map the server applies)
+    — verified with raw field arithmetic, no PyNaCl needed."""
+    import base64
+    import hashlib
+
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PrivateKey,
+    )
+    from cryptography.hazmat.primitives.asymmetric.x25519 import (
+        X25519PrivateKey,
+    )
+    from cryptography.hazmat.primitives import serialization
+
+    P = 2 ** 255 - 19
+
+    def ed_pub_to_montgomery_u(pub32: bytes) -> bytes:
+        y = int.from_bytes(pub32, "little") & ((1 << 255) - 1)
+        u = ((1 + y) * pow((1 - y) % P, P - 2, P)) % P
+        return u.to_bytes(32, "little")
+
+    for seed in (bytes(32), bytes(range(32)), b"\x11" * 32,
+                 hashlib.sha256(b"proto-clean").digest()):
+        h = bytearray(hashlib.sha512(seed).digest()[:32])
+        h[0] &= 248
+        h[31] &= 127
+        h[31] |= 64
+        assert base64.b64decode(ed25519_to_x25519_priv_b64(seed)) == bytes(h)
+        x_pub = X25519PrivateKey.from_private_bytes(bytes(h)) \
+            .public_key().public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw)
+        ed_pub = Ed25519PrivateKey.from_private_bytes(seed) \
+            .public_key().public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw)
+        assert x_pub == ed_pub_to_montgomery_u(ed_pub)
 
 
 # ---------------------------------------------------------------------------

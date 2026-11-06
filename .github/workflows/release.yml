@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  VERSION: 0.6.0
+  VERSION: 0.6.1
   # lantern-box (Lantern's GPL-3 sing-box fork) — the samizdat engine we
   # bundle. Pinned tag; the port job builds it from source for every
   # target platform (official releases only publish linux binaries).
@@ -483,15 +483,46 @@ jobs:
             app/src/main/jniLibs/armeabi-v7a/liblanternbox.so
           ls -la app/src/main/jniLibs/*/
 
-      - name: Build debug APKs (installable, debug-signed)
-        run: gradle assembleDebug --no-daemon
+      - name: Decode the release keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.PROTO_ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.PROTO_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.PROTO_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.PROTO_ANDROID_KEY_PASSWORD }}
+        run: |
+          # Release-signed, non-debuggable APKs are what Play Protect
+          # expects from a sideloaded app: debug/test-key APKs trigger
+          # the "unsafe app blocked" biometric confirmation.
+          if [ -n "$KEYSTORE_B64" ]; then
+            printf '%s' "$KEYSTORE_B64" | base64 -d > "$GITHUB_WORKSPACE/protoclean-release.keystore"
+            echo "PC_KEYSTORE_FILE=$GITHUB_WORKSPACE/protoclean-release.keystore" >> "$GITHUB_ENV"
+            echo "PC_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "PC_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "PC_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+          else
+            echo "::warning::PROTO_ANDROID_KEYSTORE_B64 secret not set — release APKs will be debug-signed"
+          fi
+
+      - name: Build release APKs (release-signed when the keystore is present)
+        run: gradle assembleRelease --no-daemon
 
       - name: Rename APKs
         run: |
-          cp app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk \
+          cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk \
              "$GITHUB_WORKSPACE/Proto-Clean-${VERSION}-android-armeabi-v7a.apk"
-          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk \
+          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk \
              "$GITHUB_WORKSPACE/Proto-Clean-${VERSION}-android-arm64-v8a.apk"
+
+      - name: Verify APK signatures (v1/v2/v3 schemes)
+        run: |
+          # Fail loudly if the APKs somehow shipped unsigned — an unsigned
+          # or debug-signed artifact is what Play Protect flags as unsafe.
+          BT="$ANDROID_HOME/build-tools/34.0.0"
+          for apk in "$GITHUB_WORKSPACE"/Proto-Clean-*-android-*.apk; do
+            echo "== $apk"
+            "$BT/apksigner" verify --min-sdk-version 26 "$apk"
+            "$BT/apksigner" verify --print-certs "$apk" | head -6
+          done
 
       - uses: actions/upload-artifact@v4
         with:
@@ -523,7 +554,31 @@ jobs:
           tag_name: v${{ env.VERSION }}
           name: Proto Clean v${{ env.VERSION }}
           body: |
-            New in v0.6.0: **Guest mode + Material Design 3 UI** —
+            New in v0.6.1: **region-grouped server list + guest-mode
+            fixes + release-signed Android APKs** —
+
+            * **Server list, reworked**: servers are grouped under
+              collapsible **region headers** on every platform — press a
+              region to expand its servers, each showing its **live
+              load**; the headers show the region's server count and
+              average load (desktop Qt tree + Android Compose list).
+            * **Guest mode — loads fixed**: the server list now shows
+              real load percentages instead of 0% (the v1 logicals
+              endpoint carries live loads inline; when only the v2
+              endpoint is reachable, loads are merged from
+              `/vpn/v1/loads`).
+            * **Guest mode — connect fixed**: guest connections now use
+              the official certificate key flow — the request carries
+              the session's Ed25519 device public key as a PKIX PEM and
+              the WireGuard private key is derived from the same
+              keypair. This replaces the raw X25519 key that Proton
+              rejected with Code 2001 "unable to read the key, please
+              provide valid EC key".
+            * **Android**: the APKs are **release-signed** (v1+v2+v3
+              schemes, non-debuggable) so Google Play Protect no longer
+              flags them as unsafe debug builds during install.
+
+            Also new in v0.6.0: **Guest mode + Material Design 3 UI** —
             "Continue as guest" via Proton's credentialless API flow
             (no account, no CAPTCHA, no Playwright; free-tier servers,
             auto-resume via refresh-token, WireGuard certs from the API
@@ -533,7 +588,7 @@ jobs:
             seeded from the Proto Clean pine-green, and a matching MD3
             theme on Android.
 
-            These builds ship the final hardening passes on top: a
+            The v0.6.0 builds also shipped the final hardening passes: a
             **performance / stability / memory** pass across all
             platforms — QUIC-obfs & salamander whitening 28× faster,
             QUIC flow-control windows 1→8 MiB (≈10× on 150 ms-RTT
@@ -547,24 +602,24 @@ jobs:
             over the real production paths (chains, WARP hops, the
             whole import universe, QR round-trips, guest-mode ↔
             WireGuard, controller lifecycle) with 6 composition fixes
-            they flushed out. 669 tests passing.
+            they flushed out. 678 tests passing.
 
             ## Downloads
             | Platform | File | Notes |
             |---|---|---|
-            | **Windows 7+ x64** | `Proto-Clean-0.6.0-win7-x64-portable.zip` | Python 3.8 + Qt 5.15 legacy stack |
-            | **Windows 7+ x86 (32-bit)** | `Proto-Clean-0.6.0-win7-x86-portable.zip` | 32-bit Qt 5.15 legacy stack |
-            | **Windows 10/11 x64 (portable)** | `Proto-Clean-0.6.0-win-x64-portable.zip` | Qt 6 modern stack |
-            | **Windows 10/11 x64 (setup)** | `Proto-Clean-0.6.0-win-x64-setup.exe` | Inno Setup installer |
-            | **macOS 10.15 Catalina+ (Intel)** | `Proto-Clean-0.6.0-macos-10.15-catalina-x86_64-portable.zip` | Qt 6.2, runs on 10.14+ |
-            | **macOS 11+ (Apple Silicon)** | `Proto-Clean-0.6.0-macos-11.0-arm64-portable.zip` | native arm64, Qt 6 |
-            | **Linux Mint 21 / Ubuntu 22.04** | `proto-clean_0.6.0-mint21-ubuntu22.04_amd64.deb` | also LMDE-era compatible glibc |
-            | **Linux Mint 22 / Ubuntu 24.04** | `proto-clean_0.6.0-mint22-ubuntu24.04_amd64.deb` | |
-            | **LMDE 6 / Debian 12** | `proto-clean_0.6.0-debian12_amd64.deb` | |
-            | **Linux (portable)** | `Proto-Clean-0.6.0-linux-x86_64-portable.tar.gz` | built on Ubuntu 22.04; runs on Mint 21/22, LMDE 6 |
-            | **Linux (Flatpak)** | `Proto-Clean-0.6.0-x86_64.flatpak` | `flatpak install --user Proto-Clean-0.6.0-x86_64.flatpak` |
-            | **Android 8.0+ (armv7)** | `Proto-Clean-0.6.0-android-armeabi-v7a.apk` | debug-signed APK |
-            | **Android 8.0+ (arm64)** | `Proto-Clean-0.6.0-android-arm64-v8a.apk` | debug-signed APK |
+            | **Windows 7+ x64** | `Proto-Clean-0.6.1-win7-x64-portable.zip` | Python 3.8 + Qt 5.15 legacy stack |
+            | **Windows 7+ x86 (32-bit)** | `Proto-Clean-0.6.1-win7-x86-portable.zip` | 32-bit Qt 5.15 legacy stack |
+            | **Windows 10/11 x64 (portable)** | `Proto-Clean-0.6.1-win-x64-portable.zip` | Qt 6 modern stack |
+            | **Windows 10/11 x64 (setup)** | `Proto-Clean-0.6.1-win-x64-setup.exe` | Inno Setup installer |
+            | **macOS 10.15 Catalina+ (Intel)** | `Proto-Clean-0.6.1-macos-10.15-catalina-x86_64-portable.zip` | Qt 6.2, runs on 10.14+ |
+            | **macOS 11+ (Apple Silicon)** | `Proto-Clean-0.6.1-macos-11.0-arm64-portable.zip` | native arm64, Qt 6 |
+            | **Linux Mint 21 / Ubuntu 22.04** | `proto-clean_0.6.1-mint21-ubuntu22.04_amd64.deb` | also LMDE-era compatible glibc |
+            | **Linux Mint 22 / Ubuntu 24.04** | `proto-clean_0.6.1-mint22-ubuntu24.04_amd64.deb` | |
+            | **LMDE 6 / Debian 12** | `proto-clean_0.6.1-debian12_amd64.deb` | |
+            | **Linux (portable)** | `Proto-Clean-0.6.1-linux-x86_64-portable.tar.gz` | built on Ubuntu 22.04; runs on Mint 21/22, LMDE 6 |
+            | **Linux (Flatpak)** | `Proto-Clean-0.6.1-x86_64.flatpak` | `flatpak install --user Proto-Clean-0.6.1-x86_64.flatpak` |
+            | **Android 8.0+ (armv7)** | `Proto-Clean-0.6.1-android-armeabi-v7a.apk` | release-signed APK |
+            | **Android 8.0+ (arm64)** | `Proto-Clean-0.6.1-android-arm64-v8a.apk` | release-signed APK |
 
             Every package still bundles **lantern-box** (Lantern's GPL-3
             sing-box fork — samizdat out of the box) and every platform
@@ -598,7 +653,7 @@ jobs:
             ## Also in this release
             * v0.4.0's **link bonding** (multi-adapter Speedify-style),
               samizdat bundling and the GPL-3 relicense carry over.
-            * 669 automated tests; Python 3.8 (Windows 7) to 3.12.
+            * 678 automated tests; Python 3.8 (Windows 7) to 3.12.
 
             ## After install
             * Log in with your own Proton account (credentials stay in your

@@ -9,14 +9,14 @@ from proto_clean.qtcompat import Qt, QTimer
 from proto_clean.qtcompat import (
     QAbstractItemView, QApplication, QCheckBox, QHBoxLayout, QHeaderView,
     QInputDialog, QLabel, QLineEdit, QMenu, QMainWindow, QPushButton,
-    QStatusBar, QSystemTrayIcon, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget,
+    QStatusBar, QSystemTrayIcon, QTreeWidget, QTreeWidgetItem, QVBoxLayout,
+    QWidget,
 )
 
 from ..controller import Controller, State
 from .. import credentials as creds
 from ..servers.models import LogicalServer
-from ..servers.selection import rank_servers
+from ..servers.selection import rank_servers, region_of
 from ..settings import load_settings, save_settings, update
 from . import resources
 from .blocklists_dialog import AddBlocklistDialog, BlocklistsDialog
@@ -140,7 +140,7 @@ class MainWindow(QMainWindow):
         controls.addWidget(self.connect_btn)
         root.addLayout(controls)
 
-        # ---- server list
+        # ---- server list: regions as collapsible headers --------------
         self.search = QLineEdit()
         self.search.setPlaceholderText("Search country / server / city…")
         self.search.textChanged.connect(self._refresh_table)
@@ -151,24 +151,27 @@ class MainWindow(QMainWindow):
         search_row.addWidget(self.refresh_btn)
         root.addLayout(search_row)
 
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(
-            ["Country", "Server", "City", "Load", "Features"])
-        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.table.setAlternatingRowColors(True)
-        self.table.verticalHeader().setVisible(False)
-        header = self.table.horizontalHeader()
+        self.tree = QTreeWidget()
+        self.tree.setColumnCount(4)
+        self.tree.setHeaderLabels(
+            ["Region / Server", "City", "Load", "Servers"])
+        self.tree.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tree.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setIndentation(20)
+        self.tree.setUniformRowHeights(True)
+        header = self.tree.header()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        self.table.setShowGrid(False)
-        self.table.cellClicked.connect(self._on_row_clicked)
-        self.table.doubleClicked.connect(lambda _: self._on_connect_clicked())
-        root.addWidget(self.table, 1)
+        self.tree.itemClicked.connect(self._on_item_clicked)
+        self.tree.itemDoubleClicked.connect(self._on_item_double_clicked)
+        root.addWidget(self.tree, 1)
+        # region headers the user expanded — kept across refreshes so a
+        # background server-list update never collapses the view
+        self._expanded_regions: set = set()
 
         # ---- bottom bar
         bottom = QHBoxLayout()
@@ -496,17 +499,6 @@ class MainWindow(QMainWindow):
         self._blocklists_dialog.raise_()
         self._blocklists_dialog.activateWindow()
 
-    def _on_row_clicked(self, row: int, _col: int) -> None:
-        server = self._server_at_row(row)
-        if server:
-            self.selected_server = server
-            self.fastest_toggle.blockSignals(True)
-            self.fastest_toggle.setChecked(False)
-            self.fastest_toggle.blockSignals(False)
-            update(autoconnect_fastest=False)
-            self.controller.reload_settings()
-            self.statusBar().showMessage(f"selected {server.name}", 4000)
-
     def _on_connect_clicked(self) -> None:
         state = self.controller.state
         if state in (State.CONNECTED, State.CONNECTING):
@@ -525,7 +517,7 @@ class MainWindow(QMainWindow):
         apply_theme(QApplication.instance(), load_settings().theme)
         self._refresh_table()
 
-    # --------------------------------------------------------------- table
+    # ----------------------------------------------------- server tree
     def _visible_servers(self) -> list:
         """Free servers only (paid excluded), filtered by the search box."""
         servers = getattr(self, "_servers", [])
@@ -533,40 +525,119 @@ class MainWindow(QMainWindow):
         needle = self.search.text().strip().lower()
         if needle:
             ranked = [s for s in ranked if needle in (
-                f"{s.exit_country} {s.name} {s.city}".lower())]
+                f"{s.exit_country} {s.name} {s.city} {region_of(s)}".lower())]
         return ranked
 
+    @staticmethod
+    def _server_features_label(server: LogicalServer) -> str:
+        feats = ["Free"]
+        if server.supports_p2p:
+            feats.append("P2P")
+        if server.is_secure_core:
+            feats.append("SecureCore")
+        if server.supports_tor:
+            feats.append("Tor")
+        return " · ".join(feats)
+
     def _refresh_table(self, *_ignored) -> None:
-        ranked = self._visible_servers()
-        self.table.setRowCount(0)
-        for server in ranked:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            self._set_item(row, 0, server.exit_country)
-            self._set_item(row, 1, server.name)
-            self._set_item(row, 2, server.city or "—")
-            load_widget = QLabel()
-            load_widget.setPixmap(resources.load_bar_pixmap(server.load))
-            load_widget.setToolTip(f"{server.load:.0f}% load")
-            self.table.setCellWidget(row, 3, load_widget)
-            feats = ["Free"]
-            if server.supports_p2p:
-                feats.append("P2P")
-            if server.is_secure_core:
-                feats.append("SecureCore")
-            if server.supports_tor:
-                feats.append("Tor")
-            self._set_item(row, 4, " · ".join(feats) or "—")
-            self.table.setRowHeight(row, 30)
+        """Rebuild the region-grouped server tree.
 
-    def _set_item(self, row: int, col: int, text: str) -> None:
-        item = QTableWidgetItem(text)
-        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-        self.table.setItem(row, col, item)
-
-    def _server_at_row(self, row: int) -> Optional[LogicalServer]:
+        Top-level rows are region headers (click to expand / collapse,
+        showing every server in that region with its live load); each
+        child row is an individual server. Regions sort by country then
+        region code; within a region servers keep the fastest-first
+        ranking order.
+        """
         ranked = self._visible_servers()
-        return ranked[row] if 0 <= row < len(ranked) else None
+        groups: dict = {}
+        for s in ranked:
+            groups.setdefault(region_of(s), []).append(s)
+
+        def _country_of(region: str) -> str:
+            return next((s.exit_country for s in groups[region]
+                         if s.exit_country), "")
+
+        # (country, region) ordering: countries alphabetically, and a
+        # bare country header ("US") before its city regions ("US-NY")
+        order = sorted(groups, key=lambda r: (_country_of(r), r))
+
+        self.tree.clear()
+        searching = bool(self.search.text().strip())
+        for region in order:
+            servers = groups[region]
+            cities = {s.city for s in servers if s.city}
+            city_label = cities.pop() if len(cities) == 1 else ""
+            avg_load = sum(s.load for s in servers) / len(servers)
+
+            hdr = QTreeWidgetItem([region, city_label, "", ""])
+            hdr.setData(0, Qt.UserRole, "region")
+            hdr.setData(0, Qt.UserRole + 1, region)
+            font = hdr.font(0)
+            font.setBold(True)
+            for col in range(4):
+                hdr.setFont(col, font)
+            self.tree.addTopLevelItem(hdr)
+            avg_bar = QLabel()
+            avg_bar.setPixmap(resources.load_bar_pixmap(avg_load))
+            avg_bar.setToolTip(f"region average load {avg_load:.0f}%")
+            self.tree.setItemWidget(hdr, 2, avg_bar)
+            self.tree.setItemWidget(hdr, 3, QLabel(
+                f"{len(servers)} server{'s' if len(servers) != 1 else ''}"))
+
+            hdr.setExpanded(searching or region in self._expanded_regions)
+            for server in servers:
+                child = QTreeWidgetItem(
+                    [server.name, server.city or "—", "", ""])
+                child.setData(0, Qt.UserRole, "server")
+                child.setData(0, Qt.UserRole + 1, server.id)
+                hdr.addChild(child)
+                bar = QLabel()
+                bar.setPixmap(resources.load_bar_pixmap(server.load))
+                bar.setToolTip(f"{server.load:.0f}% load")
+                self.tree.setItemWidget(child, 2, bar)
+                self.tree.setItemWidget(child, 3, QLabel(
+                    self._server_features_label(server)))
+
+    def _on_item_clicked(self, item: QTreeWidgetItem, _col: int) -> None:
+        """Region headers toggle expansion; server rows select the server."""
+        kind = item.data(0, Qt.UserRole)
+        if kind == "region":
+            region = item.data(0, Qt.UserRole + 1)
+            expanded = not item.isExpanded()
+            item.setExpanded(expanded)
+            if expanded:
+                self._expanded_regions.add(region)
+            else:
+                self._expanded_regions.discard(region)
+            return
+        server = self._server_at_item(item)
+        if server:
+            self.selected_server = server
+            self.fastest_toggle.blockSignals(True)
+            self.fastest_toggle.setChecked(False)
+            self.fastest_toggle.blockSignals(False)
+            update(autoconnect_fastest=False)
+            self.controller.reload_settings()
+            self.statusBar().showMessage(f"selected {server.name}", 4000)
+
+    def _on_item_double_clicked(self, item: QTreeWidgetItem, _col: int) -> None:
+        """Double-click a server row to connect (headers just toggle)."""
+        if item.data(0, Qt.UserRole) == "region":
+            self._on_item_clicked(item, _col)
+            return
+        server = self._server_at_item(item)
+        if server:
+            self.selected_server = server
+        self._on_connect_clicked()
+
+    def _server_at_item(self, item: QTreeWidgetItem) -> Optional[LogicalServer]:
+        sid = item.data(0, Qt.UserRole + 1)
+        if not sid:
+            return None
+        for s in self._visible_servers():
+            if s.id == sid:
+                return s
+        return None
 
     # ---------------------------------------------------------------- misc
     def _update_connect_button(self) -> None:

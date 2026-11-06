@@ -18,13 +18,16 @@ guest server list):
 2. ``POST /auth/v4/credentialless`` with the same ``Payload``, bearer-
    authenticated with the anonymous token -> returns the full guest
    session (``Scopes`` including ``vpn``, ``LocalID``, ``EventID``).
-3. Standard VPN endpoints (``/vpn/v2``, ``/vpn/v2/logicals``,
-   ``/vpn/v1/certificate``) are then reachable with the guest bearer
-   token. Guest tier is always 0 (free servers only).
+3. Standard VPN endpoints (``/vpn/v2``, ``/vpn/v1/logicals``
+   (primary, carries live loads — fallback ``/vpn/v2/logicals``),
+   ``/vpn/v1/loads``, ``/vpn/v1/certificate``) are then reachable with
+   the guest bearer token. Guest tier is always 0 (free servers only).
 4. The WireGuard tunnel uses *fixed* addresses (10.2.0.2/32 client,
    10.2.0.1 gateway/DNS) — they are NOT part of the certificate
    response; the cert PEM authenticates the session with Proton's
-   local agent (10.2.0.1:65432) inside the tunnel.
+   local agent (10.2.0.1:65432) inside the tunnel. The WG private key
+   is derived from the session's Ed25519 device keypair (official
+   flow), NOT generated separately.
 
 This module is async-only (uses ``httpx.AsyncClient``) and has no Qt or
 aioquic dependency.
@@ -33,6 +36,7 @@ aioquic dependency.
 from __future__ import annotations
 
 import base64
+import hashlib
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -133,12 +137,13 @@ def make_challenge_payload() -> dict:
 def gen_device_keypair() -> Tuple[str, bytes]:
     """Generate a fresh Ed25519 keypair identifying this installation.
 
-    Returns ``(base64_public_key, raw_32_byte_private_key)``. NOTE: the
-    official credentialless flow does NOT send device keys to the server
-    (the challenge payload carries device metadata only) — this keypair
-    is a purely local device identity, kept in the stored guest session
-    so resumed sessions keep a stable fingerprint. The WireGuard identity
-    is the separate X25519 keypair from :func:`gen_x25519_keypair`.
+    Returns ``(base64_public_key, raw_32_byte_seed)``. The *public* half
+    (in PKIX PEM form, see :func:`ed25519_pub_pem`) is what the official
+    clients send to ``POST /vpn/v1/certificate`` as ``ClientPublicKey``;
+    the WireGuard private key is *derived* from the same keypair (see
+    :func:`ed25519_to_x25519_priv_b64`) — the server converts the
+    Ed25519 point to its Montgomery (X25519) form when binding the
+    certificate, which is why the two must come from one keypair.
 
     Uses ``cryptography`` (already pulled in transitively via aioquic).
     """
@@ -159,6 +164,44 @@ def gen_device_keypair() -> Tuple[str, bytes]:
         encryption_algorithm=serialization.NoEncryption(),
     )
     return base64.b64encode(pub_bytes).decode(), priv_bytes
+
+
+def ed25519_pub_pem(priv_bytes: bytes) -> str:
+    """Ed25519 public key as a PKIX (SubjectPublicKeyInfo) PEM string.
+
+    This is the exact ``ClientPublicKey`` form the official clients send
+    to ``POST /vpn/v1/certificate`` — ProtonVPN/android-app
+    ``CertInfo.publicKeyPem`` (gopenpgp ``publicKeyPKIXPem()``) and the
+    Linux client's ``KeyHandler.ed25519_pk_pem``. A raw base64 X25519 key
+    is *rejected* there with Code 2001 "unable to read the key, please
+    provide valid EC key".
+    """
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+        Ed25519PrivateKey,
+    )
+    priv = Ed25519PrivateKey.from_private_bytes(priv_bytes)
+    return priv.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("ascii")
+
+
+def ed25519_to_x25519_priv_b64(priv_bytes: bytes) -> str:
+    """Derive the WireGuard X25519 private key from an Ed25519 seed.
+
+    Same conversion as PyNaCl's ``crypto_sign_ed25519_sk_to_curve25519``
+    and gopenpgp's ``KeyPair.toX25519Base64()``: SHA-512 of the 32-byte
+    seed, first 32 bytes, RFC 7748-clamped. The official clients use the
+    result verbatim as the WireGuard ``[Interface] PrivateKey`` — it
+    matches the Montgomery form of the Ed25519 public point sent in the
+    certificate request.
+    """
+    h = bytearray(hashlib.sha512(priv_bytes).digest()[:32])
+    h[0] &= 248
+    h[31] &= 127
+    h[31] |= 64
+    return base64.b64encode(bytes(h)).decode()
 
 
 class GuestAuthError(RuntimeError):
@@ -371,6 +414,11 @@ class GuestCertificate:
     ``Constants.kt`` (they are *not* in the API response): client
     ``10.2.0.2/32`` (+ ``2a07:b944::2:2/128``), gateway/DNS
     ``10.2.0.1`` (+ ``2a07:b944::2:1``).
+
+    ``wg_private_key_b64`` is the X25519 private key *derived from the
+    session's Ed25519 device keypair* (official flow: gopenpgp
+    ``KeyPair.toX25519Base64()``) — it pairs with the public key the
+    request carried, so it is the WireGuard ``[Interface] PrivateKey``.
     """
 
     certificate_pem: str
@@ -381,7 +429,8 @@ class GuestCertificate:
     ipv6: Optional[str] = VPN_CLIENT_IP_V6
     dns_ips: List[str] = field(
         default_factory=lambda: [VPN_GATEWAY_IP, VPN_GATEWAY_IP_V6])
-    client_public_key_b64: str = ""
+    client_public_key_pem: str = ""   # the PKIX PEM sent in the request
+    wg_private_key_b64: str = ""      # X25519 form of the same keypair
 
 
 # ---------------------------------------------------------------------------
@@ -401,7 +450,7 @@ class GuestAuth:
         async with GuestAuth() as auth:
             session = await auth.login()
             servers = await auth.fetch_logicals(session)
-            cert = await auth.fetch_certificate(session, client_pub_b64)
+            cert = await auth.fetch_certificate(session)
     """
 
     def __init__(
@@ -585,81 +634,149 @@ class GuestAuth:
 
     # ---- 6. logicals ---------------------------------------------------
 
+    @staticmethod
+    def _parse_logical_entry(entry: dict) -> Optional[GuestLogicalServer]:
+        """Parse one raw logical-server JSON entry (v1 or v2 shape).
+
+        Returns ``None`` for entries that are not free-tier (guest mode
+        is free-only). ``Status`` is read from the logical level first
+        (v1: int; v2: int-or-bool per the official model's
+        ``VpnIntToBoolSerializer``), then from the first physical server.
+        """
+        try:
+            tier = int(entry.get("Tier", 0))
+        except (TypeError, ValueError):
+            tier = 0
+        # Filter out paid (non-free) servers — guest mode is free-only.
+        if tier != 0:
+            return None
+        servers_arr = entry.get("Servers") or []
+        first = servers_arr[0] if servers_arr else {}
+        try:
+            features = int(entry.get("Features", 0))
+        except (TypeError, ValueError):
+            features = 0
+
+        def _status(obj: dict) -> int:
+            v = obj.get("Status")
+            if isinstance(v, bool):
+                return 1 if v else 0
+            try:
+                return 1 if int(v) == 1 else 0
+            except (TypeError, ValueError):
+                return 0
+
+        status = _status(entry) if "Status" in entry else _status(first)
+        try:
+            load = float(entry.get("Load", 0.0))
+        except (TypeError, ValueError):
+            load = 0.0
+        try:
+            score = float(entry.get("Score", 0.0))
+        except (TypeError, ValueError):
+            score = 0.0
+        return GuestLogicalServer(
+            server_id=str(entry.get("ID", "")),
+            name=str(entry.get("Name", "")),
+            exit_country=str(entry.get("ExitCountry", "")),
+            city=entry.get("City"),
+            tier=tier,
+            features=features,
+            load=load,
+            score=score,
+            domain=str(first.get("Domain", "")),
+            entry_ip=str(first.get("EntryIP", "")),
+            x25519_public_key=str(first.get("X25519PublicKey", "")),
+            status=status,
+        )
+
+    async def _get_json(self, url: str, session: GuestSession,
+                        params: Optional[dict], context: str) -> dict:
+        resp = await self.client.get(
+            url, params=params, headers=self._auth_headers(session))
+        resp.raise_for_status()
+        return self._unwrap(resp.json(), context=context)
+
+    async def fetch_loads(self, session: GuestSession) -> Dict[str, float]:
+        """``GET /vpn/v1/loads`` — live per-logical loads.
+
+        The endpoint the official clients poll every ~15 minutes (the
+        Linux client's ``MixinEndpointV1.LOADS``). Returns
+        ``{server_id: load_percent}``.
+        """
+        data = await self._get_json(f"{API_BASE}/vpn/v1/loads", session,
+                                    None, context="GET /vpn/v1/loads")
+        out: Dict[str, float] = {}
+        for item in data.get("LogicalServers", []) or []:
+            sid = str(item.get("ID", ""))
+            try:
+                out[sid] = float(item.get("Load", 0.0))
+            except (TypeError, ValueError):
+                continue
+        return out
+
     async def fetch_logicals(
         self,
         session: GuestSession,
         *,
-        protocols: str = "wireguard",
         with_state: bool = True,
     ) -> List[GuestLogicalServer]:
-        """``GET /vpn/v2/logicals`` — parse to :class:`GuestLogicalServer`.
+        """Free-tier (Tier=0) logical servers **with live loads**.
 
-        Only Tier=0 (free) servers are returned — guest mode is
-        free-only; paid (Plus / Visionary) servers are filtered out
-        because the guest bearer token cannot obtain a certificate for
-        them. Each entry's first physical server is used as the
-        WireGuard endpoint (``domain`` / ``entry_ip`` /
-        ``x25519_public_key``).
+        Endpoint strategy (mirrors the official clients):
+
+        * **Primary: ``GET /vpn/v1/logicals?SecureCoreFilter=all&
+          WithState=true``** — the exact URL of the official Linux
+          client's v1 flow; the v1 response carries real per-logical
+          ``Load`` values inline. Each entry's first physical server is
+          the WireGuard endpoint (``domain`` / ``entry_ip`` /
+          ``x25519_public_key``).
+        * **Fallback: ``GET /vpn/v2/logicals`` with
+          ``WithEntriesForProtocols=wireguard``** — used when v1 is
+          unavailable. The v2 payload reports loads as zero (official
+          clients compute them from the binary status blob
+          ``/vpn/v2/status/{StatusID}/binary``), so after a v2 fetch the
+          live loads are merged in from :meth:`fetch_loads` when that
+          endpoint is reachable — without it every load would read 0%.
+
+        Paid (Plus / Visionary) servers are filtered out: guest mode is
+        free-only and the guest bearer token cannot obtain a certificate
+        for them.
         """
-        url = f"{API_BASE}/vpn/v2/logicals"
-        params = {
-            "WithEntriesForProtocols": protocols,
-            # Proton expects a lower-cased boolean string here.
-            "WithState": "true" if with_state else "false",
-        }
-        headers = self._auth_headers(session)
-        resp = await self.client.get(url, params=params, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
-        unwrapped = self._unwrap(data, context="GET /vpn/v2/logicals")
-        raw_servers = unwrapped.get("LogicalServers", []) or []
-        out: List[GuestLogicalServer] = []
-        for entry in raw_servers:
+        raw: Optional[List[dict]] = None
+        try:
+            data = await self._get_json(
+                f"{API_BASE}/vpn/v1/logicals", session,
+                {"SecureCoreFilter": "all",
+                 "WithState": "true" if with_state else "false"},
+                context="GET /vpn/v1/logicals")
+            raw = data.get("LogicalServers") or []
+        except Exception:  # noqa: BLE001 — v1 unavailable, fall back to v2
+            raw = None
+
+        from_v2 = False
+        if not raw:
+            from_v2 = True
+            data = await self._get_json(
+                f"{API_BASE}/vpn/v2/logicals", session,
+                {"WithEntriesForProtocols": "wireguard",
+                 "WithState": "true" if with_state else "false"},
+                context="GET /vpn/v2/logicals")
+            raw = data.get("LogicalServers") or []
+
+        out = [s for s in (self._parse_logical_entry(e) for e in raw)
+               if s is not None]
+
+        if from_v2:
+            # v2 payloads report zero loads — merge the live values from
+            # /vpn/v1/loads when available (best-effort).
             try:
-                tier = int(entry.get("Tier", 0))
-            except (TypeError, ValueError):
-                tier = 0
-            # Filter out paid (non-free) servers — guest mode is free-only.
-            if tier != 0:
-                continue
-            servers_arr = entry.get("Servers") or []
-            first = servers_arr[0] if servers_arr else {}
-            try:
-                features = int(entry.get("Features", 0))
-            except (TypeError, ValueError):
-                features = 0
-            try:
-                status = int(first.get("Status", 0))
-            except (TypeError, ValueError):
-                status = 0
-            # The current API returns Status as a JSON boolean
-            # (``isOnline: Boolean`` in the official model); accept both.
-            if isinstance(first.get("Status"), bool):
-                status = 1 if first["Status"] else 0
-            try:
-                load = float(entry.get("Load", 0.0))
-            except (TypeError, ValueError):
-                load = 0.0
-            try:
-                score = float(entry.get("Score", 0.0))
-            except (TypeError, ValueError):
-                score = 0.0
-            out.append(
-                GuestLogicalServer(
-                    server_id=str(entry.get("ID", "")),
-                    name=str(entry.get("Name", "")),
-                    exit_country=str(entry.get("ExitCountry", "")),
-                    city=entry.get("City"),
-                    tier=tier,
-                    features=features,
-                    load=load,
-                    score=score,
-                    domain=str(first.get("Domain", "")),
-                    entry_ip=str(first.get("EntryIP", "")),
-                    x25519_public_key=str(first.get("X25519PublicKey", "")),
-                    status=status,
-                )
-            )
+                loads = await self.fetch_loads(session)
+                for s in out:
+                    if s.server_id in loads:
+                        s.load = loads[s.server_id]
+            except Exception:  # noqa: BLE001 — loads are best-effort
+                pass
         return out
 
     # ---- 7. wireguard certificate --------------------------------------
@@ -667,7 +784,6 @@ class GuestAuth:
     async def fetch_certificate(
         self,
         session: GuestSession,
-        client_public_key_b64: str,
         *,
         persistent: bool = True,
     ) -> GuestCertificate:
@@ -685,13 +801,23 @@ class GuestAuth:
         inside the tunnel), so the returned dataclass populates
         ``ipv4``/``ipv6``/``dns_ips`` from those constants.
 
-        ``client_public_key_b64`` should be a base64-encoded X25519
-        public key (NOT the Ed25519 device key — WireGuard uses
-        Curve25519). The caller is responsible for generating it.
+        **Key flow (the official one):** the ``ClientPublicKey`` is the
+        session's Ed25519 *device* public key as a PKIX
+        (SubjectPublicKeyInfo) PEM — gopenpgp ``publicKeyPKIXPem()`` in
+        the Android app, ``KeyHandler.ed25519_pk_pem`` in the Linux
+        client. The WireGuard private key is *derived from the same
+        keypair* (X25519 form of the seed, see
+        :func:`ed25519_to_x25519_priv_b64`) and returned as
+        ``GuestCertificate.wg_private_key_b64`` — the server converts the
+        Ed25519 point to its Montgomery form when binding the
+        certificate, so the two halves always match. Sending a raw
+        base64 X25519 key instead is rejected with Code 2001
+        "unable to read the key, please provide valid EC key".
         """
         url = f"{API_BASE}/vpn/v1/certificate"
+        pub_pem = ed25519_pub_pem(session.device_ed25519_priv)
         body = {
-            "ClientPublicKey": client_public_key_b64,
+            "ClientPublicKey": pub_pem,
             "ClientPublicKeyMode": "EC",
             "DeviceName": "SM-S901U",
             "Mode": "session",
@@ -718,7 +844,9 @@ class GuestAuth:
             ipv4=VPN_CLIENT_IP,
             ipv6=VPN_CLIENT_IP_V6 if unwrapped.get("IPv6") is not False else None,
             dns_ips=[VPN_GATEWAY_IP, VPN_GATEWAY_IP_V6],
-            client_public_key_b64=client_public_key_b64,
+            client_public_key_pem=pub_pem,
+            wg_private_key_b64=ed25519_to_x25519_priv_b64(
+                session.device_ed25519_priv),
         )
 
 
@@ -728,16 +856,17 @@ class GuestAuth:
 
 
 def gen_x25519_keypair() -> Tuple[str, str]:
-    """Generate a fresh X25519 keypair for WireGuard.
+    """Generate a fresh standalone X25519 keypair.
 
     Returns ``(base64_public_key, base64_private_key)`` — both are 44-char
-    base64 strings (32 raw bytes each). The *public* key is sent to Proton
-    in ``POST /vpn/v1/certificate`` as ``ClientPublicKey``; the *private*
-    key is the WireGuard ``[Interface] PrivateKey`` for the tunnel.
+    base64 strings (32 raw bytes each).
 
-    This is distinct from the Ed25519 device keypair used in the
-    credentialless challenge — WireGuard uses Curve25519 (X25519), not
-    Ed25519.
+    NOTE: the guest-mode certificate flow no longer uses this — the
+    official clients derive the WireGuard keypair from the session's
+    Ed25519 device key (see :func:`ed25519_to_x25519_priv_b64`) so the
+    ``ClientPublicKey`` PEM and the WG private key always pair up. This
+    helper remains for ad-hoc key generation (e.g. tests and future
+    engines).
     """
     from cryptography.hazmat.primitives.asymmetric.x25519 import (
         X25519PrivateKey,

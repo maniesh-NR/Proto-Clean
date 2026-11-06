@@ -23,6 +23,21 @@
   </description>
   <launchable type="desktop-id">app.protoclean.ProtoClean.desktop</launchable>
   <releases>
+    <release version="0.6.1" date="2026-11-06">
+      <description>
+        <p>Server list reworked: servers are grouped under collapsible
+        region headers (press a region to expand its servers, each with
+        its live load; headers show the region's average load).</p>
+        <p>Guest mode fixes: server loads now show real values (the v1
+        logicals endpoint carries them inline; a v2 fallback merges the
+        live loads from /vpn/v1/loads), and guest connections use the
+        official certificate key flow — the Ed25519 device public key
+        (PKIX PEM) with the WireGuard private key derived from the same
+        keypair, replacing the rejected raw X25519 key (Code 2001).</p>
+        <p>Android: APKs are now release-signed (v1+v2+v3 schemes) so
+        Play Protect no longer flags them as unsafe debug builds.</p>
+      </description>
+    </release>
     <release version="0.6.0" date="2026-11-04">
       <description>
         <p>Guest mode + Material Design 3 UI.</p>

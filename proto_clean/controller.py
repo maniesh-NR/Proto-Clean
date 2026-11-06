@@ -517,14 +517,18 @@ class Controller:
         try:
             self._set_state(State.CONNECTING,
                             f"generating WireGuard cert for {server.name}…")
-            # Generate a fresh X25519 keypair for this connection (the
-            # public key is sent to Proton; the private key goes into the
-            # wg-quick [Interface] block).
-            client_pub_b64, client_priv_b64 = gen_x25519_keypair()
+            # Official key flow: the certificate request carries the
+            # session's Ed25519 device public key (PKIX PEM) and the
+            # WireGuard private key is DERIVED from the same keypair
+            # (X25519 form of the seed) — the server binds the cert to
+            # the Montgomery form of that exact key, so the two always
+            # pair up (a raw X25519 key here is rejected with Code 2001
+            # "unable to read the key, please provide valid EC key").
             coro = self.guest_auth.fetch_certificate(
-                self.guest_session, client_pub_b64, persistent=True)
+                self.guest_session, persistent=True)
             fut = asyncio.run_coroutine_threadsafe(coro, self._guest_loop)
             cert = fut.result(timeout=60)
+            client_priv_b64 = cert.wg_private_key_b64
 
             # DNS override: Proto Clean's DNS blocker redirects 127.0.0.1
             # on Linux/macOS via the firewall; Windows uses the

@@ -43,3 +43,23 @@ def rank_servers(servers: List[LogicalServer], max_tier: int = 0) -> List[Logica
 def fastest_server(servers: List[LogicalServer], max_tier: int = 0) -> Optional[LogicalServer]:
     ranked = rank_servers(servers, max_tier)
     return ranked[0] if ranked else None
+
+
+def region_of(server: LogicalServer) -> str:
+    """Region grouping key for the collapsible server list.
+
+    Proton names its logical servers ``<REGION>#<index>`` where the
+    region is a country or a country-city code (``US-FREE#3``,
+    ``US-NY#1``, ``SE#2``, ``JP-FREE#1``). The header a group of servers
+    folds under is that region prefix, with the free-tier ``-FREE``
+    marker stripped so all of a country's free servers (``US-FREE#1..N``)
+    fold under the country itself (``US``); non-free city servers keep
+    their city region (``US-NY``). Falls back to the exit country when
+    the name carries no ``#`` separator.
+    """
+    name = (server.name or "").split("#", 1)[0].strip()
+    if name.upper().endswith("-FREE"):
+        name = name[:-len("-FREE")].strip()
+    if name:
+        return name
+    return server.exit_country or "?"

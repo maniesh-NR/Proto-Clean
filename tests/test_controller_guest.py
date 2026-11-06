@@ -67,12 +67,11 @@ class _FakeGuestAuth:
             raise self._raise_on_login
         return self._login_session
 
-    async def fetch_logicals(self, session) -> List[GuestLogicalServer]:
+    async def fetch_logicals(self, session, *, with_state=True) -> List[GuestLogicalServer]:
         self.logicals_calls += 1
         return list(self._logicals)
 
-    async def fetch_certificate(self, session, client_pub_b64, *,
-                                persistent=True) -> GuestCertificate:
+    async def fetch_certificate(self, session, *, persistent=True) -> GuestCertificate:
         self.cert_calls += 1
         return self._cert
 
@@ -124,7 +123,8 @@ def _make_cert() -> GuestCertificate:
         ipv4="10.2.0.5",
         ipv6=None,
         dns_ips=["10.140.0.1"],
-        client_public_key_b64="clientPubKeyB64==",
+        client_public_key_pem="-----BEGIN PUBLIC KEY-----\nFAKEPUB\n-----END PUBLIC KEY-----\n",
+        wg_private_key_b64="clientWgPrivKeyBase64==",
     )
 
 
@@ -328,7 +328,11 @@ def test_guest_connect_builds_wg_config_and_brings_up_tunnel(guest_controller, m
     # The wg-quick config has the expected shape.
     assert "[Interface]" in config_text
     assert "[Peer]" in config_text
-    assert "PrivateKey = " in config_text
+    # The WG private key is the one DERIVED from the session's Ed25519
+    # device key (returned by the certificate call) — not a fresh random
+    # X25519 keypair (that mismatch used to make Proton reject the cert
+    # request with Code 2001).
+    assert "PrivateKey = clientWgPrivKeyBase64==" in config_text
     assert "10.2.0.5/32" in config_text        # IPv4 from cert
     assert "1.2.3.4:51820" in config_text      # entry_ip:port
     assert "serverWgPubKeyBase64==" in config_text   # server WG pubkey

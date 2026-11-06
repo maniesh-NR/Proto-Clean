@@ -77,6 +77,8 @@ except ImportError:  # pragma: no cover - exercised only on legacy Qt5
         QWidget = _Stub()
         QTableWidget = _Stub()
         QTableWidgetItem = _Stub()
+        QTreeWidget = _Stub()
+        QTreeWidgetItem = _Stub()
         QHeaderView = _Stub()
         QAbstractItemView = _Stub()
         QSystemTrayIcon = _Stub()

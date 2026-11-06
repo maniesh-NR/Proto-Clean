@@ -9,6 +9,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -97,21 +98,56 @@ object GuestApi {
     fun makeChallengePayload(): JSONObject = JSONObject().put(
         "Payload", JSONObject().put(CHALLENGE_FRAME_KEY, makeChallengeFrame()))
 
-    /** Generates a fresh local device identity keypair. NOTE: the
-     *  official credentialless flow does NOT send device keys — this is
-     *  a purely local fingerprint kept in the stored guest session so
-     *  resumed sessions stay stable. Returns (base64_pub, base64_priv). */
+    /** Generates a fresh local Ed25519 device/certificate keypair.
+     *  Returns (base64_pub, base64_seed). The PUBLIC half (as a PKIX PEM,
+     *  see [ed25519PubPem]) is what the official clients send to
+     *  `POST /vpn/v1/certificate` as `ClientPublicKey`; the WireGuard
+     *  private key is DERIVED from the same keypair
+     *  ([ed25519ToX25519PrivB64]) — the two must always pair up. */
     fun genDeviceKeypair(): Pair<String, String> {
-        val rand = SecureRandom()
-        val priv = ByteArray(32).also { rand.nextBytes(it) }
-        val pub = ByteArray(32).also { rand.nextBytes(it) }
-        return base64(pub) to base64(priv)
+        val seed = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        val pub = Ed25519.publicKeyFromSeed(seed)
+        return base64(pub) to base64(seed)
     }
 
-    /** Generate a fresh X25519 (Curve25519) keypair for WireGuard.
-     *  The public key is sent to Proton in `POST /vpn/v1/certificate`
-     *  as `ClientPublicKey`; the private key is the WireGuard
-     *  `[Interface] PrivateKey`. Uses a self-contained public-domain
+    /** The Ed25519 public key of a 32-byte seed, as a PKIX
+     *  (SubjectPublicKeyInfo) PEM — the exact `ClientPublicKey` form
+     *  the official clients send to `POST /vpn/v1/certificate`
+     *  (gopenpgp `publicKeyPKIXPem()` / Linux `KeyHandler.ed25519_pk_pem`).
+     *  A raw base64 X25519 key is rejected there with Code 2001
+     *  "unable to read the key, please provide valid EC key". */
+    fun ed25519PubPem(seed: ByteArray): String {
+        val pub = Ed25519.publicKeyFromSeed(seed)
+        // DER SubjectPublicKeyInfo for Ed25519:
+        // 302a300506032b6570032100 || 32-byte key
+        val der = ByteArray(12 + 32)
+        val prefix = intArrayOf(
+            0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00)
+        for (i in prefix.indices) der[i] = prefix[i].toByte()
+        System.arraycopy(pub, 0, der, 12, 32)
+        val b64 = base64(der)
+        return "-----BEGIN PUBLIC KEY-----\n$b64\n-----END PUBLIC KEY-----\n"
+    }
+
+    /** Derive the WireGuard X25519 private key from an Ed25519 seed —
+     *  the same conversion as PyNaCl's
+     *  `crypto_sign_ed25519_sk_to_curve25519` and gopenpgp's
+     *  `KeyPair.toX25519Base64()` (SHA-512 of the seed, first 32 bytes,
+     *  RFC 7748-clamped). Matches the Montgomery form of the public
+     *  point sent in the certificate request. */
+    fun ed25519ToX25519PrivB64(seed: ByteArray): String {
+        val h = MessageDigest.getInstance("SHA-512").digest(seed).copyOfRange(0, 32)
+        h[0] = (h[0].toInt() and 248).toByte()
+        h[31] = ((h[31].toInt() and 127) or 64).toByte()
+        return base64(h)
+    }
+
+    /** Generate a fresh standalone X25519 (Curve25519) keypair.
+     *  NOTE: the guest certificate flow no longer uses this — the
+     *  official clients derive the WireGuard keypair from the session's
+     *  Ed25519 device key ([ed25519ToX25519PrivB64]) so the
+     *  `ClientPublicKey` PEM and the WG private key always pair up.
+     *  Kept for ad-hoc key generation. Uses the self-contained
      *  TweetNaCl-derived Curve25519 scalar-base multiplication. */
     fun genX25519Keypair(): Pair<String, String> {
         val rand = SecureRandom()
@@ -276,7 +312,10 @@ data class GuestCertificate(
     val ipv6: String? = GuestApi.VPN_CLIENT_IP_V6,
     val dnsIps: List<String> = listOf(
         GuestApi.VPN_GATEWAY_IP, GuestApi.VPN_GATEWAY_IP_V6),
-    val clientPublicKeyB64: String = "",
+    val clientPublicKeyPem: String = "",
+    // X25519 form of the session's Ed25519 device key — pairs with the
+    // public key sent in the request; the WireGuard PrivateKey.
+    val wgPrivateKeyB64: String = "",
 )
 
 /** Async guest-mode Proton API client. The Android mirror of the
@@ -356,56 +395,133 @@ class GuestAuth(
                 context = "GET /vpn/v2")
         }
 
-    /** `GET /vpn/v2/logicals` — parse to `GuestLogicalServer` objects.
-     *  Only Tier=0 (free) servers are returned. */
-    suspend fun fetchLogicals(session: GuestSession): List<GuestLogicalServer> =
+    /** `GET /vpn/v1/logicals?SecureCoreFilter=all&WithState=true` — the
+     *  primary free-tier server list WITH live loads inline (the exact
+     *  URL of the official Linux client's v1 flow). */
+    suspend fun fetchLogicalsV1(session: GuestSession): JSONArray =
         withContext(Dispatchers.IO) {
-            val url = "${GuestApi.API_BASE}/vpn/v2/logicals" +
-                "?WithEntriesForProtocols=wireguard&WithState=true"
+            val url = "${GuestApi.API_BASE}/vpn/v1/logicals" +
+                "?SecureCoreFilter=all&WithState=true"
             val resp = get(url, authHeaders(session),
-                           context = "GET /vpn/v2/logicals")
-            val arr = resp.optJSONArray("LogicalServers") ?: return@withContext emptyList()
-            val out = mutableListOf<GuestLogicalServer>()
+                           context = "GET /vpn/v1/logicals")
+            resp.optJSONArray("LogicalServers") ?: JSONArray()
+        }
+
+    /** `GET /vpn/v1/loads` — live per-logical loads, the endpoint the
+     *  official clients poll every ~15 minutes. Returns {id: load}. */
+    suspend fun fetchLoads(session: GuestSession): Map<String, Float> =
+        withContext(Dispatchers.IO) {
+            val resp = get("${GuestApi.API_BASE}/vpn/v1/loads",
+                           authHeaders(session), context = "GET /vpn/v1/loads")
+            val arr = resp.optJSONArray("LogicalServers") ?: JSONArray()
+            val out = mutableMapOf<String, Float>()
             for (i in 0 until arr.length()) {
                 val e = arr.optJSONObject(i) ?: continue
-                val tier = e.optInt("Tier", 0)
-                if (tier != 0) continue       // free-only filter
-                val servers = e.optJSONArray("Servers")
-                val first = servers?.optJSONObject(0) ?: JSONObject()
-                out += GuestLogicalServer(
-                    serverId = e.optString("ID"),
-                    name = e.optString("Name"),
-                    exitCountry = e.optString("ExitCountry"),
-                    city = if (e.isNull("City")) null else e.optString("City", null),
-                    tier = tier,
-                    features = e.optInt("Features", 0),
-                    load = e.optDouble("Load", 0.0).toFloat(),
-                    score = e.optDouble("Score", 0.0).toFloat(),
-                    domain = first.optString("Domain"),
-                    entryIp = first.optString("EntryIP"),
-                    x25519PublicKey = first.optString("X25519PublicKey"),
-                    // The current API returns Status as a JSON boolean
-                    // (isOnline: Boolean in the official model).
-                    status = if (first.opt("Status") is Boolean)
-                        (if (first.optBoolean("Status")) 1 else 0)
-                    else first.optInt("Status", 0),
-                )
+                out[e.optString("ID")] = e.optDouble("Load", 0.0).toFloat()
             }
             out
         }
 
+    /** Free-tier (Tier=0) logical servers **with live loads**.
+     *
+     * Primary: `/vpn/v1/logicals?SecureCoreFilter=all&WithState=true`
+     * (real per-logical Load values inline). Fallback: `/vpn/v2/logicals`
+     * with `WithEntriesForProtocols=wireguard` — the v2 payload reports
+     * loads as ZERO (official clients compute them from the binary
+     * status blob), so after a v2 fetch the live loads are merged in
+     * from `/vpn/v1/loads` when reachable; without it every load
+     * would read 0%. */
+    suspend fun fetchLogicals(session: GuestSession): List<GuestLogicalServer> =
+        withContext(Dispatchers.IO) {
+            val raw: JSONArray = try {
+                fetchLogicalsV1(session)
+            } catch (e: Exception) {
+                JSONArray()
+            }.let { if (it.length() > 0) it else JSONArray() }
+
+            val fromV2 = raw.length() == 0
+            val arr = if (!fromV2) raw else {
+                val url = "${GuestApi.API_BASE}/vpn/v2/logicals" +
+                    "?WithEntriesForProtocols=wireguard&WithState=true"
+                val resp = get(url, authHeaders(session),
+                               context = "GET /vpn/v2/logicals")
+                resp.optJSONArray("LogicalServers") ?: JSONArray()
+            }
+
+            val out = mutableListOf<GuestLogicalServer>()
+            for (i in 0 until arr.length()) {
+                val e = arr.optJSONObject(i) ?: continue
+                parseLogical(e)?.let { out += it }
+            }
+
+            if (fromV2) {
+                // v2 payloads report zero loads — merge the live values
+                // from /vpn/v1/loads when available (best-effort).
+                runCatching { fetchLoads(session) }.getOrNull()?.let { loads ->
+                    for (i in out.indices) {
+                        loads[out[i].serverId]?.let { live ->
+                            out[i] = out[i].copy(load = live)
+                        }
+                    }
+                }
+            }
+            out
+        }
+
+    /** Parse one raw logical-server JSON entry (v1 or v2 shape);
+     *  null for non-free tiers. `Status` is read from the logical level
+     *  first (v1: int, v2: int-or-bool), then from the first physical. */
+    private fun parseLogical(e: JSONObject): GuestLogicalServer? {
+        val tier = e.optInt("Tier", 0)
+        if (tier != 0) return null        // free-only filter
+        val servers = e.optJSONArray("Servers")
+        val first = servers?.optJSONObject(0) ?: JSONObject()
+        fun statusOf(o: JSONObject): Int = when (val v = o.opt("Status")) {
+            is Boolean -> if (v) 1 else 0
+            is Int -> if (v == 1) 1 else 0
+            is Long -> if (v == 1L) 1 else 0
+            else -> 0
+        }
+        return GuestLogicalServer(
+            serverId = e.optString("ID"),
+            name = e.optString("Name"),
+            exitCountry = e.optString("ExitCountry"),
+            city = if (e.isNull("City")) null else e.optString("City", null),
+            tier = tier,
+            features = e.optInt("Features", 0),
+            load = e.optDouble("Load", 0.0).toFloat(),
+            score = e.optDouble("Score", 0.0).toFloat(),
+            domain = first.optString("Domain"),
+            entryIp = first.optString("EntryIP"),
+            x25519PublicKey = first.optString("X25519PublicKey"),
+            status = if (e.has("Status")) statusOf(e) else statusOf(first),
+        )
+    }
+
     /** `POST /vpn/v1/certificate` — returns the WireGuard session cert.
-     *  Body/response per ProtonVPN/android-app CertificateRequestBody /
-     *  CertificateResponse: `{ClientPublicKey, ClientPublicKeyMode: "EC",
-     *  DeviceName, Mode: "session", Features: []}` -> `{Certificate,
-     *  ExpirationTime, RefreshTime}` (no tunnel addresses in the
-     *  response — they are fixed constants). */
+     *
+     * Body/response per ProtonVPN/android-app CertificateRequestBody /
+     * CertificateResponse: `{ClientPublicKey, ClientPublicKeyMode: "EC",
+     * DeviceName, Mode: "session", Features: []}` -> `{Certificate,
+     * ExpirationTime, RefreshTime}` (no tunnel addresses in the
+     * response — they are fixed constants).
+     *
+     * **Key flow (the official one):** `ClientPublicKey` is the
+     * session's Ed25519 device public key as a PKIX PEM
+     * (gopenpgp `publicKeyPKIXPem()` / Linux `ed25519_pk_pem`); the
+     * WireGuard private key is *derived from the same keypair*
+     * (X25519 form of the seed) and returned as
+     * `GuestCertificate.wgPrivateKeyB64`. A raw X25519 key is rejected
+     * with Code 2001 "unable to read the key, please provide valid EC
+     * key". */
     suspend fun fetchCertificate(
-        session: GuestSession, clientPublicKeyB64: String,
+        session: GuestSession,
         persistent: Boolean = true,
     ): GuestCertificate = withContext(Dispatchers.IO) {
+        val seed = GuestApi.decodeB64(session.deviceEd25519PrivB64)
+        val pubPem = GuestApi.ed25519PubPem(seed)
         val body = JSONObject()
-            .put("ClientPublicKey", clientPublicKeyB64)
+            .put("ClientPublicKey", pubPem)
             .put("ClientPublicKeyMode", "EC")
             .put("DeviceName", "SM-S901U")
             .put("Mode", "session")
@@ -421,7 +537,8 @@ class GuestAuth(
             ipv4 = GuestApi.VPN_CLIENT_IP,
             ipv6 = GuestApi.VPN_CLIENT_IP_V6,
             dnsIps = listOf(GuestApi.VPN_GATEWAY_IP, GuestApi.VPN_GATEWAY_IP_V6),
-            clientPublicKeyB64 = clientPublicKeyB64,
+            clientPublicKeyPem = pubPem,
+            wgPrivateKeyB64 = GuestApi.ed25519ToX25519PrivB64(seed),
         )
     }
 
