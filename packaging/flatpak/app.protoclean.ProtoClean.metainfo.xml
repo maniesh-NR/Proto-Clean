@@ -23,6 +23,25 @@
   </description>
   <launchable type="desktop-id">app.protoclean.ProtoClean.desktop</launchable>
   <releases>
+    <release version="0.6.2" date="2026-11-06">
+      <description>
+        <p>Default blocklists now match uBlock Origin's out-of-the-box
+        set: the five built-in uBlock filter lists, EasyList,
+        EasyPrivacy, the Online Malicious URL Blocklist and Peter
+        Lowe's Ad servers — replacing the single StevenBlack hosts
+        file, on desktop and Android.</p>
+        <p>Smarter filter engine: understands hosts files, per-line
+        domain lists and Adblock/uBlock syntax — ||domain^ network
+        rules with @@||domain^ exceptions (most-specific-wins), while
+        browser-context rules (cosmetic, scriptlet, HTML) are skipped
+        so URL-level rules can never block a whole shared domain. Old
+        single-list defaults migrate automatically; customized lists
+        are never touched.</p>
+        <p>Desktop fix: expanding a region via the tree arrow or
+        double-click no longer desyncs the expansion state (the next
+        refresh no longer collapses regions you opened).</p>
+      </description>
+    </release>
     <release version="0.6.1" date="2026-11-06">
       <description>
         <p>Server list reworked: servers are grouped under collapsible

@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  VERSION: 0.6.1
+  VERSION: 0.6.2
   # lantern-box (Lantern's GPL-3 sing-box fork) — the samizdat engine we
   # bundle. Pinned tag; the port job builds it from source for every
   # target platform (official releases only publish linux binaries).
@@ -554,7 +554,35 @@ jobs:
           tag_name: v${{ env.VERSION }}
           name: Proto Clean v${{ env.VERSION }}
           body: |
-            New in v0.6.1: **region-grouped server list + guest-mode
+            New in v0.6.2: **default blocklists now match uBlock
+            Origin's out-of-the-box set** —
+
+            * **Same defaults as uBlock Origin**: content blocking now
+              ships with the exact filter lists uBlock Origin enables
+              by default — the five built-in uBlock filters lists
+              (Quick fixes, Privacy, Badware risks…), **EasyList**,
+              **EasyPrivacy**, the **Online Malicious URL Blocklist**
+              and **Peter Lowe's Ad servers** — replacing the single
+              StevenBlack hosts file, on desktop and Android alike.
+            * **Smarter filter engine**: a new parser understands hosts
+              files, per-line domain lists and Adblock/uBlock syntax —
+              extracting `||domain^` network rules and `@@||domain^`
+              exceptions while skipping browser-context rules (cosmetic,
+              scriptlet, HTML and URL-specific rules), so a URL-level
+              rule for a shared host can never block the whole shared
+              domain.
+            * **Exceptions done right**: DomainFilter now supports
+              exception rules with most-specific-wins semantics.
+            * **Safe migration**: settings still holding the old
+              single-list default switch to the new set on load;
+              customized lists are never touched, and removed defaults
+              stay re-addable from the presets.
+            * **Desktop fix**: expanding a region via the server tree's
+              arrow (or double-click) no longer desyncs the expansion
+              state — the next server-list refresh no longer collapses
+              regions you opened.
+
+            Also new in v0.6.1: **region-grouped server list + guest-mode
             fixes + release-signed Android APKs** —
 
             * **Server list, reworked**: servers are grouped under
@@ -602,24 +630,24 @@ jobs:
             over the real production paths (chains, WARP hops, the
             whole import universe, QR round-trips, guest-mode ↔
             WireGuard, controller lifecycle) with 6 composition fixes
-            they flushed out. 678 tests passing.
+            they flushed out. 684 tests passing.
 
             ## Downloads
             | Platform | File | Notes |
             |---|---|---|
-            | **Windows 7+ x64** | `Proto-Clean-0.6.1-win7-x64-portable.zip` | Python 3.8 + Qt 5.15 legacy stack |
-            | **Windows 7+ x86 (32-bit)** | `Proto-Clean-0.6.1-win7-x86-portable.zip` | 32-bit Qt 5.15 legacy stack |
-            | **Windows 10/11 x64 (portable)** | `Proto-Clean-0.6.1-win-x64-portable.zip` | Qt 6 modern stack |
-            | **Windows 10/11 x64 (setup)** | `Proto-Clean-0.6.1-win-x64-setup.exe` | Inno Setup installer |
-            | **macOS 10.15 Catalina+ (Intel)** | `Proto-Clean-0.6.1-macos-10.15-catalina-x86_64-portable.zip` | Qt 6.2, runs on 10.14+ |
-            | **macOS 11+ (Apple Silicon)** | `Proto-Clean-0.6.1-macos-11.0-arm64-portable.zip` | native arm64, Qt 6 |
-            | **Linux Mint 21 / Ubuntu 22.04** | `proto-clean_0.6.1-mint21-ubuntu22.04_amd64.deb` | also LMDE-era compatible glibc |
-            | **Linux Mint 22 / Ubuntu 24.04** | `proto-clean_0.6.1-mint22-ubuntu24.04_amd64.deb` | |
-            | **LMDE 6 / Debian 12** | `proto-clean_0.6.1-debian12_amd64.deb` | |
-            | **Linux (portable)** | `Proto-Clean-0.6.1-linux-x86_64-portable.tar.gz` | built on Ubuntu 22.04; runs on Mint 21/22, LMDE 6 |
-            | **Linux (Flatpak)** | `Proto-Clean-0.6.1-x86_64.flatpak` | `flatpak install --user Proto-Clean-0.6.1-x86_64.flatpak` |
-            | **Android 8.0+ (armv7)** | `Proto-Clean-0.6.1-android-armeabi-v7a.apk` | release-signed APK |
-            | **Android 8.0+ (arm64)** | `Proto-Clean-0.6.1-android-arm64-v8a.apk` | release-signed APK |
+            | **Windows 7+ x64** | `Proto-Clean-0.6.2-win7-x64-portable.zip` | Python 3.8 + Qt 5.15 legacy stack |
+            | **Windows 7+ x86 (32-bit)** | `Proto-Clean-0.6.2-win7-x86-portable.zip` | 32-bit Qt 5.15 legacy stack |
+            | **Windows 10/11 x64 (portable)** | `Proto-Clean-0.6.2-win-x64-portable.zip` | Qt 6 modern stack |
+            | **Windows 10/11 x64 (setup)** | `Proto-Clean-0.6.2-win-x64-setup.exe` | Inno Setup installer |
+            | **macOS 10.15 Catalina+ (Intel)** | `Proto-Clean-0.6.2-macos-10.15-catalina-x86_64-portable.zip` | Qt 6.2, runs on 10.14+ |
+            | **macOS 11+ (Apple Silicon)** | `Proto-Clean-0.6.2-macos-11.0-arm64-portable.zip` | native arm64, Qt 6 |
+            | **Linux Mint 21 / Ubuntu 22.04** | `proto-clean_0.6.2-mint21-ubuntu22.04_amd64.deb` | also LMDE-era compatible glibc |
+            | **Linux Mint 22 / Ubuntu 24.04** | `proto-clean_0.6.2-mint22-ubuntu24.04_amd64.deb` | |
+            | **LMDE 6 / Debian 12** | `proto-clean_0.6.2-debian12_amd64.deb` | |
+            | **Linux (portable)** | `Proto-Clean-0.6.2-linux-x86_64-portable.tar.gz` | built on Ubuntu 22.04; runs on Mint 21/22, LMDE 6 |
+            | **Linux (Flatpak)** | `Proto-Clean-0.6.2-x86_64.flatpak` | `flatpak install --user Proto-Clean-0.6.2-x86_64.flatpak` |
+            | **Android 8.0+ (armv7)** | `Proto-Clean-0.6.2-android-armeabi-v7a.apk` | release-signed APK |
+            | **Android 8.0+ (arm64)** | `Proto-Clean-0.6.2-android-arm64-v8a.apk` | release-signed APK |
 
             Every package still bundles **lantern-box** (Lantern's GPL-3
             sing-box fork — samizdat out of the box) and every platform
