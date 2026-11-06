@@ -166,12 +166,26 @@ class MainWindow(QMainWindow):
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        # double-click must not ALSO toggle (the single click that starts
+        # it already toggled) — expansion is single-click + arrow only
+        self.tree.setExpandsOnDoubleClick(False)
         self.tree.itemClicked.connect(self._on_item_clicked)
         self.tree.itemDoubleClicked.connect(self._on_item_double_clicked)
+        # expansion changes made OUTSIDE itemClicked (arrow clicks,
+        # keyboard navigation) never emit itemClicked — Qt handles the
+        # branch indicator before the item view sees the release — so the
+        # authoritative sync for the expanded-regions set is these two
+        # signals, not the click handler
+        self.tree.itemExpanded.connect(self._on_region_expanded)
+        self.tree.itemCollapsed.connect(self._on_region_collapsed)
         root.addWidget(self.tree, 1)
         # region headers the user expanded — kept across refreshes so a
-        # background server-list update never collapses the view
+        # background server-list update never collapses the view. Only
+        # USER-driven changes are remembered: expansion applied while
+        # rebuilding the tree (search auto-expand, restoring the previous
+        # view) is not user intent, hence the _rebuilding_tree guard.
         self._expanded_regions: set = set()
+        self._rebuilding_tree = False
 
         # ---- bottom bar
         bottom = QHBoxLayout()
@@ -548,6 +562,16 @@ class MainWindow(QMainWindow):
         region code; within a region servers keep the fastest-first
         ranking order.
         """
+        # itemExpanded/itemCollapsed fire for the setExpanded() calls
+        # below; those reflect the previous view + search state, not new
+        # user intent, so silence the trackers for the whole rebuild
+        self._rebuilding_tree = True
+        try:
+            self._rebuild_server_tree()
+        finally:
+            self._rebuilding_tree = False
+
+    def _rebuild_server_tree(self) -> None:
         ranked = self._visible_servers()
         groups: dict = {}
         for s in ranked:
@@ -598,17 +622,23 @@ class MainWindow(QMainWindow):
                 self.tree.setItemWidget(child, 3, QLabel(
                     self._server_features_label(server)))
 
+    def _on_region_expanded(self, item: QTreeWidgetItem) -> None:
+        """Remember user-driven expansion (click, arrow, keyboard)."""
+        if not self._rebuilding_tree and item.data(0, Qt.UserRole) == "region":
+            self._expanded_regions.add(item.data(0, Qt.UserRole + 1))
+
+    def _on_region_collapsed(self, item: QTreeWidgetItem) -> None:
+        """Remember user-driven collapse (click, arrow, keyboard)."""
+        if not self._rebuilding_tree and item.data(0, Qt.UserRole) == "region":
+            self._expanded_regions.discard(item.data(0, Qt.UserRole + 1))
+
     def _on_item_clicked(self, item: QTreeWidgetItem, _col: int) -> None:
         """Region headers toggle expansion; server rows select the server."""
         kind = item.data(0, Qt.UserRole)
         if kind == "region":
-            region = item.data(0, Qt.UserRole + 1)
-            expanded = not item.isExpanded()
-            item.setExpanded(expanded)
-            if expanded:
-                self._expanded_regions.add(region)
-            else:
-                self._expanded_regions.discard(region)
+            # just toggle — _on_region_expanded/_collapsed keep the set
+            # in sync for every path (click, arrow, keyboard)
+            item.setExpanded(not item.isExpanded())
             return
         server = self._server_at_item(item)
         if server:
@@ -621,9 +651,9 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"selected {server.name}", 4000)
 
     def _on_item_double_clicked(self, item: QTreeWidgetItem, _col: int) -> None:
-        """Double-click a server row to connect (headers just toggle)."""
+        """Double-click a server row to connect (headers already toggled
+        on the single click that started the double-click)."""
         if item.data(0, Qt.UserRole) == "region":
-            self._on_item_clicked(item, _col)
             return
         server = self._server_at_item(item)
         if server:

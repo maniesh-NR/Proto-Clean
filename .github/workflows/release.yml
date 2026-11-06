@@ -602,7 +602,7 @@ jobs:
             over the real production paths (chains, WARP hops, the
             whole import universe, QR round-trips, guest-mode ↔
             WireGuard, controller lifecycle) with 6 composition fixes
-            they flushed out. 682 tests passing.
+            they flushed out. 678 tests passing.
 
             ## Downloads
             | Platform | File | Notes |
