@@ -120,7 +120,7 @@ class DomainFilter(domains: Set<String>, exceptions: Set<String> = emptySet()) {
                     if (line.isEmpty()) continue
                 }
                 if (line.startsWith("||")) {
-                    var host = line.substring(2).substringBefore("^")
+                    var host = line.substring(2).substringBefore("$").substringBefore("^")
                     if (host.contains('/')) {
                         // URL-specific rule — collapsing it to the bare domain
                         // would block the whole (shared) host

@@ -77,7 +77,6 @@ LEGACY_DEFAULT_BLOCKLIST = BlocklistSource(
     name="StevenBlack unified (ads + malware)",
     url="https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
 )
-LEGACY_DEFAULT_BLOCKLIST_URL = LEGACY_DEFAULT_BLOCKLIST.url
 
 
 def default_blocklists() -> List[BlocklistSource]:

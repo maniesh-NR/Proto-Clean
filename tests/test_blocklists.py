@@ -39,6 +39,7 @@ ADBLOCK_SAMPLE = r"""!
 ||tracker.example.net^$script,third-party   (options: not DNS-level)
 ||malware.example^$document                 (document: DNS-applicable)
 ||everything.example^$all                   (all: DNS-applicable)
+||opts.example$all                          (options without ^ separator)
 ||github.example/some/malware.zip^$document (URL-specific: not DNS-level)
 ||plain.example.org
 @@||ok.ads.example.com^
@@ -61,6 +62,7 @@ def test_parse_filters_adblock_syntax():
     assert "hosts.example.com" in blocked          # hosts lines still work
     assert "malware.example" in blocked            # $document keeps DNS meaning
     assert "everything.example" in blocked         # $all keeps DNS meaning
+    assert "opts.example" in blocked               # options without ^ separator
     # URL-specific rules never collapse to a bare domain (shared hosts!)
     assert "github.example" not in blocked
     # $option rules are context-dependent -> not DNS-blockable

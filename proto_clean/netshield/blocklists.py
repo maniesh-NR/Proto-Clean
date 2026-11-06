@@ -92,7 +92,7 @@ def parse_filters(text: str) -> Tuple[Set[str], Set[str]]:
             if not line:                                # bare "@@" (allow-all)
                 continue
         if line.startswith("||"):
-            host = line[2:].split("^", 1)[0]
+            host = line[2:].split("$", 1)[0].split("^", 1)[0]
             if "/" in host:                              # URL-specific rule
                 continue
             host = host.strip(".").lower()
