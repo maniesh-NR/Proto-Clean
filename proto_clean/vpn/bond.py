@@ -282,6 +282,13 @@ class BondEngine:
         """(engine thread) run the loop until :meth:`shutdown`."""
         try:
             asyncio.run(self._amain())
+        except asyncio.CancelledError:
+            # normal shutdown: shutdown() closes the server, which
+            # cancels serve_forever().  CancelledError is a
+            # BaseException, so this MUST be caught separately —
+            # otherwise every disconnect prints an "Exception in
+            # thread" traceback to stderr.
+            pass
         except Exception as e:    # noqa: BLE001
             if not self.error:
                 self.error = str(e)

@@ -77,18 +77,44 @@ class _BondServerThread(threading.Thread):
                 self.server.listen(self.host, self.port))
             self.ready.set()
             self.loop.run_until_complete(self.server.serve_forever())
+        except asyncio.CancelledError:
+            # normal shutdown via stop(): server.close() cancels
+            # serve_forever().  CancelledError is a BaseException, so
+            # this must not fall through to the thread's default
+            # handler (pytest flags it as an unhandled thread
+            # exception; real servers would print the traceback).
+            pass
         except Exception:  # noqa: BLE001
             self.ready.set()
         finally:
+            # give tasks cancelled by stop() a final loop iteration so
+            # they finish instead of dying as "Task was destroyed but
+            # it is pending" when the loop closes.  The loop itself is
+            # closed by stop() after join() — never here, or a stop()
+            # racing a dead thread would hit a closed loop.
+            try:
+                if not self.loop.is_closed():
+                    pending = asyncio.all_tasks(self.loop)
+                    self.loop.run_until_complete(
+                        asyncio.gather(*pending, return_exceptions=True))
+            except RuntimeError:         # pragma: no cover
+                pass
+            asyncio.set_event_loop(None)
             self.stopped.set()
 
     def stop(self) -> None:
         def _cancel_pending() -> None:
             for task in asyncio.all_tasks(self.loop):
                 task.cancel()
-        self.loop.call_soon_threadsafe(self.server.close)
-        self.loop.call_soon_threadsafe(_cancel_pending)
-        self.loop.call_soon_threadsafe(self.loop.stop)
+        if not self.loop.is_closed():
+            try:
+                self.loop.call_soon_threadsafe(self.server.close)
+                self.loop.call_soon_threadsafe(_cancel_pending)
+                self.loop.call_soon_threadsafe(self.loop.stop)
+            except RuntimeError:         # pragma: no cover
+                pass                     # loop died with the thread
         self.join(timeout=5)
+        if not self.loop.is_closed():
+            self.loop.close()
 
 
