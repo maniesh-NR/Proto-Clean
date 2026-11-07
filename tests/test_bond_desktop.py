@@ -6,12 +6,15 @@ sees one connection per adapter — and the stream must still survive
 when one adapter dies. These tests pin that contract down per desktop
 platform:
 
-* **Linux — real.** 127.0.0.2 / 127.0.0.3 are distinct bind addresses
-  on ``lo`` (the whole 127/8 is local): a bonded session's members
-  must carry exactly those peer IPs, the payload must round-trip
-  byte-identical, BOTH members must carry upload data, balance mode
-  must spread two streams over both adapters, and a server-side
-  member kill must not interrupt the stream (failover).
+* **Real multi-adapter E2E.** 127.0.0.2 / 127.0.0.3 are distinct
+  bind addresses on Linux ``lo`` (the whole 127/8 is local); macOS
+  only configures 127.0.0.1 on lo0 and Windows varies, so the
+  primary interface address is also probed as a second source —
+  wherever the host offers two usable sources, a bonded session's
+  members must carry exactly those peer IPs, the payload must
+  round-trip byte-identical, BOTH members must carry upload data,
+  balance mode must spread two streams over both adapters, and a
+  server-side member kill must not interrupt the stream (failover).
 * **macOS / Windows — discovery replayed, everything else real.**
   Discovery shells out to ``ifconfig`` / ``Get-NetIPAddress`` /
   ``ipconfig``, which do not exist on a Linux test host, so genuine
@@ -76,6 +79,34 @@ def _probe(server_port: int, wanted) -> list:
                 except OSError:
                     pass
     return ok
+
+
+def _primary_ip() -> str:
+    """This host's primary IPv4 ("" when unknown)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 9))     # no packets leave; picks a route
+        return s.getsockname()[0]
+    except OSError:
+        return ""
+    finally:
+        s.close()
+
+
+def _two_bind_ips(server_port: int) -> list:
+    """Two distinct source addresses that can reach 127.0.0.1 here.
+
+    Linux routes all of 127/8 to lo (127.0.0.2/127.0.0.3 work);
+    macOS only configures 127.0.0.1 on lo0 and Windows varies, so
+    the primary interface address is tried as the second source.
+    Empty when the host offers only one usable source address.
+    """
+    candidates = ["127.0.0.2", "127.0.0.3", "127.0.0.1"]
+    primary = _primary_ip()
+    if primary:
+        candidates.append(primary)
+    ok = _probe(server_port, candidates)
+    return ok[:2] if len(ok) >= 2 else []
 
 
 def _settings(server_port, mode="bond", interfaces=(), token=""):
@@ -170,15 +201,15 @@ def _bond_roundtrip(mgr, echo, payload: bytes) -> None:
     c.close()
 
 
-# ------------------------------------------------------------ Linux (real)
-class TestLinuxRealBonding:
+# ------------------------------------------------ real multi-adapter E2E
+class TestMultiAdapterBonding:
     def test_two_adapters_distinct_source_ips(self, echo, bond_server):
         """Bond mode over two real bind addresses: the server sees one
         member per adapter IP, both carry data, payload survives."""
-        ips = _probe(bond_server.port, ["127.0.0.2", "127.0.0.3"])
+        ips = _two_bind_ips(bond_server.port)
         if len(ips) < 2:
-            pytest.skip("host cannot bind two distinct loopback "
-                        "addresses (CI macos/windows legs hit this)")
+            pytest.skip("host offers only one usable source address "
+                        "(CI legs without loopback aliases hit this)")
         mgr = BondManager()
         try:
             mgr.start(_settings(bond_server.port, mode="bond",
@@ -201,10 +232,9 @@ class TestLinuxRealBonding:
         adapters — stream one leaves via adapter A, stream two via B.
         (Finished sessions are dropped from the server's table, so
         observed peers are accumulated across the streams.)"""
-        ips = _probe(bond_server.port, ["127.0.0.2", "127.0.0.3"])
+        ips = _two_bind_ips(bond_server.port)
         if len(ips) < 2:
-            pytest.skip("host cannot bind two distinct loopback "
-                        "addresses")
+            pytest.skip("host offers only one usable source address")
         mgr = BondManager()
         try:
             mgr.start(_settings(bond_server.port, mode="balance",
@@ -234,10 +264,9 @@ class TestLinuxRealBonding:
         """One adapter's connection is killed server-side mid-session:
         the client registers the loss, drops that adapter from the
         schedule, and the stream continues on the survivor."""
-        ips = _probe(bond_server.port, ["127.0.0.2", "127.0.0.3"])
+        ips = _two_bind_ips(bond_server.port)
         if len(ips) < 2:
-            pytest.skip("host cannot bind two distinct loopback "
-                        "addresses")
+            pytest.skip("host offers only one usable source address")
         mgr = BondManager()
         try:
             mgr.start(_settings(bond_server.port, mode="bond",
@@ -419,10 +448,9 @@ class TestMacosDiscovery:
         with mock.patch.object(bondnet, "_run",
                                return_value=IFCONFIG_DUAL):
             adapters = bondnet.list_adapters(platform="macos")
-        standins = _probe(bond_server.port, ["127.0.0.1", "127.0.0.2"])
+        standins = _two_bind_ips(bond_server.port)
         if len(standins) < 2:
-            pytest.skip("host cannot bind two distinct loopback "
-                        "addresses")
+            pytest.skip("host offers only one usable source address")
         # "name=ip" manual-override pairs: en0 stands on standins[0]…
         pairs = [f"{a.name}={ip}" for a, ip in
                  zip(adapters[:2], standins)]
@@ -506,10 +534,9 @@ class TestWindowsDiscovery:
 
     def test_bond_session_over_discovered_adapters(self, echo,
                                                    bond_server):
-        standins = _probe(bond_server.port, ["127.0.0.1", "127.0.0.2"])
+        standins = _two_bind_ips(bond_server.port)
         if len(standins) < 2:
-            pytest.skip("host cannot bind two distinct loopback "
-                        "addresses")
+            pytest.skip("host offers only one usable source address")
         pairs = [f"Ethernet={standins[0]}", f"Wi-Fi={standins[1]}"]
         mgr = BondManager()
         try:
