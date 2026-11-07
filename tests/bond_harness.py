@@ -87,14 +87,23 @@ class _BondServerThread(threading.Thread):
         except Exception:  # noqa: BLE001
             self.ready.set()
         finally:
-            # give tasks cancelled by stop() a final loop iteration so
-            # they finish instead of dying as "Task was destroyed but
-            # it is pending" when the loop closes.  The loop itself is
-            # closed by stop() after join() — never here, or a stop()
-            # racing a dead thread would hit a closed loop.
+            # Drain the loop: cancel every still-pending task (pumps,
+            # handle_member, last_member_left — the latter sleeps 60s,
+            # so without an explicit cancel() the drain below would
+            # wait it out and stop() would time out on join()).
+            # Cancellation is idempotent, so this also covers the case
+            # where stop()'s own _cancel_pending callback already ran.
+            # The loop itself is closed by stop() after join() — never
+            # here, or a stop() racing a dead thread would hit a
+            # closed loop.
             try:
-                if not self.loop.is_closed():
-                    pending = asyncio.all_tasks(self.loop)
+                for _round in range(3):
+                    pending = [t for t in asyncio.all_tasks(self.loop)
+                               if not t.done()]
+                    if not pending:
+                        break
+                    for task in pending:
+                        task.cancel()
                     self.loop.run_until_complete(
                         asyncio.gather(*pending, return_exceptions=True))
             except RuntimeError:         # pragma: no cover
@@ -115,6 +124,16 @@ class _BondServerThread(threading.Thread):
                 pass                     # loop died with the thread
         self.join(timeout=5)
         if not self.loop.is_closed():
-            self.loop.close()
+            if self.loop.is_running():
+                # thread outlived join(): nudge it once, then leave the
+                # daemon thread alone rather than close a running loop
+                # (RuntimeError: Cannot close a running event loop)
+                try:
+                    self.loop.call_soon_threadsafe(self.loop.stop)
+                except RuntimeError:     # pragma: no cover
+                    pass
+                self.join(timeout=2)
+            if not self.loop.is_closed() and not self.loop.is_running():
+                self.loop.close()
 
 
