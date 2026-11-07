@@ -114,6 +114,33 @@ class _Session:
             return False
 
     # --------------------------------------------------------------- up
+    async def _send_chunk(self, chunk: bytes) -> bool:
+        """Upload one chunk, failing over to the next live member.
+
+        A member whose send fails (its adapter died mid-write) is
+        marked down by :meth:`send`; the SAME chunk is then retried on
+        a survivor with the SAME seq — the seq may only advance on a
+        confirmed send, or the server-side reassembler would wait for
+        a gap forever. (A chunk whose bytes were already accepted by
+        the kernel but lost with the dying socket still cannot be
+        retransmitted — that would need member-level ACKs; see the
+        protocol notes in bondproto.py.)
+        """
+        for _ in range(len(self.up_sched.live_indices()) + 1):
+            if not self.live_members():
+                return False
+            idx = self.up_sched.next()
+            member = self.members[idx] \
+                if idx < len(self.members) else None
+            if member is None or not member.alive:
+                continue
+            if await self.send(member, FRAME_DATA, self.up_seq, chunk):
+                self.up_seq += 1
+                return True
+            # send failed -> member is down and the scheduler skips it;
+            # retry the chunk on a survivor
+        return False
+
     async def pump_up(self, app_reader: asyncio.StreamReader) -> None:
         """Application -> adapters: chunk, schedule, frame, send."""
         try:
@@ -122,22 +149,8 @@ class _Session:
                 if not data:
                     break
                 for chunk in chunk_data(data):
-                    sent = False
-                    for _ in range(len(self.up_sched.live_indices()) + 1):
-                        if not self.live_members():
-                            return
-                        idx = self.up_sched.next()
-                        member = self.members[idx] \
-                            if idx < len(self.members) else None
-                        if member is None or not member.alive:
-                            continue
-                        if await self.send(member, FRAME_DATA,
-                                           self.up_seq, chunk):
-                            sent = True
-                        self.up_seq += 1
-                        break
-                    if not sent:
-                        return          # every adapter failed
+                    if not await self._send_chunk(chunk):
+                        return      # every adapter failed
         except (ConnectionError, OSError, asyncio.CancelledError):
             pass
         finally:

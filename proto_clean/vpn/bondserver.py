@@ -140,6 +140,27 @@ class BondSession:
                 await self._finish()
                 return
 
+    async def _send_chunk(self, chunk: bytes) -> bool:
+        """Download one chunk, failing over to the next live member.
+
+        Symmetric to the client's upload path: a failed send drops the
+        member (``_send`` marks it dead) and the SAME chunk is retried
+        on a survivor with the SAME seq — the client-side reassembler
+        would stall on a seq gap otherwise.
+        """
+        for _ in range(len(self.down_sched.live_indices()) + 1):
+            if not self.live_members():
+                return False
+            idx = self.down_sched.next()
+            member = self.members.get(idx)
+            if member is None or not member.alive:
+                continue
+            if await self._send(member, FRAME_DATA, self.down_seq, chunk):
+                self.down_seq += 1
+                return True
+            # send failed -> member is down; retry on a survivor
+        return False
+
     async def _dest_pump(self) -> None:
         """Destination -> client: chunk + schedule across live members."""
         try:
@@ -151,18 +172,7 @@ class BondSession:
                 for chunk in chunk_data(data):
                     if not self.live_members():
                         return
-                    sent = False
-                    for _ in range(len(self.down_sched.live_indices())):
-                        idx = self.down_sched.next()
-                        member = self.members.get(idx)
-                        if member is None or not member.alive:
-                            continue
-                        if await self._send(member, FRAME_DATA,
-                                            self.down_seq, chunk):
-                            sent = True
-                        self.down_seq += 1
-                        break
-                    if not sent:
+                    if not await self._send_chunk(chunk):
                         # every live member just failed; session is over
                         return
         except (ConnectionError, OSError):
