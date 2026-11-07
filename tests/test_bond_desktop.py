@@ -60,11 +60,13 @@ def _aitest(fn):
 
 # --------------------------------------------------------------- helpers
 def _probe(server_port: int, wanted, dest: str = "127.0.0.1") -> list:
-    """The wanted source IPs that can reach *dest* here."""
+    """The wanted source IPs that can reach *dest* here.
+
+    (A source equal to the destination is fine — that is just the
+    normal default-route source for a self-connect.)
+    """
     ok = []
     for ip in dict.fromkeys(wanted):
-        if ip == dest:
-            continue
         probe = None
         try:
             probe = socket.socket()
