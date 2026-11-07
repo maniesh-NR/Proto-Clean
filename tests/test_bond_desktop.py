@@ -59,16 +59,18 @@ def _aitest(fn):
 
 
 # --------------------------------------------------------------- helpers
-def _probe(server_port: int, wanted) -> list:
-    """The wanted bind IPs that can actually reach 127.0.0.1 here."""
+def _probe(server_port: int, wanted, dest: str = "127.0.0.1") -> list:
+    """The wanted source IPs that can reach *dest* here."""
     ok = []
     for ip in dict.fromkeys(wanted):
+        if ip == dest:
+            continue
         probe = None
         try:
             probe = socket.socket()
             probe.settimeout(2)
             probe.bind((ip, 0))
-            probe.connect(("127.0.0.1", server_port))
+            probe.connect((dest, server_port))
             ok.append(ip)
         except OSError:
             pass
@@ -93,25 +95,47 @@ def _primary_ip() -> str:
         s.close()
 
 
-def _two_bind_ips(server_port: int) -> list:
-    """Two distinct source addresses that can reach 127.0.0.1 here.
+def _two_bind_ips(server_port: int, dest: str = "127.0.0.1") -> list:
+    """Two distinct source addresses that can reach *dest* here.
 
-    Linux routes all of 127/8 to lo (127.0.0.2/127.0.0.3 work);
-    macOS only configures 127.0.0.1 on lo0 and Windows varies, so
-    the primary interface address is tried as the second source.
-    Empty when the host offers only one usable source address.
+    Linux routes all of 127/8 to lo (127.0.0.2/127.0.0.3 work); macOS
+    only configures 127.0.0.1 on lo0 and Windows blocks cross-address
+    loopback connects (strong host model), so the primary interface
+    address is tried as a source too. Empty when the host offers
+    only one usable source address.
     """
     candidates = ["127.0.0.2", "127.0.0.3", "127.0.0.1"]
     primary = _primary_ip()
     if primary:
         candidates.append(primary)
-    ok = _probe(server_port, candidates)
+    ok = _probe(server_port, candidates, dest)
     return ok[:2] if len(ok) >= 2 else []
 
 
-def _settings(server_port, mode="bond", interfaces=(), token=""):
+def _plan_bind_ips(server_port: int):
+    """(bind_ips, member_dest) for the E2E tests.
+
+    Strategy 1 — members dial loopback (all interfaces listen on
+    127.0.0.1 anyway). Strategy 2 — for Windows-style stacks that
+    block cross-address loopback connects, members dial the primary
+    address (connecting to your own IP is allowed there); the bond
+    server harness then listens on all interfaces.
+    """
+    ips = _two_bind_ips(server_port, "127.0.0.1")
+    if ips:
+        return ips, "127.0.0.1"
+    primary = _primary_ip()
+    if primary:
+        ips = _two_bind_ips(server_port, primary)
+        if ips:
+            return ips, primary
+    return [], "127.0.0.1"
+
+
+def _settings(server_port, mode="bond", interfaces=(), token="",
+               server="127.0.0.1"):
     return SimpleNamespace(
-        server="127.0.0.1", port=server_port, mode=mode,
+        server=server, port=server_port, mode=mode,
         interfaces=list(interfaces), socks_port=0, token=token,
     )
 
@@ -186,7 +210,8 @@ def echo():
 
 @pytest.fixture()
 def bond_server():
-    srv = _BondServerThread()
+    # all interfaces: the Windows fallback dials the primary address
+    srv = _BondServerThread(host="0.0.0.0")
     srv.start()
     srv.ready.wait(5)
     yield srv
@@ -206,14 +231,14 @@ class TestMultiAdapterBonding:
     def test_two_adapters_distinct_source_ips(self, echo, bond_server):
         """Bond mode over two real bind addresses: the server sees one
         member per adapter IP, both carry data, payload survives."""
-        ips = _two_bind_ips(bond_server.port)
+        ips, dest = _plan_bind_ips(bond_server.port)
         if len(ips) < 2:
             pytest.skip("host offers only one usable source address "
                         "(CI legs without loopback aliases hit this)")
         mgr = BondManager()
         try:
             mgr.start(_settings(bond_server.port, mode="bond",
-                                interfaces=ips))
+                                interfaces=ips, server=dest))
             payload = bytes(range(256)) * 1024          # 256 KiB
             _bond_roundtrip(mgr, echo, payload)
             # exactly one member per adapter, from the right sources
@@ -232,13 +257,13 @@ class TestMultiAdapterBonding:
         adapters — stream one leaves via adapter A, stream two via B.
         (Finished sessions are dropped from the server's table, so
         observed peers are accumulated across the streams.)"""
-        ips = _two_bind_ips(bond_server.port)
+        ips, dest = _plan_bind_ips(bond_server.port)
         if len(ips) < 2:
             pytest.skip("host offers only one usable source address")
         mgr = BondManager()
         try:
             mgr.start(_settings(bond_server.port, mode="balance",
-                                interfaces=ips))
+                                interfaces=ips, server=dest))
             c1 = _SocksClient(mgr.socks_port)
             assert c1.connect("127.0.0.1", echo.port)
             c1.send(b"first-stream")
@@ -264,13 +289,13 @@ class TestMultiAdapterBonding:
         """One adapter's connection is killed server-side mid-session:
         the client registers the loss, drops that adapter from the
         schedule, and the stream continues on the survivor."""
-        ips = _two_bind_ips(bond_server.port)
+        ips, dest = _plan_bind_ips(bond_server.port)
         if len(ips) < 2:
             pytest.skip("host offers only one usable source address")
         mgr = BondManager()
         try:
             mgr.start(_settings(bond_server.port, mode="bond",
-                                interfaces=ips))
+                                interfaces=ips, server=dest))
             c = _SocksClient(mgr.socks_port)
             assert c.connect("127.0.0.1", echo.port)
             c.send(b"before")
@@ -448,7 +473,7 @@ class TestMacosDiscovery:
         with mock.patch.object(bondnet, "_run",
                                return_value=IFCONFIG_DUAL):
             adapters = bondnet.list_adapters(platform="macos")
-        standins = _two_bind_ips(bond_server.port)
+        standins, dest = _plan_bind_ips(bond_server.port)
         if len(standins) < 2:
             pytest.skip("host offers only one usable source address")
         # "name=ip" manual-override pairs: en0 stands on standins[0]…
@@ -457,7 +482,7 @@ class TestMacosDiscovery:
         mgr = BondManager()
         try:
             mgr.start(_settings(bond_server.port, mode="bond",
-                                interfaces=pairs))
+                                interfaces=pairs, server=dest))
             payload = bytes(range(256)) * 512          # 128 KiB
             _bond_roundtrip(mgr, echo, payload)
             assert _peers(bond_server) == set(standins)
@@ -534,14 +559,14 @@ class TestWindowsDiscovery:
 
     def test_bond_session_over_discovered_adapters(self, echo,
                                                    bond_server):
-        standins = _two_bind_ips(bond_server.port)
+        standins, dest = _plan_bind_ips(bond_server.port)
         if len(standins) < 2:
             pytest.skip("host offers only one usable source address")
         pairs = [f"Ethernet={standins[0]}", f"Wi-Fi={standins[1]}"]
         mgr = BondManager()
         try:
             mgr.start(_settings(bond_server.port, mode="bond",
-                                interfaces=pairs))
+                                interfaces=pairs, server=dest))
             payload = bytes(range(256)) * 512          # 128 KiB
             _bond_roundtrip(mgr, echo, payload)
             assert _peers(bond_server) == set(standins)

@@ -57,9 +57,10 @@ class _EchoServer(threading.Thread):
 class _BondServerThread(threading.Thread):
     """Run the asyncio bond server in a background thread."""
 
-    def __init__(self, token: str = "") -> None:
+    def __init__(self, token: str = "", host: str = "127.0.0.1") -> None:
         super().__init__(daemon=True)
         self.server = BondServer(token)
+        self.host = host
         self.sock = socket.socket()
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(("127.0.0.1", 0))
@@ -73,7 +74,7 @@ class _BondServerThread(threading.Thread):
         asyncio.set_event_loop(self.loop)
         try:
             self.loop.run_until_complete(
-                self.server.listen("127.0.0.1", self.port))
+                self.server.listen(self.host, self.port))
             self.ready.set()
             self.loop.run_until_complete(self.server.serve_forever())
         except Exception:  # noqa: BLE001
