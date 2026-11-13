@@ -26,7 +26,10 @@ from proto_clean.qtcompat import (
 from .. import credentials as creds
 from ..controller import Controller
 from ..paths import BLOCKLIST_DIR, LOG_DIR
-from ..settings import THEMES, load_settings, save_settings, update
+from ..settings import (
+    THEMES, load_settings, save_settings, update,
+)
+from ..settings import ACCENT_SOURCES  # noqa: F401  (validated upstream)
 from ..vpn.split_tunnel import SplitTunnel
 
 # The driver descriptions requested verbatim for the Advanced tab.
@@ -731,7 +734,8 @@ class SettingsDialog(QDialog):
 
     # ---------------------------------------------------------- appearance
     def _appearance_tab(self) -> QWidget:
-        """Theme: dark, light or follow the system color scheme."""
+        """Theme: dark, light or follow the system color scheme — plus the
+        Material You accent seed (brand / system / custom color)."""
         s = load_settings()
         w = QWidget()
         outer = QVBoxLayout(w)
@@ -754,10 +758,42 @@ class SettingsDialog(QDialog):
             box_layout.addWidget(r)
         outer.addWidget(box)
 
+        # ---------------- Material You (dynamic color seed)
+        accent_box = QGroupBox("Accent color (Material You)")
+        accent_layout = QVBoxLayout(accent_box)
+        self.accent_radio_brand = QRadioButton(
+            "Proto green (brand)\n"
+            "The classic Proto Clean palette, derived from the brand green")
+        self.accent_radio_system = QRadioButton(
+            "Follow my system accent\n"
+            "Derive the whole palette from the operating system accent "
+            "color — Windows DWM, macOS highlight color, GNOME accent — "
+            "the desktop Material You")
+        self.accent_radio_custom = QRadioButton(
+            "Custom color…\n"
+            "Pick any color as the seed; every surface, button and tint is "
+            "re-derived from it")
+        src = s.accent_source if s.accent_source in ACCENT_SOURCES else "brand"
+        getattr(self, f"accent_radio_{src}").setChecked(True)
+        for r in (self.accent_radio_brand, self.accent_radio_system,
+                  self.accent_radio_custom):
+            accent_layout.addWidget(r)
+
+        seed_row = QHBoxLayout()
+        seed_row.addWidget(QLabel("Custom seed: "))
+        self.accent_seed_edit = QLineEdit(s.accent_color)
+        self.accent_seed_edit.setPlaceholderText("#2f6d3f")
+        self.accent_seed_edit.setMaximumWidth(120)
+        seed_row.addWidget(self.accent_seed_edit)
+        seed_row.addWidget(QLabel("hex color, e.g. #b3261e or #0a84ff"))
+        seed_row.addStretch(1)
+        accent_layout.addLayout(seed_row)
+        outer.addWidget(accent_box)
+
         hint = QLabel(
-            "The theme applies immediately and is remembered for the next "
-            "launch. The same options live in the Theme ▾ menu of the main "
-            "window.")
+            "The theme and accent apply immediately and are remembered for "
+            "the next launch. The theme also lives in the Theme ▾ menu of "
+            "the main window.")
         hint.setWordWrap(True)
         outer.addWidget(hint)
         outer.addStretch(1)
@@ -769,12 +805,16 @@ class SettingsDialog(QDialog):
     def _apply_appearance(self) -> None:
         mode = ("system" if self.radio_system.isChecked()
                 else "light" if self.radio_light.isChecked() else "dark")
-        update(theme=mode)
+        source = ("brand" if self.accent_radio_brand.isChecked()
+                  else "system" if self.accent_radio_system.isChecked()
+                  else "custom")
+        seed = self.accent_seed_edit.text().strip() or "#2f6d3f"
+        update(theme=mode, accent_source=source, accent_color=seed)
         from proto_clean.qtcompat import QApplication
 
-        from .theme import apply_theme
+        from .theme import apply_saved_theme
 
-        apply_theme(QApplication.instance(), mode)
+        apply_saved_theme(QApplication.instance())
         self.controller.reload_settings()
         self.accept()
 

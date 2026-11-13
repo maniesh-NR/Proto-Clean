@@ -141,6 +141,9 @@ data class AppSettings(
     val samPublicKey: String = "",
     val samShortId: String = "",
     val samServerName: String = "",
+    // Material You: derive the color scheme from the wallpaper accent on
+    // Android 12+ (dynamic color); off = the Proto palette
+    val dynamicColor: Boolean = true,
 )
 
 /**
@@ -183,6 +186,7 @@ class SettingsStore(private val context: Context) {
         val samPublicKey = stringPreferencesKey("sam_public_key")
         val samShortId = stringPreferencesKey("sam_short_id")
         val samServerName = stringPreferencesKey("sam_server_name")
+        val dynamicColor = booleanPreferencesKey("dynamic_color")
     }
 
     /** Normalized protocol value (unknown → wireguard). */
@@ -235,6 +239,7 @@ class SettingsStore(private val context: Context) {
             samPublicKey = p[Keys.samPublicKey] ?: "",
             samShortId = p[Keys.samShortId] ?: "",
             samServerName = p[Keys.samServerName] ?: "",
+            dynamicColor = p[Keys.dynamicColor] ?: true,
         )
     }
 
@@ -293,6 +298,7 @@ class SettingsStore(private val context: Context) {
                 samPublicKey = p[Keys.samPublicKey] ?: "",
                 samShortId = p[Keys.samShortId] ?: "",
                 samServerName = p[Keys.samServerName] ?: "",
+                dynamicColor = p[Keys.dynamicColor] ?: true,
             )
             val n = transform(s)
             p[Keys.username] = n.username
@@ -327,6 +333,7 @@ class SettingsStore(private val context: Context) {
             p[Keys.samPublicKey] = n.samPublicKey
             p[Keys.samShortId] = n.samShortId
             p[Keys.samServerName] = n.samServerName
+            p[Keys.dynamicColor] = n.dynamicColor
         }
     }
 

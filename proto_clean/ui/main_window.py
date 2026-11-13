@@ -24,7 +24,7 @@ from .bridge import ControllerBridge
 from .login_dialog import LoginDialog
 from .settings_dialog import SettingsDialog
 from .theme import (
-    STATE_COLORS, THEMES, THEME_LABELS, apply_theme, effective_theme,
+    THEMES, THEME_LABELS, apply_saved_theme, effective_theme, state_color,
 )
 
 
@@ -52,7 +52,7 @@ class MainWindow(QMainWindow):
         # Self-apply the persisted theme so the window is styled regardless
         # of how the QApplication was created (tests, tools, embedding).
         if not QApplication.instance().property("proto_clean_theme_applied"):
-            apply_theme(QApplication.instance(), load_settings().theme)
+            apply_saved_theme(QApplication.instance())
             QApplication.instance().setProperty("proto_clean_theme_applied", True)
 
         self._build_ui()
@@ -245,7 +245,7 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------- handlers
     def _on_state(self, state: str, detail: str) -> None:
-        color, label = STATE_COLORS.get(state, ("#9aa3b2", state))
+        color, label = state_color(state)   # reflects the active Material You seed
         self.status_dot.setPixmap(resources.status_dot(color, 14))
         self.status_label.setText(f"{label}" + (f" — {detail}" if detail else ""))
         self._update_connect_button()
@@ -480,7 +480,7 @@ class MainWindow(QMainWindow):
     def _change_theme(self, mode: str) -> None:
         """Persist the theme choice and restyle the running application."""
         update(theme=mode)
-        eff = apply_theme(QApplication.instance(), mode)
+        eff = apply_saved_theme(QApplication.instance())
         self._refresh_table()      # repaint load bars with matching colors
         self.statusBar().showMessage(
             f"Theme: {THEME_LABELS.get(mode, mode)} (now painting: {eff})",
@@ -528,7 +528,7 @@ class MainWindow(QMainWindow):
         self._update_netshield_label()
         self._refresh_subtitle()
         # the Appearance tab may have switched the theme — re-apply + repaint
-        apply_theme(QApplication.instance(), load_settings().theme)
+        apply_saved_theme(QApplication.instance())
         self._refresh_table()
 
     # ----------------------------------------------------- server tree

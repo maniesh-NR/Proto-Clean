@@ -77,14 +77,13 @@ def _run_gui() -> int:
 
     from . import APP_NAME
     from .controller import Controller
-    from .settings import load_settings
     from .ui.main_window import MainWindow
-    from .ui.theme import apply_theme
+    from .ui.theme import apply_saved_theme
     from .ui.tray import Tray
 
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
-    apply_theme(app, load_settings().theme)
+    apply_saved_theme(app)
     app.setProperty("proto_clean_theme_applied", True)
     app.setQuitOnLastWindowClosed(False)
 

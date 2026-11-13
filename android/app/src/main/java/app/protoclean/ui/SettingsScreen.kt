@@ -33,6 +33,16 @@ fun SettingsScreen(vm: AppViewModel) {
         Text("Settings", style = MaterialTheme.typography.headlineSmall,
              fontWeight = FontWeight.Bold)
 
+        Section("Appearance (Material You)") {
+            ToggleRow(
+                "Dynamic color — derive the app palette from my\n" +
+                "wallpaper accent (Android 12+)",
+                settings.dynamicColor,
+            ) {
+                vm.updateSettings { s -> s.copy(dynamicColor = it) }
+            }
+        }
+
         Section("Protocol (config downloaded from Proton's page)") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(

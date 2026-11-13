@@ -34,7 +34,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ProtoCleanTheme {
+            // Material You: follow the stored dynamic-color preference
+            // (wallpaper-derived scheme on Android 12+).
+            val settings by ProtoCleanApp.instance.settings.settings
+                .collectAsState(initial = app.protoclean.data.AppSettings())
+            ProtoCleanTheme(dynamicColor = settings.dynamicColor) {
                 ProtoCleanApp(
                     onNeedConsent = { intent ->
                         intent?.let { vpnConsent.launch(it) }

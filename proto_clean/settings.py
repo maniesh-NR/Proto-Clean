@@ -169,6 +169,31 @@ BROWSER_PROXY_MODES = ("direct", "auto", "custom")
 # when the desktop changes), "light" and "dark" force a fixed look.
 THEMES = ("system", "light", "dark")
 
+# Material You: where the MD3 color-scheme seed comes from.
+#   "brand"  - the Proto Clean green (classic look, default)
+#   "system" - the OS accent color (desktop "dynamic color")
+#   "custom" - a user-chosen hex seed (accent_color)
+ACCENT_SOURCES = ("brand", "system", "custom")
+
+# The Proto Clean brand seed (must match ui/md3.py's _PROTO_SEED).
+_BRAND_SEED = "#2f6d3f"
+
+
+def normalize_hex_color(value: object) -> str:
+    """Coerce user input to a lowercase ``#rrggbb`` hex string.
+
+    Accepts ``#2f6d3f``, ``2f6d3f`` (any case) and 3-digit shorthand
+    (``#f80``); anything else falls back to the brand seed.
+    """
+    if not isinstance(value, str):
+        return _BRAND_SEED
+    v = value.strip().lstrip("#").lower()
+    if len(v) == 3 and all(c in "0123456789abcdef" for c in v):
+        v = "".join(c * 2 for c in v)
+    if len(v) != 6 or not all(c in "0123456789abcdef" for c in v):
+        return _BRAND_SEED
+    return "#" + v
+
 
 @dataclass
 class ProtocolSettings:
@@ -453,6 +478,13 @@ class Settings:
     bond: BondSettings = field(default_factory=BondSettings)
     # UI
     theme: str = "dark"                    # "system" | "light" | "dark"
+    # Material You dynamic color: where the MD3 scheme seed comes from.
+    #   "brand"  - the Proto Clean green (default; the classic look)
+    #   "system" - the OS accent color (GNOME accent-color, Windows DWM
+    #              AccentColor, macOS AppleHighlightColor) - Material You
+    #   "custom" - the user's own hex seed (accent_color below)
+    accent_source: str = "brand"           # "brand" | "system" | "custom"
+    accent_color: str = "#2f6d3f"          # hex seed used when source == "custom"
     prefer_dark_theme: bool = True         # legacy (superseded by `theme`)
     window_geometry: Optional[List[int]] = None
     # Refresh interval for server loads (seconds)
@@ -472,6 +504,11 @@ def load_settings() -> Settings:
             theme = "dark" if raw.get("prefer_dark_theme", True) else "light"
         if theme not in THEMES:
             theme = "dark"
+        accent_source = raw.get("accent_source", "brand")
+        if accent_source not in ACCENT_SOURCES:
+            accent_source = "brand"
+        accent_color = normalize_hex_color(raw.get("accent_color",
+                                                    _BRAND_SEED))
         try:
             s = Settings(
                 username=raw.get("username", ""),
@@ -479,6 +516,8 @@ def load_settings() -> Settings:
                 cache_configs=bool(raw.get("cache_configs", True)),
                 config_verify_timeout=int(raw.get("config_verify_timeout", 25)),
                 theme=theme,
+                accent_source=accent_source,
+                accent_color=accent_color,
                 prefer_dark_theme=theme != "light",
                 window_geometry=raw.get("window_geometry"),
                 server_refresh_seconds=int(raw.get("server_refresh_seconds", 60)),
@@ -558,6 +597,9 @@ def save_settings(s: Settings) -> None:
             s = replace(s, theme="dark")
         # keep the legacy boolean in sync with the new theme field
         s = replace(s, prefer_dark_theme=s.theme != "light")
+        if s.accent_source not in ACCENT_SOURCES:
+            s = replace(s, accent_source="brand")
+        s = replace(s, accent_color=normalize_hex_color(s.accent_color))
         tmp = SETTINGS_FILE.with_suffix(".tmp")
         tmp.write_text(json.dumps(asdict(s), indent=2), encoding="utf-8")
         tmp.replace(SETTINGS_FILE)
