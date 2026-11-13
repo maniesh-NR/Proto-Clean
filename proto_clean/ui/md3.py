@@ -812,8 +812,9 @@ def md3_qss(scheme: MaterialScheme, *,
 
 
 # ---------------------------------------------------------------------------
-# QPalette role mapping (describes the Material 3 → Qt role mapping that
-# proto_clean.ui.theme._apply_palette implements inline)
+# QPalette role mapping (a similar-but-TEST-ONLY mapping: runtime wiring
+# lives inline in proto_clean.ui.theme._apply_palette and differs from
+# this table on a few roles — do not treat the two as equivalent)
 # ---------------------------------------------------------------------------
 def md3_palette_qss(scheme: MaterialScheme) -> Dict[str, str]:
     """Map Qt ``QPalette`` role names to hex strings for ``scheme``.

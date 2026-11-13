@@ -11,14 +11,16 @@ its results before the NEXT stage proceeds. Status legend:
   region-grouped servers, guest-mode fixes, uBO-parity blocklists
 - ☑ Link bonding across desktop platforms (bond/balance, failover,
   self-host server) + E2E desktop test matrix + shutdown fixes
-- ☑ **S1. Material You across all OSes** (2026-11-13, G1:
-  iter-1 BLOCK on PAT-leak-in-backup-path → fixed → iter-2 consensus)
+- ☑ **S1. Material You across all OSes** (2026-11-13; gate G1:
+  iter-1 BLOCK → fixes → iter-2 BLOCK x2/PWF x1 → blockers' specified
+  resolutions applied + end-to-end verification; iteration cap
+  reached, outcome escalated to the owner — see consensus-log)
   - Desktop: dynamic-color seed (brand / system accent / custom hex),
     OS accent detection (GNOME 47 accent-color, Windows DWM
     AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,
     settings UI + persistence
   - Android: `dynamicColorScheme()` on 12+, DataStore toggle
-  - Agent harness + event-driven backups + adversarial process
+  - Agent harness + event-driven backups (v3) + adversarial process
 
 ## Near term
 
@@ -40,7 +42,9 @@ its results before the NEXT stage proceeds. Status legend:
 - ☐ **S5. Accessibility pass** — keyboard nav, screen-reader labels,
   "accent not detected" UX for KDE/XFCE (deferred finding #5)
 - ☐ **S6. Security/threat-model review** — helper privileges, DNS
-  server surface, blocklist download chain, bond server exposure
+  server surface, blocklist download chain, **bond server exposure
+  (must gate or accompany S3's packaging work — do not promote the
+  attack surface before reviewing it)**
 - ☐ **S7. Legacy-stack sunset decision** — Python 3.8 is EOL; decide
   keep/drop for the PySide2-Qt5 / PySide6-6.2 legs (every UI change
   pays the compat tax until decided)

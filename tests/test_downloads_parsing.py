@@ -102,5 +102,8 @@ def test_alternative_routing_mirror_urls():
         "https://api.protonvpn.com/vpn/logicals",
         "https://vpn-api.proton.me/vpn/logicals",
     ]
-    assert all("api.protonvpn.com" not in u or ".com" in u
-               for u in dp.LOGICALS_FETCH_URLS)   # direct list unchanged
+    # the direct list stays direct: Proton's primary hosts, no mirrors
+    assert dp.LOGICALS_FETCH_URLS == [
+        "https://api.protonvpn.ch/vpn/logicals",
+        "https://api.protonvpn.ch/vpn/v1/logicals",
+    ]

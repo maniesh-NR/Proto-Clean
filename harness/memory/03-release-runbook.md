@@ -43,9 +43,10 @@ git tag v0.6.2 && git push origin v0.6.2      # triggers release.yml
 #  https://github.com/maniesh-NR/Proto-Clean/releases/tag/vX.Y.Z
 ```
 
-11/11 jobs must succeed; 13 assets uploaded (win installer+zip,
-macos portable zip x2 arch, linux deb+portable+flatpak bundle,
-android apk x2).
+12/12 jobs must succeed (4 lantern-box + linux + windows-modern +
+2 windows-legacy + 2 macos + android + publish); 13 assets uploaded
+(win installer+zip, macos portable zip x2 arch, linux
+deb+portable+flatpak bundle, android apk x2).
 
 ## 5. Close out
 

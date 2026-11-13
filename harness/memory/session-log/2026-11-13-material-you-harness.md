@@ -31,8 +31,20 @@
   test-order guard made autouse; roadmap resequenced (S3 folded into
   S2); deferred-findings ledger created; baseline docs updated;
   consensus + session logs backfilled.
-- **Gate G1-iter2**: verification pass over the fixes (see
-  consensus-log) → consensus.
+- **Gate G1-iter2** (three adversarial agents): Red Team BLOCK,
+  Architect BLOCK (both PROVEN by execution in scratch clones:
+  `git add` collided with the new .gitignore rule — the script could
+  never complete; the secret-scan regex was BRE-syntax invoked with
+  `grep -E` — completely blind), Steward PROCEED-WITH-FINDINGS.
+  Iteration cap (2) reached → owner escalation, with the blockers'
+  specified resolutions applied first: `git add -f`, ERE patterns +
+  runtime canary self-test + message scan, worktree prune, unpushed-
+  commit reconciliation, main-push-failure resilience (warn + record
+  + continue), live-pid lock staleness, env overrides, upload/
+  excluded from the inventory. Verified end-to-end in a scratch
+  matrix (fresh-clone, append+FF, planted-secret abort x2, lock,
+  divergence-continue) AND once for real — see the accidental-run
+  note in the iter-2 consensus record.
 
 ## Key lessons added to 02-lessons
 

@@ -162,9 +162,14 @@ class TestBondManager:
             assert c2.recv_all(6) == b"second"
             stats = mgr.status()
             assert stats["mode"] == "balance"
-            assert stats["sessions"] == 0 or True
             assert len(stats["members"]) <= 2
             c1.close(); c2.close()
+            # both streams finished — the client drains gracefully
+            # (DRAIN_TIMEOUT = 5s) and must then drop both sessions
+            deadline = time.time() + 10
+            while time.time() < deadline and mgr.status()["sessions"]:
+                time.sleep(0.1)
+            assert mgr.status()["sessions"] == 0
         finally:
             mgr.stop()
 

@@ -39,8 +39,8 @@ Last updated: 2026-11-13 (Material You + harness session, post G1 fixes)
 - **Android UI**: Jetpack Compose + Material 3, dynamic color
   (Material You) on Android 12+, DataStore-backed settings
 - **Packaging**: Linux (deb + portable + flatpak), Windows (Inno
-  Setup installer), macOS (dmg), Android (release-signed APKs,
-  Play-Protect-friendly)
+  Setup installer), macOS (portable zip), Android (release-signed
+  APKs, Play-Protect-friendly)
 - **CI** (`.github/workflows/ci.yml`): ubuntu/macos/windows ×
   Python 3.12 + legacy legs (Python 3.8, PySide2-Qt5 and
   PySide6-6.2), wheel build, Android compile check
