@@ -27,7 +27,9 @@
       "message": "t5",
       "git_head": "74bea1e",
       "git_branch": "main",
-      "main_push": "ok"
+      "main_push": "ok",
+      "invalid": true,
+      "invalid_reason": "accidental test-run push of the v3 script during G1-iter3 fix-cycle verification (test harness invoked the clone's committed old script; v3 had no isolation guard). Content verified clean \u2014 audit-trail pollution only. Disclosed in 2026-11-13-S1-material-you-gate-iter3.md."
     }
   ]
 }
