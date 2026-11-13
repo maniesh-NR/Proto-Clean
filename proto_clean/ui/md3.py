@@ -194,7 +194,10 @@ def hct_to_rgb(hue_deg: float, chroma: float, tone: float) -> Tuple[int, int, in
     """
     hue_deg = hue_deg % 360.0
     L = max(0.0, min(100.0, float(tone)))
-    c = max(0.0, float(chroma))
+    # clamp absurd-but-finite chromas: anything past 1e6 is pathological
+    # API misuse, and unclamped it overflows the gamut search
+    # (G1-iter3, Red Team minor #6)
+    c = min(1e6, max(0.0, float(chroma)))
     c = _clamp_chroma(L, hue_deg, c)
     h = math.radians(hue_deg)
     a = c * math.cos(h)
@@ -352,10 +355,14 @@ class MaterialScheme:
 def scheme_from_seed(seed_rgb_hex: str, is_dark: bool) -> MaterialScheme:
     """Build a Material Design 3 :class:`MaterialScheme` from a seed color.
 
-    The seed's hue is preserved across palettes; chromas follow the M3
-    spec — primary ``min(seed_chroma, 48)``, secondary 16, tertiary 24
-    (hue + 60°), error 84 at hue 25, neutral 4 and neutral-variant 8.
-    Role → tone assignment follows the M3 light/dark tables.
+    The seed's hue is preserved across palettes. Chroma choices are a
+    deliberate Proto Clean variant of M3's tonal-spot scheme (decision
+    #13): primary ``min(seed_chroma, 48)`` keeps muted seeds muted
+    instead of boosting them to Google's flat 36, secondary 16,
+    tertiary 24 (hue + 60°), error 84 at hue 25, neutral 4 and
+    neutral-variant 8. Role → tone assignment follows the M3
+    light/dark tables. Contrast is tone-driven and unaffected by this
+    choice (verified by the seed-corpus contrast property test).
     """
     sr, sg, sb = _hex_to_rgb(seed_rgb_hex)
     seed_hue, seed_chroma, _seed_tone = rgb_to_hct(sr, sg, sb)
@@ -812,9 +819,11 @@ def md3_qss(scheme: MaterialScheme, *,
 
 
 # ---------------------------------------------------------------------------
-# QPalette role mapping (a similar-but-TEST-ONLY mapping: runtime wiring
-# lives inline in proto_clean.ui.theme._apply_palette and differs from
-# this table on a few roles — do not treat the two as equivalent)
+# QPalette role mapping — the SINGLE SOURCE for the base table.
+# proto_clean.ui.theme._apply_palette consumes this mapping directly
+# and applies its runtime overrides on top (Base / AlternateBase /
+# ToolTipBase), so tests asserting this table and the runtime palette
+# can never silently diverge again (G1-iter3, Architect minor #1).
 # ---------------------------------------------------------------------------
 def md3_palette_qss(scheme: MaterialScheme) -> Dict[str, str]:
     """Map Qt ``QPalette`` role names to hex strings for ``scheme``.

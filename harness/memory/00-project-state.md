@@ -8,11 +8,13 @@ Last updated: 2026-11-13 (Material You + harness session, post G1 fixes)
   (Linux / Windows / macOS desktop + Android)
 - **Repo**: `maniesh-NR/Proto-Clean`
 - **Version**: 0.6.2 (released) — see `03-release-runbook.md`
-- **Test baseline**: **718 tests per CI desktop leg** after the
-  Material You stage (ubuntu/macos 718 passed; windows 596 passed +
-  122 platform skips). Local sandbox: 712 passed + 6 skipped (Qt-path
-  and platform skips pass on CI runners). Any change must keep the
-  suite green; new features add tests to the baseline.
+- **Test baseline**: local sandbox **719 passed + 9 skipped** after the
+  G1-iter3 fix cycle (+7 harness-integrity tests; +3 Qt-gated restyle
+  tests that skip locally and run on CI). CI per-leg expectation for
+  the fix-cycle commit: 728 (ubuntu/macos), windows proportionally
+  fewer (hermetic backup test is POSIX-only) — **to be confirmed by CI
+  and re-recorded at the gate**. Any change must keep the suite green;
+  new features add tests to the baseline.
 
 ## Feature inventory
 

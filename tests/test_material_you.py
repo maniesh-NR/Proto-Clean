@@ -252,3 +252,103 @@ def test_stylesheet_for_tracks_active_seed(restore_brand):
     T._regenerate("#0a84ff")
     assert T.stylesheet_for("dark") is T.DARK_QSS
     assert T.stylesheet_for("light") is T.LIGHT_QSS
+
+
+# ------------------------------------------------- live restyle (G1-iter3)
+def test_live_restyle_repaints_painted_surfaces(restore_brand):
+    """A live theme/accent change must repaint the status dot, the tray
+    icon AND the table — not just the QSS (G1-iter3, Architect major
+    #3: the dot and tray only repainted on VPN state transitions, so a
+    mid-session accent change left them painted with the previous seed).
+    """
+    from proto_clean.qtcompat import qt_available
+
+    if not qt_available():
+        pytest.skip("no Qt binding available in this environment")
+    from proto_clean.qtcompat import QApplication
+    app = QApplication.instance() or QApplication([])  # noqa: F841 (QPixmap needs it)
+
+    import types
+    from proto_clean.ui import resources
+    from proto_clean.ui.main_window import MainWindow
+    from proto_clean.ui.theme import state_color
+
+    calls = []
+    fake = types.SimpleNamespace(
+        controller=types.SimpleNamespace(
+            state=types.SimpleNamespace(value="connected"),
+            state_detail="via WireGuard"),
+        status_dot=types.SimpleNamespace(
+            setPixmap=lambda pix: calls.append(("dot", pix))),
+        tray=types.SimpleNamespace(
+            _on_state=lambda s, d: calls.append(("tray", s, d))),
+        _refresh_table=lambda: calls.append(("table",)),
+    )
+
+    MainWindow._restyle(fake)
+
+    kinds = [c[0] for c in calls]
+    assert kinds == ["dot", "tray", "table"], kinds
+    # the dot is repainted from the CURRENT state color (seed-aware)
+    expected = resources.status_dot(state_color("connected")[0], 14)
+    got = [c[1] for c in calls if c[0] == "dot"][0]
+    assert got.toImage() == expected.toImage()
+    # the tray is poked with the current state + detail
+    assert ("tray", "connected", "via WireGuard") in calls
+
+
+def test_live_restyle_without_tray(restore_brand):
+    """_restyle must not crash when the tray has not been created yet."""
+    from proto_clean.qtcompat import qt_available
+
+    if not qt_available():
+        pytest.skip("no Qt binding available in this environment")
+    from proto_clean.qtcompat import QApplication
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+
+    import types
+    from proto_clean.ui.main_window import MainWindow
+
+    calls = []
+    fake = types.SimpleNamespace(
+        controller=types.SimpleNamespace(
+            state=types.SimpleNamespace(value="logged_out"),
+            state_detail=""),
+        status_dot=types.SimpleNamespace(
+            setPixmap=lambda pix: calls.append(("dot", pix))),
+        _refresh_table=lambda: calls.append(("table",)),
+    )  # NOTE: no `tray` attribute — pre-tray window state
+
+    MainWindow._restyle(fake)
+    assert [c[0] for c in calls] == ["dot", "table"]
+
+
+def test_change_theme_routes_through_restyle(restore_brand, monkeypatch,
+                                             tmp_path):
+    """The Theme-menu path must call _restyle (dot + tray + table), not
+    just _refresh_table (G1-iter3 wiring contract)."""
+    from proto_clean.qtcompat import qt_available
+
+    if not qt_available():
+        pytest.skip("no Qt binding available in this environment")
+    from proto_clean.qtcompat import QApplication
+    app = QApplication.instance() or QApplication([])  # noqa: F841
+
+    import types
+    import proto_clean.ui.main_window as MW
+    from proto_clean.ui.main_window import MainWindow
+
+    monkeypatch.setattr(S, "SETTINGS_FILE", tmp_path / "settings.json")
+    monkeypatch.setattr(MW, "update", lambda **kw: None)
+    monkeypatch.setattr(MW, "apply_saved_theme", lambda app: "dark")
+
+    calls = []
+    fake = types.SimpleNamespace(
+        _restyle=lambda: calls.append("restyle"),
+        statusBar=lambda: types.SimpleNamespace(
+            showMessage=lambda *a, **k: calls.append("status")))
+
+    MainWindow._change_theme(fake, "dark")
+
+    assert "restyle" in calls, "_change_theme must repaint painted surfaces"
+    assert "status" in calls

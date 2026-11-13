@@ -41,6 +41,7 @@ from .md3 import (
     md3_scheme_for,
     scheme_from_seed,
     state_colors as _state_colors_for,
+    md3_palette_qss,
 )
 
 # Backward-compat alias (old imports / scripts use `QSS`).
@@ -361,22 +362,18 @@ def _apply_palette(app, effective: str) -> None:
     #   PlaceholderText → on_surface_variant
     #   AlternateBase → surface_container
     #   Link          → primary
-    material_palette = {
-        "Window": scheme.surface_container_low,
-        "WindowText": scheme.on_surface,
+    # Single source: the base role table lives in md3.md3_palette_qss
+    # (shared with its tests); these overrides are the runtime-verified
+    # choices where this app intentionally differs from that table.
+    # (G1-iter3, Architect minor #1: the test-only mirror is gone —
+    # runtime and tests now consume the same mapping.)
+    material_palette = dict(md3_palette_qss(scheme))
+    material_palette.update({
         "Base": scheme.surface_container_highest,
         "AlternateBase": scheme.surface_container,
-        "Text": scheme.on_surface,
-        "Button": scheme.surface_container_high,
-        "ButtonText": scheme.on_surface,
-        "Highlight": scheme.primary,
-        "HighlightedText": scheme.on_primary,
         "ToolTipBase": scheme.surface_container_highest,
-        "ToolTipText": scheme.on_surface,
-        "PlaceholderText": scheme.on_surface_variant,
-        "Link": scheme.primary,
-    }
-    disabled = scheme.outline_variant
+    })
+    disabled = material_palette.pop("Disabled", scheme.outline_variant)
 
     # Resolve Qt role names → QPalette role enum values
     role_name_to_enum = {

@@ -533,7 +533,7 @@ def load_settings() -> Settings:
                 bond=_bond_from_json(_sub(raw, "bond")),
             )
             return s
-        except TypeError:
+        except (TypeError, ValueError):
             return Settings()
 
 

@@ -463,7 +463,7 @@ class MainWindow(QMainWindow):
         for mode in THEMES:
             suffix = {
                 "system": " — switches with the desktop",
-                "light": " — bright look, same violet accent",
+                "light": " — bright look, same dynamic seed",
                 "dark": " — the original Proto Clean look",
             }[mode]
             act = m.addAction(THEME_LABELS[mode] + suffix)
@@ -477,11 +477,27 @@ class MainWindow(QMainWindow):
         info = m.addAction(f"now painting: {eff}")
         info.setEnabled(False)
 
+    def _restyle(self) -> None:
+        """Repaint every painted-from-theme surface after a live
+        theme/accent change.
+
+        The status dot and the tray icon only repaint inside
+        ``_on_state`` (VPN transitions); without this method a live
+        accent change left them painted with the previous seed until
+        the next state change (G1-iter3, Architect major #3)."""
+        state = self.controller.state.value
+        color, _label = state_color(state)
+        self.status_dot.setPixmap(resources.status_dot(color, 14))
+        tray = getattr(self, "tray", None)
+        if tray is not None:
+            tray._on_state(state, self.controller.state_detail)
+        self._refresh_table()      # repaint load bars with matching colors
+
     def _change_theme(self, mode: str) -> None:
         """Persist the theme choice and restyle the running application."""
         update(theme=mode)
         eff = apply_saved_theme(QApplication.instance())
-        self._refresh_table()      # repaint load bars with matching colors
+        self._restyle()
         self.statusBar().showMessage(
             f"Theme: {THEME_LABELS.get(mode, mode)} (now painting: {eff})",
             6000)
@@ -527,9 +543,10 @@ class MainWindow(QMainWindow):
         self.controller.reload_settings()
         self._update_netshield_label()
         self._refresh_subtitle()
-        # the Appearance tab may have switched the theme — re-apply + repaint
+        # the Appearance tab may have switched the theme/accent — re-apply
+        # and repaint EVERYTHING painted from it (dot, tray, load bars)
         apply_saved_theme(QApplication.instance())
-        self._refresh_table()
+        self._restyle()
 
     # ----------------------------------------------------- server tree
     def _visible_servers(self) -> list:
