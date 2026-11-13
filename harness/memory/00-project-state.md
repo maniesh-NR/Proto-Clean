@@ -1,6 +1,6 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-13 (Material You + harness session)
+Last updated: 2026-11-13 (Material You + harness session, post G1 fixes)
 
 ## Identity
 
@@ -8,10 +8,11 @@ Last updated: 2026-11-13 (Material You + harness session)
   (Linux / Windows / macOS desktop + Android)
 - **Repo**: `maniesh-NR/Proto-Clean`
 - **Version**: 0.6.2 (released) — see `03-release-runbook.md`
-- **Test baseline**: **700 tests** in CI per desktop leg
-  (local sandbox: 696 passed + 4 platform skips; the 4 skips pass on CI
-  runners which have capabilities the sandbox lacks). Any change must
-  keep the suite green; new features add tests to the baseline.
+- **Test baseline**: **718 tests per CI desktop leg** after the
+  Material You stage (ubuntu/macos 718 passed; windows 596 passed +
+  122 platform skips). Local sandbox: 712 passed + 6 skipped (Qt-path
+  and platform skips pass on CI runners). Any change must keep the
+  suite green; new features add tests to the baseline.
 
 ## Feature inventory
 
@@ -31,8 +32,10 @@ Last updated: 2026-11-13 (Material You + harness session)
 - **Server list**: region-grouped tree UI, load/user indicators
 - **Desktop UI**: PySide6 (PySide2-Qt5 fallback via `qtcompat`),
   Material Design 3 theme system (`ui/md3.py` + `ui/theme.py`) with
-  HCT tonal palettes; **Material You dynamic color** (system/custom
-  seed) as of 2026-11-13
+  HCT tonal palettes; **Material You dynamic color** (brand / system
+  accent / custom seed) as of 2026-11-13 — desktop defaults to the
+  brand green, Android 12+ defaults to wallpaper dynamic color
+  (decision #10)
 - **Android UI**: Jetpack Compose + Material 3, dynamic color
   (Material You) on Android 12+, DataStore-backed settings
 - **Packaging**: Linux (deb + portable + flatpak), Windows (Inno
@@ -50,7 +53,7 @@ Last updated: 2026-11-13 (Material You + harness session)
 | v0.6.0 | interop hardening, perf/stability/memory pass (669 tests) |
 | v0.6.1 | region-grouped server list, guest-mode fixes, release-signed APKs |
 | v0.6.2 | uBO-parity default blocklists, region-tree expansion fix (684 tests) |
-| main since | bonding failover fix, desktop bonding test matrix (700 tests), Material You UI, agent harness |
+| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (718/leg) |
 
 ## Known open threads
 

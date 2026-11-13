@@ -37,6 +37,14 @@ MINOR:     [list or none]   — fix-or-file
   re-run the gate.
 - Agents must not see each other's verdicts before publishing their
   own (independence). The orchestrator collects, then reconciles.
+- **Iteration cap: 2.** If consensus is not reached after the second
+  iteration, the stage halts and the decision escalates to the
+  project owner (with both iterations' records). Gates may not be
+  re-run until one passes — every re-run is recorded.
+- Every gate record **pins the reviewed commit SHAs** and lists each
+  finding's resolution (fixed / deferred with ledger entry /
+  accepted with reason). Deferred findings go to
+  `memory/deferred-findings.md` and are re-examined at the next gate.
 
 ## Record
 

@@ -7,6 +7,7 @@ from proto_clean.qtcompat import QMenu, QSystemTrayIcon
 
 from ..controller import Controller, State
 from . import resources
+from .theme import effective_scheme, state_color
 
 
 class Tray(QSystemTrayIcon):
@@ -67,11 +68,12 @@ class Tray(QSystemTrayIcon):
     def _on_state(self, state: str, detail: str) -> None:
         if state in (State.CONNECTED.value,):
             self.toggle_action.setText("Disconnect")
-            self.setIcon(resources.shield_icon("#22c55e"))
+            # state dot + shield follow the active Material You seed
+            self.setIcon(resources.shield_icon(state_color(state)[0]))
             self.setToolTip(f"Proto Clean — protected ({detail})")
         else:
             self.toggle_action.setText("Connect (fastest)")
-            self.setIcon(resources.shield_icon("#2f6d3f"))
+            self.setIcon(resources.shield_icon(effective_scheme().primary))
             self.setToolTip(f"Proto Clean — {state.replace('_', ' ')}")
 
     def _reload_protocol_profiles(self) -> None:

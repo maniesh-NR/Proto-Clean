@@ -231,3 +231,25 @@ python -m pytest tests/ -q     # 90 tests: platforms, wgconf CIDR math,
   phone itself via Termux if you want to bond a phone's links for
   another device.
 
+
+## Material You (dynamic color) per platform
+
+Every Proto Clean UI is Material Design 3; "Material You" adds a
+dynamic seed that re-derives the entire palette:
+
+* **Desktop (Linux / Windows / macOS)** — Settings → Appearance →
+  Accent color: the Proto brand green (default), **the OS accent**
+  (GNOME 47+ `accent-color`, Windows DWM `AccentColor`, macOS
+  highlight/accent color), or any custom hex seed. The whole scheme —
+  buttons, surfaces, tray shield, state dots — regenerates from it,
+  light and dark. Detection is best-effort per desktop environment;
+  unknown environments fall back to the brand green.
+* **Android 12+** — wallpaper-derived dynamic color (Material You) is
+  ON by default, matching the platform convention; Settings →
+  Appearance has the toggle, and Android 11 and below use the Proto
+  palette.
+
+The desktop and Android defaults differ deliberately: on the desktop
+the OS accent is a weaker identity signal and support varies by
+desktop environment, so the brand green ships as default; on Android,
+wallpaper theming is what users of the platform expect.

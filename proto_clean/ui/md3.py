@@ -812,7 +812,8 @@ def md3_qss(scheme: MaterialScheme, *,
 
 
 # ---------------------------------------------------------------------------
-# QPalette role mapping (consumed by proto_clean.ui.theme._apply_palette)
+# QPalette role mapping (describes the Material 3 → Qt role mapping that
+# proto_clean.ui.theme._apply_palette implements inline)
 # ---------------------------------------------------------------------------
 def md3_palette_qss(scheme: MaterialScheme) -> Dict[str, str]:
     """Map Qt ``QPalette`` role names to hex strings for ``scheme``.
@@ -871,6 +872,11 @@ LIGHT_SCHEME, _LIGHT_ACCENT = md3_scheme_for("light")
 DARK_QSS: str = md3_qss(DARK_SCHEME)
 LIGHT_QSS: str = md3_qss(LIGHT_SCHEME)
 
-# Backward-compat module-level STATE_COLORS (computed from the dark scheme).
-# The orchestrator re-exports a matching constant from proto_clean.ui.theme.
+# Backward-compat module-level STATE_COLORS — NOTE: md3's module-level
+# constants (DARK_SCHEME / LIGHT_SCHEME / *_QSS / STATE_COLORS) are ALWAYS
+# brand-seeded; they exist for tests and the dev preview script
+# (scripts/render_md3_preview.py). Runtime painters must import the
+# seed-aware accessors from proto_clean.ui.theme instead
+# (effective_scheme / state_color / stylesheet_for) — theme.py rebinds its
+# own constants when the Material You seed changes, this module never does.
 STATE_COLORS: Dict[str, Tuple[str, str]] = state_colors(DARK_SCHEME)

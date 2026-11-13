@@ -9,12 +9,35 @@ fixed time interval. (Project owner directive, 2026-11-13.)
 | Layer | Where it lives | Mechanism |
 |---|---|---|
 | Product code + docs + `harness/` memory | `main` branch | normal commits (already part of every plan) |
-| Sandbox-only state (`/home/z/my-project/scripts/`, sandbox inventory) | `sandbox/backups` branch, under `harness/sandbox/` | `scripts/sandbox_backup.sh` |
-| Backup audit trail | `harness/backups/manifest.json` (append-only) | same script |
+| Sandbox-only state (`/home/z/my-project/scripts/`, sandbox inventory) | `sandbox/backups` branch, under `harness/sandbox/` | `scripts/sandbox_backup.sh` (v2) |
+| Backup audit trail | `harness/backups/manifest.json` — **branch-owned, append-only** | same script |
 
-The `sandbox/backups` branch intentionally does NOT trigger CI
+The `sandbox/backups` branch intentionally does not trigger CI
 (`ci.yml` runs on `main` only) so frequent backups don't burn runner
 minutes.
+
+## v2 design (hardened by gate G1, 2026-11-13)
+
+The v1 design was BLOCKED by the adversarial gate: it wrote state into
+the main checkout (which release commits would absorb), amended +
+force-pushed to record its own SHA (one transient push failure
+bricked all future backups), and would have leaked credentials that
+lived in sandbox scripts. v2:
+
+- builds **all state inside a temporary git worktree** — the main
+  checkout is never written (`harness/sandbox/` is additionally
+  gitignored on main);
+- one **plain append-only commit** per backup — no amend, no
+  force-push; commit SHAs live in `git log sandbox/backups`, keyed by
+  the manifest's timestamps (the manifest records git head + branch
+  instead of its own SHA);
+- bases the branch on **origin's tip** when it exists (fresh-clone
+  safe), creates it from main only the first time;
+- **secret-scans twice** (source dir, then the exact tree that would
+  be pushed) and hard-fails before anything leaves the machine;
+- **serializes concurrent runs** with a lock;
+- pushes `main` first if it is ahead (product code is part of the
+  backup).
 
 ## Running
 
@@ -22,20 +45,10 @@ minutes.
 scripts/sandbox_backup.sh "what this checkpoint captures"
 ```
 
-The script (idempotent, safe on a dirty main tree for harness files):
-
-1. pushes `main` if it is ahead of `origin/main` (product code is
-   part of the backup),
-2. snapshots `/home/z/my-project/scripts/` → `harness/sandbox/scripts/`
-   (excluding `__pycache__`),
-3. writes `harness/sandbox/state.json` (timestamp, main HEAD, sandbox
-   inventory),
-4. appends an entry to `harness/backups/manifest.json`,
-5. commits everything on the `sandbox/backups` branch via a temporary
-   git worktree (the checked-out tree is never disturbed) and pushes.
-
 ## Restore
 
 - Sandbox scripts: `git show sandbox/backups:harness/sandbox/scripts/<name>`
 - Memory/project state: it's on `main` — just pull.
-- Point-in-time: every manifest entry records the backup commit SHA.
+- Point-in-time: match the manifest timestamp to the branch's
+  `git log` (commit SHAs are recorded by git itself, not the
+  manifest).

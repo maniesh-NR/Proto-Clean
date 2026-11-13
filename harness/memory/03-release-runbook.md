@@ -18,9 +18,14 @@ in the same commit, or some platform reports a stale version.
 ## 2. Verify
 
 ```bash
-pip install -q -e . pytest
+pip install -q -e . pytest aioquic dnslib segno zxing-cpp
 python -m pytest tests/ -q -p no:asyncio      # full suite green
 ```
+
+Before tagging, clear the release-blocking deferred findings in
+`harness/memory/deferred-findings.md` (at time of writing: #1 Android
+dynamicColor manual QA — toggle in Settings, force-kill, relaunch,
+verify the preference persisted and is honored).
 
 ## 3. Commit + tag + push
 
@@ -39,7 +44,8 @@ git tag v0.6.2 && git push origin v0.6.2      # triggers release.yml
 ```
 
 11/11 jobs must succeed; 13 assets uploaded (win installer+zip,
-macos dmg x2 arch, linux deb+portable+flatpak bundle, android apk x2).
+macos portable zip x2 arch, linux deb+portable+flatpak bundle,
+android apk x2).
 
 ## 5. Close out
 

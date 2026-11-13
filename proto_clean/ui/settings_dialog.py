@@ -27,9 +27,8 @@ from .. import credentials as creds
 from ..controller import Controller
 from ..paths import BLOCKLIST_DIR, LOG_DIR
 from ..settings import (
-    THEMES, load_settings, save_settings, update,
+    THEMES, ACCENT_SOURCES, load_settings, save_settings, update,
 )
-from ..settings import ACCENT_SOURCES  # noqa: F401  (validated upstream)
 from ..vpn.split_tunnel import SplitTunnel
 
 # The driver descriptions requested verbatim for the Advanced tab.
@@ -748,7 +747,7 @@ class SettingsDialog(QDialog):
             "when the system changes between light and dark")
         self.radio_light = QRadioButton(
             "Light mode\n"
-            "Bright look with the same violet accent")
+            "Bright look with the same seed-derived accent")
         self.radio_dark = QRadioButton(
             "Dark mode\n"
             "The original Proto Clean look")
@@ -808,7 +807,7 @@ class SettingsDialog(QDialog):
         source = ("brand" if self.accent_radio_brand.isChecked()
                   else "system" if self.accent_radio_system.isChecked()
                   else "custom")
-        seed = self.accent_seed_edit.text().strip() or "#2f6d3f"
+        seed = self.accent_seed_edit.text().strip()
         update(theme=mode, accent_source=source, accent_color=seed)
         from proto_clean.qtcompat import QApplication
 

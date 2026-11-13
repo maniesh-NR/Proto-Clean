@@ -21,9 +21,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 BRAND = "#2f6d3f"
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def restore_brand():
-    """Restore the brand seed + accent state after a reseeding test."""
+    """Restore the brand seed + accent state after EVERY test in this
+    module (autouse — the reseedable module state must never leak into
+    other test files' hardcoded-color assertions, regardless of which
+    tests opt in)."""
     from proto_clean.ui import theme as T
     yield T
     T._accent_source = "brand"
@@ -131,7 +134,6 @@ def test_regenerate_changes_schemes_and_qss(restore_brand):
     assert T.effective_seed() == "#b3261e"
     assert T.DARK_SCHEME.primary != brand_primary
     assert T.DARK_QSS != brand_qss
-    assert "#b3261e" not in T.DARK_QSS or True   # seed itself need not appear
     # the alias stays in sync with the rebound constant
     assert T.QSS is T.DARK_QSS
     # both light and dark derive from the same seed
@@ -215,11 +217,10 @@ def test_apply_saved_theme_reads_settings(restore_brand, monkeypatch,
     eff = T.apply_saved_theme(app)
     assert eff == "dark"
     assert T.effective_seed() == "#0a84ff"
-    assert "#0a84ff" not in app.styleSheet() or True    # seed-derived QSS
-    # the QSS really was regenerated: primary comes from the blue seed
-    assert T.DARK_SCHEME.primary != S.load_settings  # sanity: not a method
+    # the QSS really was regenerated from the blue seed
     from proto_clean.ui.md3 import scheme_from_seed
     assert T.DARK_SCHEME == scheme_from_seed("#0a84ff", True)
+    assert app.styleSheet() == T.DARK_QSS
     S.update(accent_source="brand")
     T.apply_saved_theme(app)
     assert T.effective_seed() == BRAND

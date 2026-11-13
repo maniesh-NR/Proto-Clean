@@ -5,8 +5,16 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
 ## Sandbox environment
 
 - The sandbox is recycled between prompts: installed pip packages
-  vanish. Re-run `pip install -q -e . pytest` in `/home/z/my-project/cleanroom`
+  vanish (INCLUDING optional extras — reinstall `aioquic dnslib segno
+  zxing-cpp` too or 21 test modules fail to collect). Re-run
+  `pip install -q -e . pytest` in `/home/z/my-project/cleanroom`
   before running tests.
+- **Never store credentials in sandbox scripts** — anything under
+  `/home/z/my-project/scripts/` gets rsynced into the repo by the
+  backup workflow. Read tokens from `GITHUB_TOKEN` or the git remote;
+  the backup script secret-scans and hard-fails, but don't rely on
+  the scanner (G1 near-miss: two poll scripts shipped embedded PATs;
+  nothing leaked, but rotation was advised).
 - `gh` CLI does not work in the sandbox — use `curl` + the GitHub API.
 - The PAT is embedded in the git remote URL (`https://user:token@…`).
   Extract with `CRED=$(git remote get-url origin); CRED="${CRED##*://}";`
@@ -34,9 +42,9 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   close a loop that `is_running()` (macOS CI caught this, `bdefec5`).
 - Full suite runtime ≈ 80-90 s locally; `python -m pytest tests/ -q
   -p no:asyncio`.
-- Baseline: local 696 passed + 4 skipped; CI 700 passed per leg
-  (ubuntu/macos 0 skipped, windows 122 platform skips). A changed
-  skip count on a leg means a test silently changed behavior — check
+- Baseline (post Material You): local 712 passed + 6 skipped; CI
+  718 per leg (windows 596 + 122 platform skips). A changed skip
+  count on a leg means a test silently changed behavior — check
   before/after when adding tests.
 
 ## CI / GitHub
@@ -64,6 +72,15 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
 
 - `ui/md3.py` must stay importable without Qt (headless tests import
   it). QColor/QSS wiring stays in `ui/theme.py`.
-- Legacy legs run Python 3.8: no walrus/match/case-only syntax in
-  `proto_clean/`; `from __future__ import annotations` is already
-  everywhere it matters.
+- md3.py's module constants (DARK_SCHEME/STATE_COLORS/…) are ALWAYS
+  brand-seeded (tests + dev preview only); theme.py rebinds its own
+  on seed change. Runtime painters must use the accessors
+  (`effective_scheme`, `state_color`, `stylesheet_for`) — never import
+  the constants by value (they go stale on reseed).
+- Legacy legs run Python 3.8: no `match`/`case`, no 3.9+ stdlib
+  (`dict |`, `str.removeprefix`); walrus IS fine on 3.8.
+  `from __future__ import annotations` is already everywhere.
+- Desktop OS-accent detection covers GNOME 47+ / Windows / macOS;
+  inside the Flatpak sandbox gsettings reads the sandbox's dconf, not
+  the host's (deferred finding #4 — finish-args or portal needed).
+  KDE/XFCE fall back to the brand seed.

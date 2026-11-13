@@ -16,10 +16,13 @@ apply_theme(app, mode) styles the whole application:
   GNOME color-scheme gsettings key, then to the palette lightness).
 
 The module tracks the effective mode so runtime painters (icons, load
-bars) can pick theme-matching colors via is_dark(). The MD3-derived
-``DARK_SCHEME`` / ``LIGHT_SCHEME`` objects expose all Material 3 color
-roles for runtime painters (e.g. ``DARK_SCHEME.primary_container``,
-``LIGHT_SCHEME.surface_container_high``).
+bars) can pick theme-matching colors via is_dark(). For full MD3 color
+roles at runtime use :func:`effective_scheme` — it always reflects the
+active Material You seed (e.g. ``effective_scheme().primary_container``).
+Do NOT import ``DARK_SCHEME`` / ``LIGHT_SCHEME`` / ``STATE_COLORS`` by
+value in runtime painters: those constants are rebound when the seed
+changes, so a name captured at import time goes stale. Accessor forms:
+:func:`effective_scheme`, :func:`state_color`, :func:`stylesheet_for`.
 """
 
 from __future__ import annotations
@@ -34,7 +37,6 @@ from .md3 import (
     DARK_SCHEME,
     LIGHT_SCHEME,
     MaterialScheme,
-    md3_palette_qss,
     md3_qss,
     md3_scheme_for,
     scheme_from_seed,
@@ -341,13 +343,10 @@ def _apply_palette(app, effective: str) -> None:
     from proto_clean.qtcompat import QColor, QPalette
 
     scheme = DARK_SCHEME if effective == "dark" else LIGHT_SCHEME
-    roles_map = md3_palette_qss(scheme)
 
     p = QPalette()
-    # The md3_palette_qss map uses Qt role names as string keys
-    # (Window, WindowText, Base, Text, Button, ButtonText, Highlight,
-    #  HighlightedText, ToolTipBase, ToolTipText, PlaceholderText,
-    #  AlternateBase, Link). Material 3 roles map to:
+    # Material 3 roles map to Qt roles so native bits (menus, popups,
+    # edits, tooltips) that the stylesheet does not cover still match:
     #   Window        → surface_container_low
     #   WindowText    → on_surface
     #   Base          → surface_container_highest (edit/list backgrounds)

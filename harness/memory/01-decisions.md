@@ -47,5 +47,22 @@ Format: **decision** — context — date. Newest last.
 10. **Material You = MD3 + dynamic color seed** — the desktop derives
     the whole scheme from a seed (brand green / OS accent / custom);
     Android uses `dynamicColorScheme()` on 12+ with the Proto palette
-    as fallback. Preserves brand identity by default, Material You
-    where the user asks for it. (2026-11-13)
+    as fallback. **Defaults diverge by platform, deliberately** (amended
+    at gate G1): desktop defaults to brand green (OS accents are a
+    weaker identity signal there and detection is DE-dependent);
+    Android 12+ defaults to wallpaper dynamic color (the platform
+    convention users expect). Either is a one-tap setting away.
+    (2026-11-13)
+11. **Backup script v2: append-only, worktree-isolated** — the first
+    design (manifest self-recording its commit SHA via amend +
+    force-push, writing state into the main checkout) was BLOCKED by
+    the G1 gate: it could leak secrets, brick itself on one transient
+    push failure, and dirty main's tree into release commits. v2
+    builds all state inside a temporary worktree on the
+    `sandbox/backups` branch, one plain commit per backup, never
+    rewrites history, secret-scans twice, and serializes with a lock.
+    (2026-11-13, G1)
+12. **Credentials never live in scripts** — poll/release helpers read
+    the token from `GITHUB_TOKEN` or the git remote. Any script that
+    could be copied by a backup/collect flow gets a secret scan with
+    hard failure. (2026-11-13, G1 — near-miss, nothing leaked)

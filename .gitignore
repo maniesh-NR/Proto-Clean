@@ -69,3 +69,7 @@ android/.idea/
 # bundled engine binaries (dropped in by CI)
 packaging/flatpak/lantern-box*
 android/app/src/main/jniLibs/
+
+# event-driven sandbox backups build state only on the sandbox/backups
+# branch; never track it on main
+harness/sandbox/
