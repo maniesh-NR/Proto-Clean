@@ -1,6 +1,6 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-13 (Material You + harness session, post G1 fixes)
+Last updated: 2026-11-14 (G1-iter3 iteration 2: no consensus, cap reached; remediation applied; owner escalation)
 
 ## Identity
 
@@ -8,11 +8,13 @@ Last updated: 2026-11-13 (Material You + harness session, post G1 fixes)
   (Linux / Windows / macOS desktop + Android)
 - **Repo**: `maniesh-NR/Proto-Clean`
 - **Version**: 0.6.2 (released) — see `03-release-runbook.md`
-- **Test baseline**: **718 tests per CI desktop leg** after the
-  Material You stage (ubuntu/macos 718 passed; windows 596 passed +
-  122 platform skips). Local sandbox: 712 passed + 6 skipped (Qt-path
-  and platform skips pass on CI runners). Any change must keep the
-  suite green; new features add tests to the baseline.
+- **Test baseline**: local sandbox **719 passed + 9 skipped** after the
+  G1-iter3 fix cycle (+7 harness-integrity tests; +3 Qt-gated restyle
+  tests that skip locally and run on CI). CI per-leg expectation for
+  the fix-cycle commit: 728 (ubuntu/macos), windows proportionally
+  fewer (hermetic backup test is POSIX-only) — **to be confirmed by CI
+  and re-recorded at the gate**. Any change must keep the suite green;
+  new features add tests to the baseline.
 
 ## Feature inventory
 
@@ -39,8 +41,8 @@ Last updated: 2026-11-13 (Material You + harness session, post G1 fixes)
 - **Android UI**: Jetpack Compose + Material 3, dynamic color
   (Material You) on Android 12+, DataStore-backed settings
 - **Packaging**: Linux (deb + portable + flatpak), Windows (Inno
-  Setup installer), macOS (dmg), Android (release-signed APKs,
-  Play-Protect-friendly)
+  Setup installer), macOS (portable zip), Android (release-signed
+  APKs, Play-Protect-friendly)
 - **CI** (`.github/workflows/ci.yml`): ubuntu/macos/windows ×
   Python 3.12 + legacy legs (Python 3.8, PySide2-Qt5 and
   PySide6-6.2), wheel build, Android compile check
@@ -53,10 +55,16 @@ Last updated: 2026-11-13 (Material You + harness session, post G1 fixes)
 | v0.6.0 | interop hardening, perf/stability/memory pass (669 tests) |
 | v0.6.1 | region-grouped server list, guest-mode fixes, release-signed APKs |
 | v0.6.2 | uBO-parity default blocklists, region-tree expansion fix (684 tests) |
-| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (718/leg) |
+| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `67df974`) |
 
 ## Known open threads
 
+- **S1 gate: cap reached without consensus (2026-11-14)** — G1-iter3
+  iteration 2 returned a Red Team BLOCK (scan-coverage critical,
+  isolation/alarm/trace majors); all findings remediated and
+  execution-verified, but per process a fresh gate (G1-iter4) must
+  re-judge the remediation commit before S1 closes. **Owner decision
+  required.**
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan

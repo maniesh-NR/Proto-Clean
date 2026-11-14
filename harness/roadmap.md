@@ -11,27 +11,54 @@ its results before the NEXT stage proceeds. Status legend:
   region-grouped servers, guest-mode fixes, uBO-parity blocklists
 - ☑ Link bonding across desktop platforms (bond/balance, failover,
   self-host server) + E2E desktop test matrix + shutdown fixes
-- ☑ **S1. Material You across all OSes** (2026-11-13, G1:
-  iter-1 BLOCK on PAT-leak-in-backup-path → fixed → iter-2 consensus)
+
+## In gate (outcome pending — no pre-recording)
+
+- ◐ **S1. Material You across all OSes + agent harness + event-driven
+  backups** — gate history: G1 iter-1 BLOCK → iter-2 cap → owner-ordered
+  fresh gate **G1-iter3** (cap 2): iter-1 BLOCK (canary/scan gaps) →
+  fix cycle `7e54aa1` → CI broke 5/7 → three environment fix extensions
+  (`140d9dc` identity fallback, `3d51da9` push-stderr capture + container
+  rsync, `67df974` shallow-checkout fetch-depth; CI 7/7 green,
+  728/leg POSIX · 604+124 windows) → **iter-2 (2026-11-14): Red Team
+  BLOCK** (scan coverage gap on the harness/ refresh surface — proven
+  exfiltration to the pushed branch — plus guard/alarm/GIT_TRACE
+  majors) + Architect/Steward PROCEED-WITH-FINDINGS → **iteration cap
+  reached, NO CONSENSUS — escalated to the project owner.** All
+  iteration-2 findings remediated in the commit carrying the iter-2
+  record (scan covers all of harness/, any-target production refusal,
+  branch-push streak alarm + `prev_branch_push` manifest field,
+  GIT_TRACE unset + stderr redaction, per-field identity fallback,
+  shaped-filename tree exclusion, FINAL-OUTCOME-backed integrity
+  check); each fix execution-verified in scratch. **S1 stays open: a
+  fresh gate (G1-iter4) must re-judge the remediation commit before
+  closure — per process, that re-gate is the owner's call.**
   - Desktop: dynamic-color seed (brand / system accent / custom hex),
     OS accent detection (GNOME 47 accent-color, Windows DWM
     AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,
     settings UI + persistence
   - Android: `dynamicColorScheme()` on 12+, DataStore toggle
-  - Agent harness + event-driven backups + adversarial process
+  - Agent harness + event-driven backups (v4 remediated) + adversarial
+    process
 
 ## Near term
 
-- ◐ **S2. Release v0.6.3** — ship Material You + bonding fixes
-  (runbook: `memory/03-release-runbook.md`). Scope now includes
-  (folded in from old S3 per G1):
+- ☐ **S2. Release v0.6.3** — ship Material You + bonding fixes
+  (runbook: `memory/03-release-runbook.md`; **adversarial pre-gate
+  required before work starts — none has run yet**). Scope (folded in
+  from old S3 per G1):
   - SHA-256 checksums of every asset in the release body
   - seed-corpus WCAG contrast property test (≥ 4.5 on the fixed tone
     pairs across ~200 seeds) gating the tag
-  - clear deferred findings #1–#4 (Android dynamicColor QA,
-    accessor allow-list test, accent-probe caching, Flatpak dconf)
+  - clear every deferred-findings row gated at this tag: **#1–#4 and
+    #7** (Android dynamicColor QA, accessor allow-list test,
+    accent-probe caching — legacy-leg behavior specified, Flatpak
+    dconf, raw-hex ban in painter modules) — the ledger is
+    authoritative; runbook §2 derives from it
 - ☐ **S3. Bond server packaging + docs** — one-command self-host
-  (docker image or static binary), token guidance
+  (docker image or static binary), token guidance. **Blocked by S6**
+  (security review): do not promote the attack surface before
+  reviewing it.
 - ☐ **S4. Split-tunneling parity on Android** (per-app exclusions
   exist; verify site/IP rules parity with desktop)
 
@@ -40,10 +67,14 @@ its results before the NEXT stage proceeds. Status legend:
 - ☐ **S5. Accessibility pass** — keyboard nav, screen-reader labels,
   "accent not detected" UX for KDE/XFCE (deferred finding #5)
 - ☐ **S6. Security/threat-model review** — helper privileges, DNS
-  server surface, blocklist download chain, bond server exposure
+  server surface, blocklist download chain, **bond server exposure
+  (must gate or accompany S3's packaging work — do not promote the
+  attack surface before reviewing it)**
 - ☐ **S7. Legacy-stack sunset decision** — Python 3.8 is EOL; decide
   keep/drop for the PySide2-Qt5 / PySide6-6.2 legs (every UI change
-  pays the compat tax until decided)
+  pays the compat tax until decided). Decision due by v0.7 — S2's
+  deferred-#3 fix must (and does, per its plan) specify legacy-leg
+  behavior that works without Qt ≥6.5 signals.
 
 ## Long term / candidates
 

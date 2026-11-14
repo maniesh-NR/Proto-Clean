@@ -39,18 +39,46 @@ MINOR:     [list or none]   — fix-or-file
   own (independence). The orchestrator collects, then reconciles.
 - **Iteration cap: 2.** If consensus is not reached after the second
   iteration, the stage halts and the decision escalates to the
-  project owner (with both iterations' records). Gates may not be
-  re-run until one passes — every re-run is recorded.
+  project owner (with both iterations' records). Re-runs happen only
+  after fixes; every re-run counts against the cap and is recorded.
+- **No pre-recording gate outcomes.** A gate's result is written only
+  after the independent verdicts return — a session log or roadmap
+  line that asserts a consensus before it exists is an audit-trail
+  violation (G1-iter2 caught exactly this).
 - Every gate record **pins the reviewed commit SHAs** and lists each
   finding's resolution (fixed / deferred with ledger entry /
   accepted with reason). Deferred findings go to
   `memory/deferred-findings.md` and are re-examined at the next gate.
+- Verdicts are judged against the **current test baseline** (718 per
+  CI leg / 712+6 local at the time of writing — see
+  `memory/00-project-state.md` for the live number).
 
 ## Record
 
 Every gate run writes `memory/consensus-log/<date>-<stage>.md`:
 roles launched, verdicts verbatim, findings with resolutions, final
 consensus decision. No record = gate didn't happen.
+
+**Record format (adopted 2026-11-14, after G1-iter3-i2 found the
+glyph integrity check passing on a pre-recorded ☑):** every record
+dated 2026-11-14 or later MUST carry exactly one machine-parseable
+closure line:
+
+```
+FINAL OUTCOME: CONSENSUS REACHED
+```
+or
+```
+FINAL OUTCOME: NO CONSENSUS — <short reason>
+```
+
+It is written ONLY after the independent verdicts return. A roadmap
+stage may be marked done (☑) only if a record that names it carries
+`FINAL OUTCOME: CONSENSUS REACHED`; `tests/test_harness_integrity.py`
+enforces both rules. Cap-exhausted gates record
+`FINAL OUTCOME: NO CONSENSUS — iteration cap reached` and escalate to
+the project owner; a fresh gate may then be ordered by the owner on
+the remediation commit (the G1 → G1-iter3 precedent).
 
 ## Scope of review per gate
 

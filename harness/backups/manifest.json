@@ -30,6 +30,16 @@
       "main_push": "ok",
       "invalid": true,
       "invalid_reason": "accidental test-run push of the v3 script during G1-iter3 fix-cycle verification (test harness invoked the clone's committed old script; v3 had no isolation guard). Content verified clean \u2014 audit-trail pollution only. Disclosed in 2026-11-13-S1-material-you-gate-iter3.md."
+    },
+    {
+      "seq": 4,
+      "timestamp": "2026-11-14T03:03:59Z",
+      "trigger": "event",
+      "message": "S1 remediation: G1-iter3-i2 findings fixed (scan coverage, guard, alarms, trace hygiene), gate cap reached - escalated to owner; CI 7/7 on 6324a4d",
+      "git_head": "6324a4d",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
     }
   ]
 }

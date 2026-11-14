@@ -66,3 +66,39 @@ Format: **decision** — context — date. Newest last.
     the token from `GITHUB_TOKEN` or the git remote. Any script that
     could be copied by a backup/collect flow gets a secret scan with
     hard failure. (2026-11-13, G1 — near-miss, nothing leaked)
+13. **Chroma model is a deliberate M3 variant** — `scheme_from_seed`
+    keeps muted seeds muted: primary chroma `min(seed_chroma, 48)`
+    rather than Google tonal-spot's flat 36 (which would boost a muted
+    seed like GNOME slate to full color). Contrast is tone-driven and
+    unaffected (the G1-iter3 Architect ad-hoc ran the planned S2
+    contrast property test: 4,000 checks, worst 6.42:1). Documented in
+    the `scheme_from_seed` docstring. (2026-11-13, G1-iter3)
+14. **Backup script v4: self-testing scan + test isolation** — G1-iter3
+    proved by execution that v3's canary self-test missed 3 of 7
+    pattern alternations and never exercised the production grep
+    invocation (a flag drift left it blind), and that env overrides
+    did not control the push target (a test run against a clone of the
+    real repo pushed test commits toward github — reproduced
+    accidentally during fix-cycle verification, disclosed in the
+    consensus log). v4: one scan function everywhere, per-alternation
+    canaries through that function, exit-6 production-origin guard for
+    any override run, atomic locks, manifest recovery from git
+    history, divergence auto-merge with manifest union, harness/
+    refresh per checkpoint, 2+-failure main-push alarm. Machine-checked
+    by tests/test_harness_integrity.py. (2026-11-13, G1-iter3)
+15. **Gate caps escalate; remediation does not equal closure** —
+    G1-iter3 exhausted its 2-iteration cap with a Red Team BLOCK on
+    iteration 2 (scan-coverage critical on the harness/ refresh
+    surface, proven by execution; plus isolation, alarm and GIT_TRACE
+    majors). Per the process doc the stage halts and escalates to the
+    owner; all findings were remediated and scratch-verified in the
+    same cycle (full-harness scan coverage, any-target production
+    refusal, branch-push streak alarm with `prev_branch_push` manifest
+    field, GIT_TRACE unset + stderr redaction, per-field identity
+    fallback, shaped-filename tree exclusion), but S1 is NOT closed: a
+    fresh gate (G1-iter4) ordered by the owner must re-judge the
+    remediation commit. Alongside: consensus records now carry a
+    machine-parseable `FINAL OUTCOME:` line, and a roadmap ☑ requires
+    a `FINAL OUTCOME: CONSENSUS REACHED` record naming the stage
+    (enforced by tests/test_harness_integrity.py). (2026-11-14,
+    G1-iter3-i2)
