@@ -32,10 +32,29 @@ def test_gitignore_still_guards_harness_sandbox():
 def test_roadmap_glyphs_backed_by_gate_records():
     """Every roadmap stage marked done (☑) or active (◐) must be
     mentioned by a consensus-log record — a stage cannot claim a gate
-    outcome that no record contains (the no-pre-recording rule)."""
+    outcome that no record contains (the no-pre-recording rule).
+
+    Strengthened after the G1-iter3-i2 Architect finding that this
+    check passed on a commit whose ☑ pre-recorded an OPEN gate's
+    outcome (record-existence is not outcome-agreement):
+    - a ☑ line additionally requires a record that both names the
+      stage and carries 'FINAL OUTCOME: CONSENSUS REACHED';
+    - every record dated 2026-11-14 or later (the rule's adoption)
+      must carry a FINAL OUTCOME: line at all — closure is always
+      machine-parseable."""
     log_dir = HARNESS / "memory" / "consensus-log"
-    records = "\n".join(p.name + "\n" + p.read_text(encoding="utf-8")
-                        for p in log_dir.glob("*.md"))
+    per_record = {p.name: p.read_text(encoding="utf-8")
+                  for p in log_dir.glob("*.md")}
+    records = "\n".join(name + "\n" + text
+                        for name, text in per_record.items())
+    for name, text in per_record.items():
+        m = re.match(r"(\d{4})-(\d{2})-(\d{2})-", name)
+        if not m:
+            continue
+        if (int(m.group(1)), int(m.group(2)), int(m.group(3))) >= (2026, 11, 14):
+            assert "FINAL OUTCOME:" in text, (
+                f"{name} is dated on/after 2026-11-14 (the FINAL OUTCOME "
+                f"rule's adoption) but carries no FINAL OUTCOME: line")
     roadmap = (HARNESS / "roadmap.md").read_text(encoding="utf-8")
     for line in roadmap.splitlines():
         if ("☑" in line or "◐" in line):
@@ -46,6 +65,15 @@ def test_roadmap_glyphs_backed_by_gate_records():
             assert sid in records, (
                 f"roadmap marks {sid} as done/active but no consensus-log "
                 f"record mentions it")
+            if "☑" in line:
+                backing = [n for n, t in per_record.items()
+                           if sid in t
+                           and "FINAL OUTCOME: CONSENSUS REACHED" in t]
+                assert backing, (
+                    f"roadmap marks {sid} done (☑) but no consensus-log "
+                    f"record both names it and carries 'FINAL OUTCOME: "
+                    f"CONSENSUS REACHED' — a stage cannot claim closure "
+                    f"an open or failed gate never granted")
 
 
 def test_deferred_findings_reference_real_targets():
@@ -150,6 +178,12 @@ def test_backup_script_hermetic_cycle(tmp_path):
                     "origin", str(bare)], check=True)
     (home / "scripts").mkdir(parents=True)
     (home / "scripts" / "ok.py").write_text("print('hi')\n")
+    # credential-SHAPED name with CLEAN content: must never enter the
+    # pushed tree (G1-iter3-i2 Red Team minor) and state.json must
+    # count the skip (never record the name — a shaped name in
+    # state.json would itself trip the tree scan)
+    shaped = "gh" + "p_" + "b" * 36 + ".py"
+    (home / "scripts" / shaped).write_text("print('clean')\n")
 
     env = {"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
            "PC_BACKUP_PUSH_REMOTE": str(bare)}
@@ -171,14 +205,27 @@ def test_backup_script_hermetic_cycle(tmp_path):
     assert r1.returncode == 0, r1.stdout + r1.stderr
     # 2. append (seq increments)
     r2 = run_backup("hermetic second")
-    assert r2.returncode == 0, r2.stdout + r1.stderr
+    assert r2.returncode == 0, r2.stdout + r2.stderr
     manifest = subprocess.run(
         ["git", "-C", str(repo), "show",
          "sandbox/backups:harness/backups/manifest.json"],
         capture_output=True, text=True, check=True).stdout
     assert '"seq": 2' in manifest, "second backup must append (seq 2)"
+    # 2b. shaped-name exclusion: the shaped file never entered the
+    #     pushed tree, and state.json counted exactly one skip
+    tree = subprocess.run(
+        ["git", "-C", str(repo), "ls-tree", "-r", "--name-only",
+         "sandbox/backups"], capture_output=True, text=True,
+        check=True).stdout
+    assert shaped not in tree, "credential-shaped filename entered the pushed tree"
+    state = subprocess.run(
+        ["git", "-C", str(repo), "show",
+         "sandbox/backups:harness/sandbox/state.json"],
+        capture_output=True, text=True, check=True).stdout
+    assert '"scripts_skipped_shaped_count": 1' in state, (
+        "state.json must count the shaped-name skip (got: " + state + ")")
     # 3. planted secret (built at runtime — no literal in this file).
-    #    show-ref --verify: exit 1 with NO stdout when the ref is
+    #    show-ref --verify: non-zero rc with NO stdout when the ref is
     #    missing — a bare `rev-parse <ref>` ECHOES the unknown ref
     #    name to stdout, which once made a non-empty-output assert
     #    pass spuriously (the third CI-break layer, 2026-11-14).

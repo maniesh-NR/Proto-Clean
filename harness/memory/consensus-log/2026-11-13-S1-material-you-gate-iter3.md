@@ -329,4 +329,101 @@ echo-unknown-refs behavior) are exactly the blind spots a dev sandbox
 cannot catch — each fix makes the test assert the environment it
 needs rather than assume it.
 
-## Iteration 2 — [pending: launched on the fix-cycle extension commit]
+## Iteration 2 — verdicts (2026-11-14, pinned to `67df974`)
+
+Roles launched in parallel, independent, no shared context.
+
+| Task | Role | Verdict | Method |
+|---|---|---|---|
+| G1-iter3-i2-R | Red Team | **BLOCK** | ~25 scratch experiments: canary sabotages ×5 (all exit 5), planted secrets (abort 4, remote untouched), guard-bypass executions, GIT_TRACE leak proof, hook-rejection double-run |
+| G1-iter3-i2-A | Devil's Architect | PROCEED-WITH-FINDINGS | resolution-claim verification by execution (self-heal, refresh, exit-7/8, exit-6, glyph-check falsified on `74bea1e`, partial-identity brick), full suite 719+9 |
+| G1-iter3-i2-S | Ship Steward | PROCEED-WITH-FINDINGS | full suite run (719 passed + 9 skipped, exact), independent CI re-verification (7/7 on `67df974`; per-leg 728/0 ×4 POSIX, 604/124 windows — exact), docs/ledger/runbook audit |
+
+### Red Team — BLOCK (key findings)
+
+- CRITICAL: layer 2 scanned only `harness/sandbox` + `harness/backups`,
+  but every run rsyncs the ENTIRE live `harness/` working copy
+  (including uncommitted/untracked files) into the branch — a planted
+  token in an untracked `harness/memory/` file was COMMITTED AND
+  PUSHED with every check green, falsifying the "exact backup tree"
+  claim.
+- MAJOR: the exit-6 guard inspected only a target literally named
+  "origin" — `PC_BACKUP_PUSH_REMOTE=prod` (remote → production URL)
+  and a direct production URL both pushed to github (executed).
+- MAJOR: persistent branch-push failure masked forever — no
+  `branch_push` manifest field, no alarm; a pre-receive hook rejecting
+  only the branch produced rc-0 "backup complete" runs indefinitely.
+- MAJOR: with `GIT_TRACE=1` exported, the new push-stderr printing
+  leaked the credential-bearing URL 12 times.
+- MINOR: identity fallback checked only `user.email` (half-configured
+  identity bricked the run at exit 128); credential-shaped FILENAMES
+  landed in the pushed tree; stale `r1.stderr` in an r2 assert.
+
+### Devil's Architect — PROCEED-WITH-FINDINGS (key findings)
+
+- MAJOR: the roadmap-glyph integrity check passed on `74bea1e` (where
+  S1 was pre-recorded ☑ with its gate open) — record-existence is not
+  outcome-agreement; no machine-parseable outcome marker existed.
+- MAJOR: no production backup since `74bea1e` — v4 never ran against
+  the real remote; the branch was stale at origin's `3e69e36` (the
+  invalid "t5" entry); condition: run one real backup before closure.
+- MINOR: exit-8 masked the exit-7 banner; identity asymmetry (same as
+  RT); ledger #3 vs roadmap drift; README exit-code table gaps +
+  post-union seq non-uniqueness; test comment (show-ref rc).
+
+### Ship Steward — PROCEED-WITH-FINDINGS (key findings)
+
+- MINOR: stale "718/leg" release-history row; CI hedge imprecision;
+  iteration-2 record must pin `67df974` (done — this record).
+- Verified-good: local suite and CI per-leg counts exactly matched
+  every stated expectation; the addenda chain reproduced against
+  actual commit history via the API; no pre-recording anywhere.
+
+**Consensus: NOT reached (one BLOCK). Iteration cap (2) exhausted —
+the stage halts and escalates to the project owner with both
+iterations' records (process §consensus rule).**
+
+### Remediation (applied before escalation; NOT stage closure)
+
+Every iteration-2 finding was fixed and execution-verified in scratch
+in the commit carrying this record:
+
+- RT-CRITICAL: layer 2 now scans ALL of `harness/` (the complete set
+  of paths a backup commit can introduce). Verified: the RT's exact
+  untracked-file probe now aborts exit 4, remote untouched.
+- RT-M1: the production refusal resolves ANY push target (remote
+  name, path, URL). Verified: `prod`-named remote and direct
+  production URL both refuse exit 6, credential never printed.
+- RT-M2: branch-push streak alarm — `<repo>/.git/pc-backup-failcount`
+  counter (updated only when the fetch succeeded; a remote that never
+  received the branch counts as not-survived), `prev_branch_push`
+  recorded per manifest entry (one-run lag is inherent: an entry
+  cannot contain its own push result). Verified: hook-rejection run 1
+  rc 0 recorded, run 2 exit 7 with BRANCH-PUSH-ALARM banner.
+- RT-M3: `GIT_TRACE*` unset for the run; printed push stderr is
+  credential-redacted. Verified: no credential in output under
+  `GIT_TRACE=1`.
+- RT-m1/A-m2: per-field identity fallback (configured fields never
+  overridden; half-configured identities commit). Verified:
+  email-only run commits with configured name + fallback email.
+- RT-m2: shaped filenames excluded from the pushed tree, counted in
+  state.json (`scripts_skipped_shaped_count`; names never recorded —
+  a shaped name in state.json would itself trip the scan). Covered by
+  a new hermetic-test assertion.
+- RT-m3: the stale assert fixed.
+- A-M1: `FINAL OUTCOME:` record rule adopted (process doc) and
+  machine-enforced: records dated ≥ 2026-11-14 must carry it; a
+  roadmap ☑ requires a `FINAL OUTCOME: CONSENSUS REACHED` record
+  naming the stage (the check now fails the `74bea1e` violation
+  class).
+- A-M2: a production backup run is the final step of THIS execution
+  plan (v4-remediated production debut; result lands in the branch
+  manifest).
+- A-m1: `_alarms` runs at the exit-8 aborts (no banner masking).
+- A-m3: ledger #3 now carries the legacy-leg semantics in the
+  authoritative row. A-m4: README exit-code table + post-union seq
+  note. A-m5/S-m1/S-m2: comment and project-state corrections.
+- Local suite after remediation: **719 passed + 9 skipped** (baseline
+  exact); every scratch verification listed above green.
+
+FINAL OUTCOME: NO CONSENSUS — iteration cap reached; escalated to the project owner (remediation applied; fresh gate G1-iter4 required before S1 closure).

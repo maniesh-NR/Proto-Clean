@@ -15,19 +15,31 @@ its results before the NEXT stage proceeds. Status legend:
 ## In gate (outcome pending — no pre-recording)
 
 - ◐ **S1. Material You across all OSes + agent harness + event-driven
-  backups** — G1 iter-1 BLOCK (PAT near-miss) → iter-2 cap reached
-  (BLOCK×2 proven by execution) → owner ordered fresh gate G1-iter3 on
-  `74bea1e`: iteration 1 returned Red Team BLOCK (canary/scan gaps,
-  proven by execution) + 2× PWF → fix cycle applied (backup v4,
-  restyle repaint, harness integrity tests) → iteration 2 pending on
-  the fix commit. Final state will be recorded ONLY from that gate's
-  verdicts (see consensus-log/2026-11-13-S1-material-you-gate-iter3.md).
+  backups** — gate history: G1 iter-1 BLOCK → iter-2 cap → owner-ordered
+  fresh gate **G1-iter3** (cap 2): iter-1 BLOCK (canary/scan gaps) →
+  fix cycle `7e54aa1` → CI broke 5/7 → three environment fix extensions
+  (`140d9dc` identity fallback, `3d51da9` push-stderr capture + container
+  rsync, `67df974` shallow-checkout fetch-depth; CI 7/7 green,
+  728/leg POSIX · 604+124 windows) → **iter-2 (2026-11-14): Red Team
+  BLOCK** (scan coverage gap on the harness/ refresh surface — proven
+  exfiltration to the pushed branch — plus guard/alarm/GIT_TRACE
+  majors) + Architect/Steward PROCEED-WITH-FINDINGS → **iteration cap
+  reached, NO CONSENSUS — escalated to the project owner.** All
+  iteration-2 findings remediated in the commit carrying the iter-2
+  record (scan covers all of harness/, any-target production refusal,
+  branch-push streak alarm + `prev_branch_push` manifest field,
+  GIT_TRACE unset + stderr redaction, per-field identity fallback,
+  shaped-filename tree exclusion, FINAL-OUTCOME-backed integrity
+  check); each fix execution-verified in scratch. **S1 stays open: a
+  fresh gate (G1-iter4) must re-judge the remediation commit before
+  closure — per process, that re-gate is the owner's call.**
   - Desktop: dynamic-color seed (brand / system accent / custom hex),
     OS accent detection (GNOME 47 accent-color, Windows DWM
     AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,
     settings UI + persistence
   - Android: `dynamicColorScheme()` on 12+, DataStore toggle
-  - Agent harness + event-driven backups (v4) + adversarial process
+  - Agent harness + event-driven backups (v4 remediated) + adversarial
+    process
 
 ## Near term
 

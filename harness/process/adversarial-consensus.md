@@ -59,6 +59,27 @@ Every gate run writes `memory/consensus-log/<date>-<stage>.md`:
 roles launched, verdicts verbatim, findings with resolutions, final
 consensus decision. No record = gate didn't happen.
 
+**Record format (adopted 2026-11-14, after G1-iter3-i2 found the
+glyph integrity check passing on a pre-recorded ☑):** every record
+dated 2026-11-14 or later MUST carry exactly one machine-parseable
+closure line:
+
+```
+FINAL OUTCOME: CONSENSUS REACHED
+```
+or
+```
+FINAL OUTCOME: NO CONSENSUS — <short reason>
+```
+
+It is written ONLY after the independent verdicts return. A roadmap
+stage may be marked done (☑) only if a record that names it carries
+`FINAL OUTCOME: CONSENSUS REACHED`; `tests/test_harness_integrity.py`
+enforces both rules. Cap-exhausted gates record
+`FINAL OUTCOME: NO CONSENSUS — iteration cap reached` and escalate to
+the project owner; a fresh gate may then be ordered by the owner on
+the remediation commit (the G1 → G1-iter3 precedent).
+
 ## Scope of review per gate
 
 - The **current stage's** diff/plan (implementation vs stated intent)

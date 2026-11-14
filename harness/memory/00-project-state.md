@@ -1,6 +1,6 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-13 (Material You + harness session, post G1 fixes)
+Last updated: 2026-11-14 (G1-iter3 iteration 2: no consensus, cap reached; remediation applied; owner escalation)
 
 ## Identity
 
@@ -55,10 +55,16 @@ Last updated: 2026-11-13 (Material You + harness session, post G1 fixes)
 | v0.6.0 | interop hardening, perf/stability/memory pass (669 tests) |
 | v0.6.1 | region-grouped server list, guest-mode fixes, release-signed APKs |
 | v0.6.2 | uBO-parity default blocklists, region-tree expansion fix (684 tests) |
-| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (718/leg) |
+| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `67df974`) |
 
 ## Known open threads
 
+- **S1 gate: cap reached without consensus (2026-11-14)** — G1-iter3
+  iteration 2 returned a Red Team BLOCK (scan-coverage critical,
+  isolation/alarm/trace majors); all findings remediated and
+  execution-verified, but per process a fresh gate (G1-iter4) must
+  re-judge the remediation commit before S1 closes. **Owner decision
+  required.**
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan

@@ -86,3 +86,19 @@ Format: **decision** — context — date. Newest last.
     history, divergence auto-merge with manifest union, harness/
     refresh per checkpoint, 2+-failure main-push alarm. Machine-checked
     by tests/test_harness_integrity.py. (2026-11-13, G1-iter3)
+15. **Gate caps escalate; remediation does not equal closure** —
+    G1-iter3 exhausted its 2-iteration cap with a Red Team BLOCK on
+    iteration 2 (scan-coverage critical on the harness/ refresh
+    surface, proven by execution; plus isolation, alarm and GIT_TRACE
+    majors). Per the process doc the stage halts and escalates to the
+    owner; all findings were remediated and scratch-verified in the
+    same cycle (full-harness scan coverage, any-target production
+    refusal, branch-push streak alarm with `prev_branch_push` manifest
+    field, GIT_TRACE unset + stderr redaction, per-field identity
+    fallback, shaped-filename tree exclusion), but S1 is NOT closed: a
+    fresh gate (G1-iter4) ordered by the owner must re-judge the
+    remediation commit. Alongside: consensus records now carry a
+    machine-parseable `FINAL OUTCOME:` line, and a roadmap ☑ requires
+    a `FINAL OUTCOME: CONSENSUS REACHED` record naming the stage
+    (enforced by tests/test_harness_integrity.py). (2026-11-14,
+    G1-iter3-i2)
