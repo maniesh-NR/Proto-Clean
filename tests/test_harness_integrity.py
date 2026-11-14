@@ -132,7 +132,12 @@ def test_backup_script_hermetic_cycle(tmp_path):
     git identity at all — the first CI execution of this test failed
     on 5/7 legs at the script's first `git commit` — so every machine
     now exercises the SAME path: the script's built-in identity
-    fallback (see scripts/sandbox_backup.sh)."""
+    fallback (see scripts/sandbox_backup.sh).
+
+    NOTE: the source checkout must carry full history (CI uses
+    fetch-depth: 0) — a shallow ROOT makes the scratch clone shallow
+    and every push to the bare is rejected with "shallow update not
+    allowed" (the second CI break, 2026-11-14)."""
     script = ROOT / "scripts" / "sandbox_backup.sh"
     repo = tmp_path / "clone"
     bare = tmp_path / "bare.git"
@@ -172,21 +177,32 @@ def test_backup_script_hermetic_cycle(tmp_path):
          "sandbox/backups:harness/backups/manifest.json"],
         capture_output=True, text=True, check=True).stdout
     assert '"seq": 2' in manifest, "second backup must append (seq 2)"
-    # 3. planted secret (built at runtime — no literal in this file)
+    # 3. planted secret (built at runtime — no literal in this file).
+    #    show-ref --verify: exit 1 with NO stdout when the ref is
+    #    missing — a bare `rev-parse <ref>` ECHOES the unknown ref
+    #    name to stdout, which once made a non-empty-output assert
+    #    pass spuriously (the third CI-break layer, 2026-11-14).
     fake = "gh" + "p_" + "a" * 36
     (home / "scripts" / "leaky.py").write_text(f"t = '{fake}'\n")
-    bare_tip = subprocess.run(
-        ["git", "-C", str(bare), "rev-parse", "sandbox/backups"],
-        capture_output=True, text=True).stdout.strip()
-    assert bare_tip, (
-        "sandbox/backups missing from the bare although both runs exited 0"
-        " — run1 output: " + (r1.stdout + r1.stderr).strip()
+    r_tip = subprocess.run(
+        ["git", "-C", str(bare), "show-ref", "--verify",
+         "refs/heads/sandbox/backups"],
+        capture_output=True, text=True)
+    assert r_tip.returncode == 0, (
+        "sandbox/backups never landed in the bare although both runs "
+        "exited 0 — run1 output: " + (r1.stdout + r1.stderr).strip()
         + " || run2 output: " + (r2.stdout + r2.stderr).strip())
+    bare_tip = r_tip.stdout.split()[0]
     r3 = run_backup("hermetic secret")
     assert r3.returncode == 4, (r3.returncode, r3.stdout + r3.stderr)
-    after = subprocess.run(
-        ["git", "-C", str(bare), "rev-parse", "sandbox/backups"],
-        capture_output=True, text=True, check=True).stdout.strip()
+    r_after = subprocess.run(
+        ["git", "-C", str(bare), "show-ref", "--verify",
+         "refs/heads/sandbox/backups"],
+        capture_output=True, text=True)
+    assert r_after.returncode == 0, (
+        "branch vanished from the bare after the abort run: "
+        + r3.stdout + r3.stderr)
+    after = r_after.stdout.split()[0]
     assert after == bare_tip, "secret-bearing run must not move the remote"
     # 4. the main checkout is never dirtied
     status = subprocess.run(["git", "-C", str(repo), "status", "--porcelain"],

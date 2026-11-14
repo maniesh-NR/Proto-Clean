@@ -297,4 +297,36 @@ Local suite after the extension: **719 passed + 9 skipped** (baseline
 exact). Iteration 2 pins the commit carrying this addendum and must
 re-verify CI green on it before verdicts are recorded.
 
+## Addendum 2 — the full CI-break chain, root-caused (disclosed)
+
+Three stacked layers, each peeled by one red→green CI cycle. All
+environment/test-side; the shipped backup script's own logic was
+exonerated at every layer (and is what surfaced each cause):
+
+1. **Ambient git identity** (140d9dc, 5/7 legs): fixed by the script's
+   conditional identity fallback + config-neutralized test runs.
+2. **Missing rsync in the legacy containers + swallowed push stderr**
+   (3d51da9): rsync added to the container install set; the script now
+   captures and prints push stderr on failure (main and branch
+   pushes) — a silent push failure had burned a whole debugging cycle.
+3. **Shallow CI checkout** (root cause of every "branch push failed"
+   on POSIX legs): `actions/checkout` defaults to fetch-depth 1, the
+   hermetic test's scratch clone inherits `.git/shallow` from it, and
+   `git push` to the fresh bare is rejected — `! [remote rejected] …
+   (shallow update not allowed)` — reproduced bit-for-bit in the
+   sandbox via `file://` depth-1 clone → local clone → push. The
+   script's exit-0 "commit kept locally" fallback then masked it.
+   **CI-side fix: fetch-depth: 0** for the test and legacy checkouts.
+   Additionally, the test's bare-ref checks used bare
+   `git rev-parse <ref>`, which ECHOES an unknown ref name to stdout —
+   a non-empty-output assert passed spuriously and hid the missing
+   branch; both checks now use `show-ref --verify` (exit 1, no
+   stdout) with the full run output in every failure message.
+
+Lesson recorded: environment-dependent test assumptions (ambient
+identity, ambient tool availability, checkout depth, rev-parse's
+echo-unknown-refs behavior) are exactly the blind spots a dev sandbox
+cannot catch — each fix makes the test assert the environment it
+needs rather than assume it.
+
 ## Iteration 2 — [pending: launched on the fix-cycle extension commit]

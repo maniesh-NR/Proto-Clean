@@ -465,7 +465,7 @@ else
     echo "== checking for divergence"
     fetch_branch
     if ! git rev-parse --verify "$RBRANCH" >/dev/null 2>&1; then
-      echo "!! branch push failed (remote unreachable?) — commit kept locally; next run retries" >&2
+      echo "!! branch push failed (remote rejected or unreachable? — see stderr above) — commit kept locally; next run retries" >&2
     elif git merge-base --is-ancestor "$RBRANCH" HEAD 2>/dev/null; then
       echo "!! branch push failed (network?) — commit kept locally; next run retries" >&2
     else
