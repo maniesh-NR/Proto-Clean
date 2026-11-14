@@ -177,7 +177,11 @@ def test_backup_script_hermetic_cycle(tmp_path):
     (home / "scripts" / "leaky.py").write_text(f"t = '{fake}'\n")
     bare_tip = subprocess.run(
         ["git", "-C", str(bare), "rev-parse", "sandbox/backups"],
-        capture_output=True, text=True, check=True).stdout.strip()
+        capture_output=True, text=True).stdout.strip()
+    assert bare_tip, (
+        "sandbox/backups missing from the bare although both runs exited 0"
+        " — run1 output: " + (r1.stdout + r1.stderr).strip()
+        + " || run2 output: " + (r2.stdout + r2.stderr).strip())
     r3 = run_backup("hermetic secret")
     assert r3.returncode == 4, (r3.returncode, r3.stdout + r3.stderr)
     after = subprocess.run(

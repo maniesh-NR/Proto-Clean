@@ -210,10 +210,14 @@ if git rev-parse --verify "$RMAIN" >/dev/null 2>&1; then
   AHEAD=$(git rev-list --count "$RMAIN..main" 2>/dev/null || echo 0)
   if [ "$AHEAD" -gt 0 ]; then
     echo "== pushing main ($AHEAD commit(s))"
-    if ! git push "$PUSH_URL" main; then
+    _mperr="$(mktemp /tmp/pc-mainpush.XXXXXX)"
+    if ! git push "$PUSH_URL" main 2>"$_mperr"; then
       MAIN_PUSH="failed"
-      echo "!! main push failed (diverged? network?) — backing up the sandbox snapshot anyway" >&2
+      echo "!! main push failed (diverged? network?) — stderr:" >&2
+      sed 's/^/   /' "$_mperr" >&2
+      echo "!! backing up the sandbox snapshot anyway" >&2
     fi
+    rm -f "$_mperr"
   fi
 fi
 
@@ -450,8 +454,15 @@ else
   #     it here (programmatic manifest union, ours for state.json) and
   #     push the merge commit. Append-only is preserved; force-push is
   #     never attempted; unresolvable conflicts abort loudly (exit 8).
-  if ! git push "$PUSH_URL" "$BRANCH" 2>/dev/null; then
-    echo "== branch push failed — checking for divergence"
+  #     Push stderr is CAPTURED and printed on failure (a silent push
+  #     failure burned a full CI debugging cycle on 2026-11-14: two
+  #     rc-0 runs, branch never landed in the remote, error discarded).
+  _bperr="$(mktemp /tmp/pc-branchpush.XXXXXX)"
+  if ! git push "$PUSH_URL" "$BRANCH" 2>"$_bperr"; then
+    echo "== branch push failed — stderr:" >&2
+    sed 's/^/   /' "$_bperr" >&2
+    rm -f "$_bperr"
+    echo "== checking for divergence"
     fetch_branch
     if ! git rev-parse --verify "$RBRANCH" >/dev/null 2>&1; then
       echo "!! branch push failed (remote unreachable?) — commit kept locally; next run retries" >&2
@@ -524,6 +535,7 @@ PY
       fi
     fi
   fi
+  rm -f "$_bperr" 2>/dev/null || true
   echo "== backup commit $SHA recorded on $BRANCH (branch tip: $(git rev-parse --short HEAD))"
 fi
 
