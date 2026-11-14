@@ -69,6 +69,15 @@ agents executing scratch-clone attacks. v4, in execution order:
 - rsync runs without `-l`, so symlinks are skipped — a link's target
   path can never enter the tree unscanned (documented: not
   executable-verified in the dev sandbox, which forbids symlinks).
+- **Identity self-sufficiency**: if no git identity is configured
+  anywhere (fresh sandbox, CI runner), the run's commits fall back to a
+  built-in `Proto Clean Sandbox Backup
+  <backup@sandbox.protoclean.invalid>` identity instead of dying at the
+  first commit — backups are the mandatory last step of every execution
+  plan, so the script must never be blocked on ambient config. Added
+  after the hermetic CI test's first run caught 5/7 legs with no global
+  git identity (2026-11-13); the test now neutralizes ambient config to
+  exercise this path on every machine.
 
 Exit codes: 0 ok · 2 usage · 3 lock contention · 4 secret detected ·
 5 scan self-test failed · 6 refused (test-mode/push-target guard) ·

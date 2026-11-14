@@ -55,6 +55,22 @@ if [ "$#" -gt 1 ]; then
   exit 2
 fi
 
+# -- git identity self-sufficiency (G1-iter3 fix-cycle extension,
+#    2026-11-13): backups are the MANDATORY last step of every
+#    execution plan, so the script must be able to commit even where no
+#    ambient identity is configured (fresh sandboxes, CI runners — the
+#    hermetic CI test caught exactly this: 5/7 legs have no global git
+#    identity and died at the first commit). The fallback identity is
+#    used ONLY when none is configured anywhere; an existing identity
+#    keeps authoring the commits as before.
+if [ -z "$(git config user.email 2>/dev/null || true)" ]; then
+  export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-Proto Clean Sandbox Backup}"
+  export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-backup@sandbox.protoclean.invalid}"
+  export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-Proto Clean Sandbox Backup}"
+  export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-backup@sandbox.protoclean.invalid}"
+  echo "== no git identity configured — using the built-in backup identity for this run's commits"
+fi
+
 # -- test-mode isolation (G1-iter3 major #1) -------------------------
 # Any env override marks this as a TEST run. A test run must never
 # push to the production origin — even when $REPO is a clone of the

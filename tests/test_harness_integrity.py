@@ -87,8 +87,11 @@ def test_harness_doc_references_resolve():
                 f"{p.relative_to(ROOT)} references missing {ref}")
 
 
+@pytest.mark.skipif(os.name != "posix",
+                    reason="Windows runners' 'bash' is the WSL stub (no "
+                            "distro installed) — POSIX legs guard the script")
 def test_backup_script_syntax():
-    """The backup script must stay valid bash (cheap guard, every leg)."""
+    """The backup script must stay valid bash (cheap guard, POSIX legs)."""
     script = ROOT / "scripts" / "sandbox_backup.sh"
     r = subprocess.run(["bash", "-n", str(script)],
                        capture_output=True, text=True)
@@ -122,7 +125,14 @@ def test_backup_script_hermetic_cycle(tmp_path):
     clone + bare remote via the documented env overrides (G1-iter3):
     fresh-create, append, and a planted secret aborting BEFORE any
     push. The overrides were built for exactly this and are now
-    consumed by CI on every push to main."""
+    consumed by CI on every push to main.
+
+    Ambient git config is NEUTRALIZED inside the runs
+    (GIT_CONFIG_GLOBAL/SYSTEM -> /dev/null): CI runners configure no
+    git identity at all — the first CI execution of this test failed
+    on 5/7 legs at the script's first `git commit` — so every machine
+    now exercises the SAME path: the script's built-in identity
+    fallback (see scripts/sandbox_backup.sh)."""
     script = ROOT / "scripts" / "sandbox_backup.sh"
     repo = tmp_path / "clone"
     bare = tmp_path / "bare.git"
@@ -142,6 +152,11 @@ def test_backup_script_hermetic_cycle(tmp_path):
     def run_backup(message):
         e = dict(os.environ)
         e.update(env)
+        # no ambient identity/config: identical behavior on CI runners
+        # (which have none) and dev machines (which do) — the script's
+        # identity fallback commits on every platform
+        e["GIT_CONFIG_GLOBAL"] = os.devnull
+        e["GIT_CONFIG_SYSTEM"] = os.devnull
         return subprocess.run(["bash", str(script), message],
                               cwd=str(repo), env=e,
                               capture_output=True, text=True, timeout=240)

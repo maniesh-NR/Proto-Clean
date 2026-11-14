@@ -259,4 +259,42 @@ relative invocation silently runs the committed (old) version.**
 
 Iteration 2 outcome: **recorded below after the re-run — not before.**
 
-## Iteration 2 — [pending: launched on the fix-cycle commit]
+## Addendum — CI break on the first fix-cycle commit (disclosed)
+
+`7e54aa1` (iteration-1 fixes) went red on CI: **5/7 legs failed** —
+all four POSIX legs (ubuntu, macos, both legacy) on
+`test_backup_script_hermetic_cycle`, Windows on
+`test_backup_script_syntax`. Root causes (neither in the shipped
+backup script's logic):
+
+1. The "hermetic" test was not hermetic: it relied on the ambient
+   global git identity, which GitHub runners do not configure — the
+   script's first `git commit` died (exit 128, "Author identity
+   unknown"). It passed in the dev sandbox only because that machine
+   carries a global identity — the same environment-blindness the
+   39/39 scratch matrix shared (it, too, ran with ambient identity).
+2. On Windows runners `bash` resolves to the WSL stub (no distro
+   installed): `bash -n` exits 1 with a UTF-16 error — the syntax
+   guard cannot execute there at all.
+
+Fix-cycle extension (the commit carrying this addendum):
+
+- `scripts/sandbox_backup.sh`: identity self-sufficiency — when no
+  git identity is configured anywhere (fresh sandbox, CI runner), the
+  run's commits fall back to a built-in `Proto Clean Sandbox Backup
+  <backup@sandbox.protoclean.invalid>` identity. Backups are the
+  mandatory last step of every execution plan, so the script must
+  never be blocked on ambient config. An existing identity still
+  authors commits as before (fallback is conditional).
+- `tests/test_harness_integrity.py`: the hermetic cycle neutralizes
+  ambient git config (GIT_CONFIG_GLOBAL/SYSTEM → /dev/null) inside
+  every run — CI runners (no identity) and dev machines (identity)
+  now execute the SAME path (the fallback). The syntax guard is
+  POSIX-only, with the WSL-stub reason recorded.
+- `harness/backups/README.md`: identity self-sufficiency bullet.
+
+Local suite after the extension: **719 passed + 9 skipped** (baseline
+exact). Iteration 2 pins the commit carrying this addendum and must
+re-verify CI green on it before verdicts are recorded.
+
+## Iteration 2 — [pending: launched on the fix-cycle extension commit]
