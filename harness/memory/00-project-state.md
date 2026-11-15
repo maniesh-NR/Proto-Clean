@@ -1,6 +1,6 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-14 (G1-iter3 iteration 2: no consensus, cap reached; remediation applied; owner escalation)
+Last updated: 2026-11-15 (G1-iter4 iteration 1: no consensus — RT+Architect BLOCK, Steward PROCEED-WITH-FINDINGS; all findings remediated, backup v5 + hardened integrity check; iteration 2 re-judges the fix commit)
 
 ## Identity
 
@@ -8,13 +8,14 @@ Last updated: 2026-11-14 (G1-iter3 iteration 2: no consensus, cap reached; remed
   (Linux / Windows / macOS desktop + Android)
 - **Repo**: `maniesh-NR/Proto-Clean`
 - **Version**: 0.6.2 (released) — see `03-release-runbook.md`
-- **Test baseline**: local sandbox **719 passed + 9 skipped** after the
-  G1-iter3 fix cycle (+7 harness-integrity tests; +3 Qt-gated restyle
-  tests that skip locally and run on CI). CI per-leg expectation for
-  the fix-cycle commit: 728 (ubuntu/macos), windows proportionally
-  fewer (hermetic backup test is POSIX-only) — **to be confirmed by CI
-  and re-recorded at the gate**. Any change must keep the suite green;
-  new features add tests to the baseline.
+- **Test baseline**: local sandbox **723 passed + 9 skipped** after the
+  G1-iter4 fix cycle (719+9 plus 4 new machine tests: production
+  opt-in, github-spelling refusals, unreachable-remote alarm,
+  FINAL-OUTCOME forgery suite). CI confirmed at `6324a4d`: 728 × 4
+  POSIX legs, 604 passed + 124 skipped on windows. Expectation for
+  the G1-iter4 fix commit: 732 × 4 POSIX, 605+127 windows — to be
+  confirmed by CI at iteration 2. Any change must keep the suite
+  green; new features add tests to the baseline.
 
 ## Feature inventory
 
@@ -55,16 +56,19 @@ Last updated: 2026-11-14 (G1-iter3 iteration 2: no consensus, cap reached; remed
 | v0.6.0 | interop hardening, perf/stability/memory pass (669 tests) |
 | v0.6.1 | region-grouped server list, guest-mode fixes, release-signed APKs |
 | v0.6.2 | uBO-parity default blocklists, region-tree expansion fix (684 tests) |
-| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `67df974`) |
+| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `6324a4d`), backup v5 + hardened gate-record integrity (723+9 local; G1-iter4 fix cycle) |
 
 ## Known open threads
 
-- **S1 gate: cap reached without consensus (2026-11-14)** — G1-iter3
-  iteration 2 returned a Red Team BLOCK (scan-coverage critical,
-  isolation/alarm/trace majors); all findings remediated and
-  execution-verified, but per process a fresh gate (G1-iter4) must
-  re-judge the remediation commit before S1 closes. **Owner decision
-  required.**
+- **S1 gate: G1-iter4 in progress (2026-11-15)** — the owner ordered
+  a fresh gate on the G1-iter3 remediation commit; iteration 1
+  returned Red Team + Devil's Architect BLOCK (production-as-default,
+  guard spelling bypass, unreachable-alarm, unscanned divergence
+  merge, GIT_TRACE2, and the FINAL-OUTCOME check defeated by its own
+  documentation) vs Ship Steward PROCEED-WITH-FINDINGS; every finding
+  is remediated and execution-verified (backup v5; 20/20 scratch
+  matrix; +4 machine tests) and iteration 2 re-judges the fix commit
+  within the gate's cap.
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan

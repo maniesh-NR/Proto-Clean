@@ -23,7 +23,8 @@ python -m pytest tests/ -q -p no:asyncio      # full suite green
 ```
 
 Before tagging, clear **every deferred-findings row whose "Gate
-before" is this tag** — the ledger (`harness/memory/deferred-findings.md`)
+before" is this tag or names this tag's stage** (S2 ≡ the v0.6.3 tag) —
+the ledger (`harness/memory/deferred-findings.md`)
 is authoritative; do not rely on any list transcribed here (G1-iter3
 Steward major #2: the docs had drifted to three different subsets).
 At time of writing that set is #1 (Android dynamicColor QA — toggle

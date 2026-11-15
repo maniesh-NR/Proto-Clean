@@ -2,7 +2,9 @@
 # Event-driven sandbox backup — run as the LAST step of every
 # execution plan / prompt output. Never on a timer.
 #
-#   scripts/sandbox_backup.sh "message describing this checkpoint"
+#   PC_BACKUP_ALLOW_PRODUCTION=1 scripts/sandbox_backup.sh "msg"  # production (OPT-IN)
+#   PC_BACKUP_REPO=… PC_SANDBOX_HOME=… PC_BACKUP_PUSH_REMOTE=… \
+#     scripts/sandbox_backup.sh "msg"                              # test / CI (never github)
 #
 # Design (see harness/backups/README.md + consensus-log 2026-11-13):
 #   * the MAIN CHECKOUT IS NEVER WRITTEN: all backup state is built
@@ -40,9 +42,12 @@
 #     from the branch's git history, never silently reset
 set -euo pipefail
 # GIT_TRACE* would make git print full push URLs — INCLUDING embedded
-# credentials — into the captured stderr this script prints on push
-# failures (proven by the G1-iter3-i2 Red Team). No trace for backups.
-unset GIT_TRACE GIT_TRACE_PACKET GIT_TRACE_EVENT GIT_TRACE_CURL GIT_TRACE_SHALLOW
+# credentials — into captured/pushed stderr (proven by the G1-iter3-i2
+# Red Team; G1-iter4 RT major #5 proved the TRACE2 family leaks through
+# v4's UNCAPPED re-pushes — every trace family is unset, and EVERY
+# push captures + redacts its stderr).
+unset GIT_TRACE GIT_TRACE_PACKET GIT_TRACE_EVENT GIT_TRACE_CURL GIT_TRACE_SHALLOW \
+      GIT_TRACE2 GIT_TRACE2_EVENT GIT_TRACE2_PERF GIT_TRACE2_BRIEF
 
 REPO="${PC_BACKUP_REPO:-/home/z/my-project/cleanroom}"
 REPO="${REPO#file://}"          # accept file:// URLs (G1-iter3 major #1)
@@ -52,10 +57,51 @@ BRANCH="sandbox/backups"
 SANDBOX_SCRIPTS="$SANDBOX_HOME/scripts"
 LOCK="/tmp/pc-sandbox-backup.lock"
 
-cd "$REPO"
 MSG="${1:-checkpoint}"
 if [ "$#" -gt 1 ]; then
-  echo "usage: scripts/sandbox_backup.sh \"message\"" >&2
+  echo "usage: PC_BACKUP_ALLOW_PRODUCTION=1 scripts/sandbox_backup.sh \"message\"        # production (opt-in)" >&2
+  echo "       PC_BACKUP_REPO=… PC_SANDBOX_HOME=… PC_BACKUP_PUSH_REMOTE=… scripts/sandbox_backup.sh \"message\"  # test/CI" >&2
+  exit 2
+fi
+
+# -- test-mode detection (any env override marks a TEST run) ----------
+TEST_MODE=0
+[ "$REPO" != "/home/z/my-project/cleanroom" ] && TEST_MODE=1
+[ "$SANDBOX_HOME" != "/home/z/my-project" ] && TEST_MODE=1
+[ -n "${PC_BACKUP_PUSH_REMOTE:-}" ] && TEST_MODE=1
+
+# -- production is OPT-IN (G1-iter4 RT major #1) ----------------------
+# Two consecutive gates produced two accidental production pushes by
+# agents that lost their env overrides (manifest seq 3 "t5" at
+# G1-iter3; seq 5 "E9c" at G1-iter4 — the gate's own Red Team, a
+# broken && chain). A default-production script WILL eventually run
+# by accident: without the explicit flag the script refuses BEFORE
+# any action; the flag plus test overrides is a conflicting mode.
+ALLOW_PRODUCTION="${PC_BACKUP_ALLOW_PRODUCTION:-0}"
+if [ "$TEST_MODE" = 1 ] && [ "$ALLOW_PRODUCTION" = "1" ]; then
+  echo "!! conflicting mode: PC_BACKUP_ALLOW_PRODUCTION=1 combined with test overrides" >&2
+  echo "   (PC_BACKUP_REPO / PC_SANDBOX_HOME / PC_BACKUP_PUSH_REMOTE) — pick one mode." >&2
+  exit 2
+fi
+if [ "$TEST_MODE" = 0 ] && [ "$ALLOW_PRODUCTION" != "1" ]; then
+  echo "!! production backups are OPT-IN — refusing to run production-mode by default." >&2
+  echo "   Real run:  PC_BACKUP_ALLOW_PRODUCTION=1 scripts/sandbox_backup.sh \"message\"" >&2
+  echo "   Test run:  set PC_BACKUP_REPO / PC_SANDBOX_HOME / PC_BACKUP_PUSH_REMOTE to scratch paths" >&2
+  echo "   (see harness/backups/README.md)." >&2
+  exit 6
+fi
+
+cd "$REPO"
+
+# -- input validation (G1-iter4 RT minor #6 / Architect minor #5): a
+#    bare or HEAD-less repo used to die deep inside rsync/git with a
+#    raw error (exit 23/128, undocumented) — fail fast with a message
+if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null || echo false)" != "true" ]; then
+  echo "!! PC_BACKUP_REPO must be a working-tree checkout (bare repos are not supported)" >&2
+  exit 2
+fi
+if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+  echo "!! the backup repo has no HEAD commit (unborn branch?) — clone a real checkout first" >&2
   exit 2
 fi
 
@@ -82,20 +128,12 @@ if [ -z "$_gb_name" ] || [ -z "$_gb_email" ]; then
   echo "== git identity incomplete (name/email) — built-in backup identity covers the missing field(s)"
 fi
 
-# -- test-mode isolation (G1-iter3 major #1; GENERALIZED in the
-#    G1-iter3-i2 remediation after the Red Team bypassed the old guard
-#    with a differently-named remote and a direct production URL) -----
-# Any env override marks this as a TEST run. A test run must never
-# push to the production repo — whatever the target's shape. The
-# actual refusal happens right after the remote plumbing resolves it.
-TEST_MODE=0
-[ "$REPO" != "/home/z/my-project/cleanroom" ] && TEST_MODE=1
-[ "$SANDBOX_HOME" != "/home/z/my-project" ] && TEST_MODE=1
-[ -n "${PC_BACKUP_PUSH_REMOTE:-}" ] && TEST_MODE=1
+# (test-mode detection + the OPT-IN production gate live ABOVE the cd
+#  now — the gate must be able to refuse before touching any repo)
 
 # -- remote plumbing: every fetch/push goes through $PUSH_URL --------
 case "$PUSH_URL" in
-  *://*|/*|./*)
+  *://*|/*|./*|../*)
     : # a URL or filesystem path — git addresses it directly
     ;;
   *)
@@ -122,22 +160,53 @@ else
 fi
 _GITDIR="$(git -C "$REPO" rev-parse --absolute-git-dir)"
 
-# -- production-target refusal for TEST runs (G1-iter3-i2 RT major:
-#    the v4 guard only inspected a target literally named "origin" —
-#    PC_BACKUP_PUSH_REMOTE=prod or a direct production URL pushed
-#    straight to github, proven by execution). Resolve the target —
-#    name, path or URL — and refuse if it is the production repo.
-#    The resolved URL is NEVER printed (it may embed a token).
+# -- production-target refusal for TEST runs (G1-iter3-i2 RT major;
+#    NORMALIZED at G1-iter4 after the Red Team bypassed v4's
+#    case-sensitive spelling grep with :443, //, case, scp and
+#    trailing-dot variants — one executed end-to-end on a decoy). Two
+#    rules:
+#      1. a TEST run never pushes to ANY github host, however
+#         spelled (scratch is always local);
+#      2. a TEST run never pushes to the production repo, however
+#         spelled (canonical comparison after normalization).
+#    The resolved URL is NEVER printed (it may embed a token); nor is
+#    the normalized form. Off-domain redirectors remain outside any
+#    client-side spelling check (documented residual, G1-iter4 RT).
+_norm_url() {
+  printf '%s\n' "$1" | tr 'A-Z' 'a-z' | sed -E \
+    -e 's#^[a-z0-9+.-]+://##' \
+    -e 's#^[^/@]+@##' \
+    -e 's#:443(/|$)#\1#g' \
+    -e 's#:22(/|$)#\1#g' \
+    -e 's#^([^/]+):([^/].*)$#\1/\2#' \
+    -e 's#//+#/#g' \
+    -e 's#^([^/]+)\./#\1/#' \
+    -e 's#\.git$##' \
+    -e 's#/$##' \
+    -e 's#^\./##'
+}
 if [ "$TEST_MODE" = 1 ]; then
   case "$PUSH_URL" in
-    *://*|/*|./*) _tgt="$PUSH_URL" ;;
-    *)            _tgt="$(git remote get-url "$PUSH_URL" 2>/dev/null || true)" ;;
+    *://*|/*|./*|../*) _tgt="$PUSH_URL" ;;
+    *)                 _tgt="$(git remote get-url "$PUSH_URL" 2>/dev/null || true)" ;;
   esac
-  if printf '%s' "$_tgt" | grep -q 'github\.com[:/]maniesh-NR/Proto-Clean'; then
-    echo "!! refusing: env overrides mark this as a TEST run, but the push target" >&2
-    echo "   resolves to the PRODUCTION github repo. Point PC_BACKUP_PUSH_REMOTE" >&2
-    echo "   at a scratch bare repo (see harness/backups/README.md)." >&2
-    exit 6
+  if [ -n "${_tgt:-}" ]; then
+    _nt="$(_norm_url "$_tgt")"
+    case "$_nt" in
+      github.com|github.com/*|ssh.github.com|ssh.github.com/*)
+        echo "!! refusing: env overrides mark this as a TEST run, but the push" >&2
+        echo "   target resolves to a github host — test traffic never reaches" >&2
+        echo "   github, whatever the spelling. Point PC_BACKUP_PUSH_REMOTE at a" >&2
+        echo "   scratch bare repo (see harness/backups/README.md)." >&2
+        exit 6
+        ;;
+    esac
+    if [ "$_nt" = "$(_norm_url 'https://github.com/maniesh-NR/Proto-Clean.git')" ]; then
+      echo "!! refusing: env overrides mark this as a TEST run, but the push target" >&2
+      echo "   resolves to the PRODUCTION repo (however spelled). Point" >&2
+      echo "   PC_BACKUP_PUSH_REMOTE at a scratch bare repo (see harness/backups/README.md)." >&2
+      exit 6
+    fi
   fi
 fi
 
@@ -321,30 +390,40 @@ mkdir -p harness/sandbox/scripts harness/backups
 #      so the branch is self-contained as of every checkpoint
 #      (G1-iter3 Architect major #2). Branch-owned state is protected:
 #      sandbox/ (the snapshot itself) and backups/manifest.json (the
-#      append-only audit trail). -rptgoD skips symlinks (see layer 1).
-rsync -rptgoD --delete --exclude='/sandbox' --exclude='/backups/manifest.json' \
+#      append-only audit trail). -rptgoD skips symlinks (see layer 1);
+#      -c (checksum) so a same-size edit made in the same second as
+#      the worktree checkout is never silently skipped (G1-iter4
+#      Architect minor #4 — the mtime quick-check proved skippable).
+rsync -c -rptgoD --delete --exclude='/sandbox' --exclude='/backups/manifest.json' \
   "$REPO/harness"/ harness/
 
 # 5a. sandbox scripts snapshot
 if [ -d "$SANDBOX_SCRIPTS" ]; then
-  rsync -rptgoD --delete --exclude '__pycache__' \
+  rsync -c -rptgoD --delete --exclude '__pycache__' \
     "$SANDBOX_SCRIPTS"/ harness/sandbox/scripts/
-  # credential-SHAPED filenames never enter the pushed tree even with
-  # clean content (G1-iter3-i2 RT minor): excluded here, COUNTED in
-  # state.json (names are not recorded — a shaped name in state.json
-  # would itself trip the tree scan; the count is the audit trail)
-  find harness/sandbox/scripts -type f \
-    \( -iname 'github_pat_*' -o -iname 'ghp_*' -o -iname 'gho_*' \
-       -o -iname 'ghs_*' -o -iname 'ghv_*' -o -iname 'akia*' \) \
-    -print -delete
 fi
+
+# 5a-2. credential-SHAPED filenames never enter the pushed tree from
+#       ANY surface (G1-iter3-i2 RT minor for the scripts snapshot;
+#       G1-iter4 RT minor #2 widened it to the WHOLE harness/ refresh
+#       surface — v4 only excluded the scripts snapshot while the
+#       refresh rsyncs ALL of harness/ including untracked files).
+#       Names are never printed (G1-iter4 RT minor #3) and never
+#       recorded (a shaped name in state.json would itself trip the
+#       tree scan) — the COUNT is the audit trail.
+_h_shaped=0
+while IFS= read -r -d '' _sf; do
+  rm -f -- "$_sf" && _h_shaped=$((_h_shaped + 1))
+done < <(find harness -type f \
+    \( -iname 'github_pat_*' -o -iname 'ghp_*' -o -iname 'gho_*' \
+       -o -iname 'ghs_*' -o -iname 'ghv_*' -o -iname 'akia*' \) -print0)
 
 # 5b. sandbox inventory (scripts/download/skills; upload/ is
 #     deliberately NOT listed — user uploads may have sensitive FILE
 #     NAMES; credential-looking names are filtered by WORD and by SHAPE
 #     — G1-iter3 Red Team major #2)
 SANDBOX_HOME="$SANDBOX_HOME" TS="$TS" MAIN_HEAD="$MAIN_HEAD" \
-MAIN_BRANCH="$MAIN_BRANCH" MAIN_PUSH="$MAIN_PUSH" python3 - <<'PY'
+MAIN_BRANCH="$MAIN_BRANCH" MAIN_PUSH="$MAIN_PUSH" HARNESS_SHAPED="$_h_shaped" python3 - <<'PY'
 import json, os, re
 ts = os.environ["TS"]; head = os.environ["MAIN_HEAD"]
 branch = os.environ["MAIN_BRANCH"]; home = os.environ["SANDBOX_HOME"]
@@ -379,6 +458,7 @@ state = {
         "scripts": inv("scripts"),
         "skills": inv("skills"),
         "scripts_skipped_shaped_count": shaped_count("scripts"),
+        "harness_skipped_shaped_count": int(os.environ.get("HARNESS_SHAPED", "0")),
     },
 }
 with open("harness/sandbox/state.json", "w") as f:
@@ -441,8 +521,9 @@ if not isinstance(doc, dict) or doc.get("schema") != 2:
     # migrate (e.g. the schema-1 seed from main) KEEPING prior entries
     prev = doc.get("backups", []) if isinstance(doc, dict) else []
     doc = {"schema": 2, "note": "Append-only audit trail (branch-owned; "
-                                "SHAs live in git log of this branch; "
-                                "entries keyed by seq).",
+                                "SHAs live in git log of this branch; entries "
+                                "keyed by the (seq, timestamp, message) triple "
+                                "— seq may repeat after a divergence union).",
            "backups": prev}
 seq = (doc["backups"][-1]["seq"] + 1) if doc["backups"] else 1
 entry = {
@@ -506,6 +587,11 @@ fi
 _alarms() {
   local flagged=0 _ahead _cnt
   fetch_branch
+  _cnt=0
+  if [ -f "$_GITDIR/pc-backup-failcount" ]; then
+    _cnt="$(cat "$_GITDIR/pc-backup-failcount" 2>/dev/null || echo 0)"
+    case "$_cnt" in ''|*[!0-9]*) _cnt=0 ;; esac
+  fi
   if [ "$FETCH_OK" = 1 ]; then
     if git rev-parse --verify "$RBRANCH" >/dev/null 2>&1; then
       _ahead=$(git rev-list --count "$RBRANCH..$BRANCH" 2>/dev/null || echo 0)
@@ -515,24 +601,29 @@ _alarms() {
     else
       _ahead=0
     fi
-    _cnt=0
-    if [ -f "$_GITDIR/pc-backup-failcount" ]; then
-      _cnt="$(cat "$_GITDIR/pc-backup-failcount" 2>/dev/null || echo 0)"
-      case "$_cnt" in ''|*[!0-9]*) _cnt=0 ;; esac
-    fi
     if [ "$_ahead" -gt 0 ]; then _cnt=$((_cnt + 1)); else _cnt=0; fi
-    printf '%s\n' "$_cnt" > "$_GITDIR/.pc-backup-failcount.tmp" \
-      && mv "$_GITDIR/.pc-backup-failcount.tmp" "$_GITDIR/pc-backup-failcount"
-    if [ "$_cnt" -ge 2 ]; then
-      flagged=1
-      echo "" >&2
-      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
-      echo "!! BRANCH-PUSH-ALARM: the backup branch could NOT be pushed to" >&2
-      echo "!! the remote again this checkpoint ($_cnt consecutive). The" >&2
-      echo "!! audit trail currently exists ONLY on this machine — owner" >&2
-      echo "!! attention required (push stderr above names the cause)." >&2
-      echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
-    fi
+  else
+    # G1-iter4 RT major #3: v4 froze the counter whenever the fetch
+    # failed, so a revoked credential or a persistent partition meant
+    # rc-0 runs forever with the audit trail machine-bound (3 runs
+    # executed, no banner, counter frozen). If THIS run's branch push
+    # failed, the checkpoint did not verifiably survive the machine —
+    # count it even unreachable. (A fetch failure on a run that pushed
+    # fine, or backed nothing up, leaves the streak untouched — a
+    # blip is still never punished.)
+    if [ "$BRANCH_PUSH" = "failed" ]; then _cnt=$((_cnt + 1)); fi
+  fi
+  printf '%s\n' "$_cnt" > "$_GITDIR/.pc-backup-failcount.tmp" \
+    && mv "$_GITDIR/.pc-backup-failcount.tmp" "$_GITDIR/pc-backup-failcount"
+  if [ "$_cnt" -ge 2 ]; then
+    flagged=1
+    echo "" >&2
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
+    echo "!! BRANCH-PUSH-ALARM: the backup branch could NOT be pushed to" >&2
+    echo "!! the remote again this checkpoint ($_cnt consecutive). The" >&2
+    echo "!! audit trail currently exists ONLY on this machine — owner" >&2
+    echo "!! attention required (push stderr above names the cause)." >&2
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" >&2
   fi
   if [ "$MAINPUSH_ALARM" = 1 ]; then
     flagged=1
@@ -546,6 +637,27 @@ _alarms() {
   return "$flagged"
 }
 
+# _push_branch: EVERY branch push goes through here (G1-iter4 RT
+# major #5 + RT minor #1 / Architect major #2: v4's post-merge
+# re-pushes were UNCAPPED — a set -e rc-1 death that masked pending
+# alarm banners and, under GIT_TRACE2, printed the credentialed push
+# URL raw). stderr is captured and printed credential-redacted on
+# failure; BRANCH_PUSH stays accurate; the caller decides the next
+# step. No push anywhere in this script bypasses this helper.
+_push_branch() {
+  local _pe
+  _pe="$(mktemp /tmp/pc-branchpush.XXXXXX)"
+  if git push "$PUSH_URL" "$BRANCH" 2>"$_pe"; then
+    rm -f "$_pe"
+    return 0
+  fi
+  BRANCH_PUSH="failed"
+  echo "!! branch push failed — stderr (credentials redacted):" >&2
+  sed -E 's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/(ghp_|gho_|ghs_|ghv_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g; s/^/   /' "$_pe" >&2
+  rm -f "$_pe"
+  return 1
+}
+
 BRANCH_PUSH="ok"
 if [ -z "$(git status --porcelain harness)" ]; then
   echo "== nothing new to back up on $BRANCH"
@@ -557,19 +669,18 @@ else
   SHA="$(git rev-parse --short HEAD)"
 
   # 6b. push — and self-heal a DIVERGED remote branch (G1-iter3
-  #     Architect major #1): if the remote has commits we lack, merge
-  #     it here (programmatic manifest union, ours for state.json) and
-  #     push the merge commit. Append-only is preserved; force-push is
-  #     never attempted; unresolvable conflicts abort loudly (exit 8).
-  #     Push stderr is CAPTURED and printed on failure (a silent push
-  #     failure burned a full CI debugging cycle on 2026-11-14: two
-  #     rc-0 runs, branch never landed in the remote, error discarded).
-  _bperr="$(mktemp /tmp/pc-branchpush.XXXXXX)"
-  if ! git push "$PUSH_URL" "$BRANCH" 2>"$_bperr"; then
-    BRANCH_PUSH="failed"
-    echo "== branch push failed — stderr:" >&2
-    sed -E 's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/^/   /' "$_bperr" >&2
-    rm -f "$_bperr"
+  #     Architect major #1; HARDENED at G1-iter4 after the Red Team
+  #     proved v4's content merge pushed unscanned remote content — an
+  #     injected manifest token rode the union merge RC 0 and then
+  #     bricked every future run with an exit-4 loop, and a token in a
+  #     remote file OUTSIDE harness/ rode a clean merge): merge with
+  #     `-s ours` (remote commits become ANCESTORS — append-only
+  #     preserved, no force-push — but the TREE stays exactly ours, so
+  #     remote-only files can never enter), take the programmatic
+  #     manifest union with EVERY string value scrubbed against the
+  #     secret patterns, re-scan, and only then commit + push through
+  #     the guarded helper. Nothing is committed or pushed dirty.
+  if ! _push_branch; then
     echo "== checking for divergence"
     fetch_branch
     if ! git rev-parse --verify "$RBRANCH" >/dev/null 2>&1; then
@@ -577,15 +688,25 @@ else
     elif git merge-base --is-ancestor "$RBRANCH" HEAD 2>/dev/null; then
       echo "!! branch push failed (network?) — commit kept locally; next run retries" >&2
     else
-      echo "== remote $BRANCH has commits we lack — merging (append-only preserved)"
-      if git merge --no-edit "$RBRANCH"; then
-        git push "$PUSH_URL" "$BRANCH"
-        BRANCH_PUSH="ok"
-      else
-        git checkout --ours harness/sandbox/state.json 2>/dev/null || true
-        if ! MERGE_HEAD_REF="$RBRANCH" python3 - <<'PY'
-import json, os, subprocess, sys, tempfile
+      echo "== remote $BRANCH has commits we lack — merging (append-only preserved; content stays ours)"
+      if ! git merge --no-edit -s ours --no-commit "$RBRANCH" 2>/dev/null; then
+        git merge --abort 2>/dev/null || true
+        echo "!! divergence merge could not be prepared — ABORT (exit 8); manual recovery required" >&2
+        _alarms || true
+        exit 8
+      fi
+      if ! MERGE_HEAD_REF="$RBRANCH" SECRET_PATTERNS="$SECRET_PATTERNS" python3 - <<'PY'
+import json, os, re, subprocess, sys, tempfile
 theirs_ref = os.environ["MERGE_HEAD_REF"]
+SECRET = re.compile(os.environ["SECRET_PATTERNS"])
+def scrub(x):
+    if isinstance(x, str):
+        return SECRET.sub("[REDACTED]", x)
+    if isinstance(x, list):
+        return [scrub(v) for v in x]
+    if isinstance(x, dict):
+        return {k: scrub(v) for k, v in x.items()}
+    return x
 def show(ref):
     try:
         out = subprocess.run(["git", "show", f"{ref}:harness/backups/manifest.json"],
@@ -597,6 +718,7 @@ def show(ref):
         pass
     return None
 ours, theirs = show("HEAD"), show(theirs_ref)
+scrubbed = 0
 if ours is None and theirs is None:
     print("!! neither side has a parseable manifest — starting a fresh "
           "audit trail with a reset marker", file=sys.stderr)
@@ -616,11 +738,23 @@ else:
     merged = {}
     for side in (ours, theirs):
         for e in side.get("backups", []):
+            e = scrub(e)
             merged[(e.get("seq"), e.get("timestamp"), e.get("message", ""))] = e
+    # count entries the scrub actually changed (audit marker)
+    def _flat(s):
+        return json.dumps(s.get("backups", []), sort_keys=True)
     doc = {"schema": 2,
            "note": ours.get("note", "Append-only audit trail."),
            "backups": sorted(merged.values(), key=lambda e: (e.get("seq", 0), e.get("timestamp", ""))),
            "merged_divergence": True}
+    raw_ours = _flat(ours); raw_theirs = _flat(theirs)
+    for e in doc["backups"]:
+        if json.dumps(e, sort_keys=True) not in raw_ours and json.dumps(e, sort_keys=True) not in raw_theirs:
+            scrubbed += 1
+    if scrubbed:
+        doc["merge_scrubbed_entries"] = scrubbed
+        print(f"== manifest union scrubbed {scrubbed} entry(ies) carrying "
+              f"secret-shaped strings (G1-iter4 RT major #4)", file=sys.stderr)
 path = "harness/backups/manifest.json"
 fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".manifest.", suffix=".tmp")
 with os.fdopen(fd, "w") as f:
@@ -629,25 +763,32 @@ with os.fdopen(fd, "w") as f:
 os.replace(tmp, path)
 print(f"== manifest divergence-merged: {len(doc['backups'])} entries (union)")
 PY
-        then
-          echo "!! divergence merge could not be completed automatically — ABORT (exit 8)" >&2
-          _alarms || true
-          exit 8
-        fi
-        git add harness/backups/manifest.json
-        git add -f harness/sandbox/state.json 2>/dev/null || true
-        if git diff --name-only --diff-filter=U | grep -q .; then
-          echo "!! unresolved conflicts beyond the manifest — ABORT (exit 8); manual recovery required" >&2
-          _alarms || true
-          exit 8
-        fi
-        git commit --no-edit -q
-        git push "$PUSH_URL" "$BRANCH"
-        BRANCH_PUSH="ok"
+      then
+        git merge --abort 2>/dev/null || true
+        echo "!! manifest union could not be computed — ABORT (exit 8); manual recovery required" >&2
+        _alarms || true
+        exit 8
+      fi
+      git add harness/backups/manifest.json
+      # the merged surface is re-scanned BEFORE anything is committed
+      # or pushed (G1-iter4 RT major #4: v4 scanned pre-merge only — a
+      # poisoned remote manifest rode the union and then bricked
+      # every future run; dirty merged content aborts with the branch
+      # left unmerged and unpushed)
+      if secret_scan harness; then
+        git merge --abort 2>/dev/null || true
+        echo "!! SECRET DETECTED in merged content — divergence ABORTED (exit 8); nothing committed, nothing pushed" >&2
+        _alarms || true
+        exit 8
+      fi
+      git commit --no-edit -q
+      if _push_branch; then
+        echo "== divergence healed: remote commits preserved as ancestors, sanitized manifest union pushed"
+      else
+        echo "!! healed-merge push failed — commit kept locally; next run retries" >&2
       fi
     fi
   fi
-  rm -f "$_bperr" 2>/dev/null || true
   echo "== backup commit $SHA recorded on $BRANCH (branch tip: $(git rev-parse --short HEAD))"
 fi
 
@@ -656,9 +797,11 @@ echo "== backup complete: $TS (repo HEAD $MAIN_HEAD on $MAIN_BRANCH, main push: 
 # -- 7. alarms — see _alarms (defined above step 6; returns 0 = no
 #    alarm, 1 = alarm): MAIN-PUSH-ALARM (2+ consecutive manifest
 #    entries with main_push: failed) and BRANCH-PUSH-ALARM (2+
-#    consecutive runs left the branch ahead of the remote; streak
-#    counter at $_GITDIR/pc-backup-failcount, updated only when the
-#    fetch succeeded — a network blip is recorded but never punished).
-#    _alarms also runs at the exit-8 aborts so no alarm can be masked
-#    by an abort.
+#    consecutive checkpoints the branch did not verifiably survive:
+#    streak counter at $_GITDIR/pc-backup-failcount — incremented on
+#    unpushed-ahead commits, or on a failed push even when the remote
+#    is unreachable (G1-iter4 RT major #3); a fetch blip on a run that
+#    pushed fine or backed nothing up is never punished).
+#    _alarms also runs at every exit-8 abort so no alarm can be
+#    masked by an abort.
 _alarms || exit 7

@@ -24,6 +24,16 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   processes' env) — don't try to work around; pick another approach.
 - `python -c "import yaml; yaml.safe_load(ci.yml)"` reads `on:` as
   boolean `True` — it's a YAML 1.1 quirk, the file is fine.
+- **A script whose default action is a production push will eventually
+  run by accident** — make the dangerous path opt-in. Two gates, two
+  accidental production pushes (manifest seq 3 "t5", seq 5 "E9c"),
+  both from agents losing env overrides through broken command chains.
+  v5 refuses production mode without `PC_BACKUP_ALLOW_PRODUCTION=1`.
+- A substring integrity check is satisfied by its own documentation —
+  anchor machine checks to full lines, require exactly one, and
+  self-falsify them with synthetic forgeries (the FINAL-OUTCOME
+  rule's own prose backed a forged ☑ at `6324a4d` until G1-iter4's
+  Architect caught it).
 
 ## Test suite
 

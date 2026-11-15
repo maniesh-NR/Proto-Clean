@@ -10,7 +10,7 @@ STAGE 1: <work>            # deliverable, files touched
 STAGE 2: <work>
 ...
 STAGE N: Adversarial consensus gate     # per process/adversarial-consensus.md
-FINAL STAGE: Sandbox backup             # scripts/sandbox_backup.sh "<message>"
+FINAL STAGE: Sandbox backup             # PC_BACKUP_ALLOW_PRODUCTION=1 scripts/sandbox_backup.sh "<message>" (v5: production is opt-in)
 ```
 
 Rules:

@@ -102,3 +102,24 @@ Format: **decision** — context — date. Newest last.
     a `FINAL OUTCOME: CONSENSUS REACHED` record naming the stage
     (enforced by tests/test_harness_integrity.py). (2026-11-14,
     G1-iter3-i2)
+16. **Backup script v5: production is opt-in; the guard normalizes;
+    the merge never takes remote content** — G1-iter4 proved by
+    execution that v4's production-as-default caused two accidental
+    production pushes across two gates (manifest seq 3 and 5), that
+    the exit-6 guard was a spelling blocklist (case/:443///scp
+    variants reached github in scratch), that the branch-push alarm
+    froze under persistent unreachability, that the divergence
+    content-merge pushed unscanned remote content (and a poisoned
+    manifest then bricked every future run), and that the
+    FINAL-OUTCOME machine check was satisfied by its own documentation
+    prose. v5: production requires `PC_BACKUP_ALLOW_PRODUCTION=1`
+    (refusal exit 6 before any action otherwise), TEST runs refuse
+    every github host however spelled (canonicalized compare), the
+    branch-push streak counts failed pushes even unreachable,
+    divergence merges take `-s ours` + a sanitized manifest union +
+    a pre-commit re-scan, every push is captured and
+    credential-redacted (TRACE2 family unset), shaped names are
+    excluded and counted across all of harness/, inputs are validated,
+    both rsyncs are checksummed, and the FINAL-OUTCOME check is
+    line-anchored, exactly-one and self-falsified. (2026-11-15,
+    G1-iter4)
