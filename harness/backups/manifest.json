@@ -49,7 +49,9 @@
       "git_head": "6324a4d",
       "git_branch": "main",
       "main_push": "ok",
-      "prev_branch_push": "ok"
+      "prev_branch_push": "ok",
+      "invalid": true,
+      "invalid_reason": "accidental production-default run during the G1-iter4 Red Team's guard experiments (a broken && chain lost the PC_BACKUP_* env overrides; v4 made production the default). All v4 scan layers ran and passed - content verified clean, audit-trail pollution only. Disclosed in 2026-11-15-S1-material-you-gate-iter4.md; this accident class is removed by v5's opt-in gate."
     }
   ]
 }
