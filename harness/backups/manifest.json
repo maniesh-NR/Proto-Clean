@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "note": "Append-only audit trail (branch-owned; SHAs live in git log of this branch; entries keyed by seq).",
+  "note": "Append-only audit trail (branch-owned; SHAs live in git log of this branch; entries keyed by the (seq, timestamp, message) triple \u2014 seq may repeat after a divergence union).",
   "backups": [
     {
       "seq": 1,
@@ -69,6 +69,16 @@
       "trigger": "event",
       "message": "must refuse by default",
       "git_head": "ad3b4e1",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
+    },
+    {
+      "seq": 8,
+      "timestamp": "2026-11-16T17:43:36Z",
+      "trigger": "event",
+      "message": "G1-iter4-i2 remediation checkpoint: backup v6 + declaration-bound gate-record authority at bf0c74e/c00f647 (727+9 local; CI 7/7 at c00f647, per-leg verified 736 x4 POSIX / 605+131 windows; 22/22 v6 scratch matrix; gate closed NO CONSENSUS at cap, escalated to owner; CI-break fix disclosed in record)",
+      "git_head": "c00f647",
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "ok"

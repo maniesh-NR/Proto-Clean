@@ -1,6 +1,6 @@
 {
   "git_branch": "main",
-  "git_head": "ad3b4e1",
+  "git_head": "c00f647",
   "main_push": "ok",
   "sandbox": {
     "download": [
@@ -79,7 +79,8 @@
       "socks_min.py",
       "tnacl_mirror.py",
       "verify_backup_v4.sh",
-      "verify_backup_v5.sh"
+      "verify_backup_v5.sh",
+      "verify_backup_v6.sh"
     ],
     "scripts_skipped_shaped_count": 0,
     "skills": [
@@ -113,5 +114,5 @@
       "xlsx"
     ]
   },
-  "timestamp": "2026-11-16T16:19:06Z"
+  "timestamp": "2026-11-16T17:43:36Z"
 }

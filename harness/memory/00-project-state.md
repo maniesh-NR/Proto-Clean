@@ -1,6 +1,13 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-15 (G1-iter4 iteration 1: no consensus — RT+Architect BLOCK, Steward PROCEED-WITH-FINDINGS; all findings remediated, backup v5 + hardened integrity check; iteration 2 re-judges the fix commit)
+Last updated: 2026-11-16 (G1-iter4 iteration 2 — NO CONSENSUS at the
+iteration cap: Red Team BLOCK (github-subdomain guard bypass,
+FINAL-OUTCOME backing still forgeable, main-push credential leak
+under GIT_CURL_VERBOSE, partial-override isolation gap) vs Architect
++ Steward PROCEED-WITH-FINDINGS; all findings from both iterations
+remediated and machine-covered in the remediation commit, which
+carries the record; escalated to the project owner — a fresh gate on
+the remediation commit is the owner's call)
 
 ## Identity
 
@@ -8,13 +15,14 @@ Last updated: 2026-11-15 (G1-iter4 iteration 1: no consensus — RT+Architect BL
   (Linux / Windows / macOS desktop + Android)
 - **Repo**: `maniesh-NR/Proto-Clean`
 - **Version**: 0.6.2 (released) — see `03-release-runbook.md`
-- **Test baseline**: local sandbox **723 passed + 9 skipped** after the
-  G1-iter4 fix cycle (719+9 plus 4 new machine tests: production
-  opt-in, github-spelling refusals, unreachable-remote alarm,
-  FINAL-OUTCOME forgery suite). CI confirmed at `6324a4d`: 728 × 4
-  POSIX legs, 604 passed + 124 skipped on windows. Expectation for
-  the G1-iter4 fix commit: 732 × 4 POSIX, 605+127 windows — to be
-  confirmed by CI at iteration 2. Any change must keep the suite
+- **Test baseline**: local sandbox **727 passed + 9 skipped** after the
+  G1-iter4-i2 fix cycle (723+9 plus 4 new machine tests: partial-
+  override + production-checkout refusals, subdomain guard
+  spellings, main-push redaction + trace/config-env hygiene, union
+  key-scrub heal). CI confirmed at `ad3b4e1`: 732 × 4
+  POSIX legs, 605 passed + 127 skipped on windows. Expectation for
+  the G1-iter4-i2 remediation commit: 736 × 4 POSIX, 605+131
+  windows — to be confirmed by CI. Any change must keep the suite
   green; new features add tests to the baseline.
 
 ## Feature inventory
@@ -56,19 +64,25 @@ Last updated: 2026-11-15 (G1-iter4 iteration 1: no consensus — RT+Architect BL
 | v0.6.0 | interop hardening, perf/stability/memory pass (669 tests) |
 | v0.6.1 | region-grouped server list, guest-mode fixes, release-signed APKs |
 | v0.6.2 | uBO-parity default blocklists, region-tree expansion fix (684 tests) |
-| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `6324a4d`), backup v5 + hardened gate-record integrity (723+9 local; G1-iter4 fix cycle) |
+| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `6324a4d`), backup v5 + hardened gate-record integrity (723+9 local; G1-iter4 fix cycle), backup v6 + declaration-bound gate-record authority (727+9 local; G1-iter4-i2 fix cycle — escalated at the cap) |
 
 ## Known open threads
 
-- **S1 gate: G1-iter4 in progress (2026-11-15)** — the owner ordered
-  a fresh gate on the G1-iter3 remediation commit; iteration 1
-  returned Red Team + Devil's Architect BLOCK (production-as-default,
-  guard spelling bypass, unreachable-alarm, unscanned divergence
-  merge, GIT_TRACE2, and the FINAL-OUTCOME check defeated by its own
-  documentation) vs Ship Steward PROCEED-WITH-FINDINGS; every finding
-  is remediated and execution-verified (backup v5; 20/20 scratch
-  matrix; +4 machine tests) and iteration 2 re-judges the fix commit
-  within the gate's cap.
+- **S1 gate: G1-iter4 cap exhausted (2026-11-16)** — iteration 2
+  re-judged the iteration-1 fix commit `ad3b4e1`: Red Team BLOCK
+  (2 criticals — the github-subdomain guard bypass, with
+  `www.github.com` verified a live anonymous git endpoint for the
+  production repo, and the FINAL-OUTCOME ☑ check still forgeable four
+  ways; 2 majors — the `GIT_CURL_VERBOSE` raw-credential leak through
+  the then-inline main push, and partial-override test runs polluting
+  the production checkout's backup branch) vs Architect and Steward
+  PROCEED-WITH-FINDINGS → **NO CONSENSUS at the 2-iteration cap →
+  escalated to the project owner**. Every finding from both
+  iterations is remediated and machine-covered in the remediation
+  commit that carries the closed record
+  (`memory/consensus-log/2026-11-15-S1-material-you-gate-iter4.md`).
+  A fresh gate (G1-iter5) on the remediation commit is the owner's
+  call — the G1 → G1-iter3 → G1-iter4 precedent.
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan

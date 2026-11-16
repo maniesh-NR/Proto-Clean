@@ -60,9 +60,14 @@ roles launched, verdicts verbatim, findings with resolutions, final
 consensus decision. No record = gate didn't happen.
 
 **Record format (adopted 2026-11-14, after G1-iter3-i2 found the
-glyph integrity check passing on a pre-recorded ☑):** every record
-dated 2026-11-14 or later MUST carry exactly one machine-parseable
-closure line:
+glyph integrity check passing on a pre-recorded ☑; REDESIGNED
+2026-11-16 after G1-iter4-i2 proved the hardened check was still
+incidence-based):** every gate record carries a `Stage: S<n>`
+declaration line naming the stage(s) it gates (REQUIRED for records
+dated on/after 2026-11-16 — a record backs only the stages it
+DECLARES, never stages it merely mentions in prose, and stage-id
+matching is exact: a record for S20 does not back S2) and exactly one
+machine-parseable closure line:
 
 ```
 FINAL OUTCOME: CONSENSUS REACHED
@@ -72,19 +77,43 @@ or
 FINAL OUTCOME: NO CONSENSUS — <short reason>
 ```
 
+Closure-line rules (all machine-enforced in
+`tests/test_harness_integrity.py`, whose forgery suite
+self-falsifies the check against ten violation classes):
+- the line is LINE-ANCHORED at column 0, the ONLY such line in the
+  record, and the record's LAST non-empty line — a mid-record line
+  is prose, not outcome, and a record must not end with a fenced
+  example (fenced code blocks are stripped before analysis: format
+  examples inside fences are documentation and never count);
+- the record's effective date is the LATER of its filename and its
+  `Date:` header; records dated on/after 2026-11-14 must carry
+  exactly one closure line, and records dated on/after 2026-11-16
+  must declare their stage(s);
+- UNDATED records never back anything (no date in filename or
+  header = no closure authority);
+- a multi-iteration record carries the LATEST gate outcome as its
+  single closure line — when an iteration concludes, any interim
+  closure line from the previous iteration is REWRITTEN to prose
+  (that iteration's outcome stays in the verdict prose and git
+  history; the G1-iter4 record demonstrates the pattern).
+
 It is written ONLY after the independent verdicts return. A roadmap
-stage may be marked done (☑) only if a record that names it carries
-`FINAL OUTCOME: CONSENSUS REACHED`; `tests/test_harness_integrity.py`
-enforces both rules — G1-iter4 hardening: the closure line must be
-LINE-ANCHORED at column 0 and the ONLY such line in the record
-(inline mentions of the phrase never back a ☑ — the iter-3 record's
-own prose defeated the substring check until the G1-iter4 Architect
-caught it); the record's date is the later of its filename and its
-`Date:` header; and the check itself is self-falsified with synthetic
-forgeries in the same test file. Cap-exhausted gates record
+stage may be marked done (☑) only if a record that DECLARES it
+carries `FINAL OUTCOME: CONSENSUS REACHED` under all the rules above.
+Cap-exhausted gates record
 `FINAL OUTCOME: NO CONSENSUS — iteration cap reached` and escalate to
 the project owner; a fresh gate may then be ordered by the owner on
 the remediation commit (the G1 → G1-iter3 precedent).
+
+**Closure choreography (adopted 2026-11-16, G1-iter4-i2 Architect
+minor #8):** when a gate reaches consensus, close it in THIS order,
+in ONE commit: (1) verdicts recorded in the gate record; (2) the
+FINAL OUTCOME line written/rewritten as the record's last line; (3)
+the roadmap glyph flip (◐→☑) lands in the SAME commit as its backing
+record — a glyph flip NEVER precedes its backing record in any push;
+(4) project state + session log updated; (5) commit + push main;
+(6) event backup (`scripts/sandbox_backup.sh`, opt-in). The integrity
+test enforces (3) mechanically.
 
 ## Scope of review per gate
 
