@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "note": "Append-only audit trail (branch-owned; SHAs live in git log of this branch; entries keyed by the (seq, timestamp, message) triple \u2014 seq may repeat after a divergence union).",
+  "note": "Append-only audit trail (branch-owned; SHAs live in git log of this branch; entries keyed by the (seq, timestamp, message) triple — seq may repeat after a divergence union).",
   "backups": [
     {
       "seq": 1,
@@ -29,7 +29,7 @@
       "git_branch": "main",
       "main_push": "ok",
       "invalid": true,
-      "invalid_reason": "accidental test-run push of the v3 script during G1-iter3 fix-cycle verification (test harness invoked the clone's committed old script; v3 had no isolation guard). Content verified clean \u2014 audit-trail pollution only. Disclosed in 2026-11-13-S1-material-you-gate-iter3.md."
+      "invalid_reason": "accidental test-run push of the v3 script during G1-iter3 fix-cycle verification (test harness invoked the clone's committed old script; v3 had no isolation guard). Content verified clean — audit-trail pollution only. Disclosed in 2026-11-13-S1-material-you-gate-iter3.md."
     },
     {
       "seq": 4,
@@ -71,7 +71,9 @@
       "git_head": "ad3b4e1",
       "git_branch": "main",
       "main_push": "ok",
-      "prev_branch_push": "ok"
+      "prev_branch_push": "ok",
+      "invalid": true,
+      "invalid_reason": "accidental production run during the G1-iter4-i2 fix cycle: the opt-in test's 'must refuse by default' probe executed while the backup script sat in an UNCOMMITTED mid-edit state between MultiEdit batches (the only state, never committed, in which the gate did not fire); it completed a full production checkpoint (commit 3bea49d, test message, fallback identity). All scan layers ran and passed - content verified clean (manifest+state.json only, harness tree byte-identical to seq 6); audit-trail pollution only. The FINAL committed script is verified clean of this: 4 full integrity-suite runs + the 22/22 v6 scratch matrix all assert the same probe refuses exit 6. Disclosed in 2026-11-15-S1-material-you-gate-iter4.md; process rule recorded: never run the suite against a script with uncommitted edits - test from HEAD (stash or a clean clone)."
     },
     {
       "seq": 8,
