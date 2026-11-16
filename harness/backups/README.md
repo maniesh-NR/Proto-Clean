@@ -209,6 +209,19 @@ push to main (POSIX legs).
 
 ## Known audit-trail anomalies
 
+- `3bea49d` (manifest seq 7, "must refuse by default"): during the
+  G1-iter4-i2 fix cycle the opt-in test's refusal probe executed
+  while the script sat in an uncommitted mid-edit state between
+  editor batches — the only state (never committed) in which the
+  gate did not fire — and completed a full production checkpoint.
+  Content verified clean (all scan layers ran; manifest + state.json
+  only); audit-trail pollution only. Annotated in the manifest;
+  disclosed in 2026-11-15-S1-material-you-gate-iter4.md. The
+  committed script is verified clean of this (four integrity-suite
+  runs + the 22/22 v6 matrix assert the same probe refuses exit 6).
+  Process rule: never run the suite against a script with uncommitted
+  edits — test from HEAD.
+
 - `726b437` (manifest seq 5, "E9c case variant prod remote"): during
   the G1-iter4 Red Team's guard experiments a broken `&&` chain lost
   the env overrides and the script ran in v4's production-DEFAULT
