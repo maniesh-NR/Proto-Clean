@@ -84,6 +84,11 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   (`Stage:` lines, last-line closure, fence-stripping) — the check's
   own forgery suite must enumerate the attack classes the check's
   history actually produced (G1-iter4-i2 RT C2 / Architect M1).
+- A test that runs `git commit` without an inline identity works on
+  the dev sandbox and breaks every POSIX CI leg (exit 128) — the
+  G1-iter3 hermetic-cycle lesson, re-learned at G1-iter4-i2 by the
+  new main-push test. EVERY git commit inside a test carries
+  `-c user.name=… -c user.email=…`.
 
 ## CI / GitHub
 

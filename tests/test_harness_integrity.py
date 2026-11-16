@@ -770,7 +770,11 @@ def test_backup_script_mainpush_redaction_and_trace_hygiene(tmp_path):
     r1 = run_backup("seed")
     assert r1.returncode == 0, r1.stdout + r1.stderr
     # a commit on main the remote lacks → the next run pushes main
-    subprocess.run(["git", "-C", str(repo), "commit", "-q",
+    # (inline identity: CI runners configure no ambient git identity
+    # — the G1-iter3 lesson, re-learned at G1-iter4-i2 when this very
+    # line broke 4 POSIX legs with exit 128)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=probe",
+                    "-c", "user.email=probe@invalid", "commit", "-q",
                     "--allow-empty", "-m", "ahead"], check=True)
 
     fake = "gh" + "p_" + "f" * 36

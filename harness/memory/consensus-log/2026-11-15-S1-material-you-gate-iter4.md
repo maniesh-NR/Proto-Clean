@@ -558,5 +558,10 @@ reached the template but not the production artifact.
   CURL_VERBOSE/config-injection + main-push redaction lane, E12
   key-poison union heal, E13 refusal-echo redaction — 22/22 executed
   green before commit (E9 x8, E10 x8, E11 x1, E12 x4, E13 x1).
+  First CI run on the remediation commit broke 4/7 legs: the new
+  main-push test's `git commit --allow-empty` relied on ambient git
+  identity (exit 128 on runners — the G1-iter3 lesson re-learned;
+  windows/Android/wheel unaffected). Disclosed here; fixed with an
+  inline identity in the follow-up commit that carries this note.
 
 FINAL OUTCOME: NO CONSENSUS — iteration cap reached (2 of 2); Red Team BLOCK on two criticals (github-subdomain guard bypass, FINAL-OUTCOME backing still forgeable) and two majors (main-push credential leak under GIT_CURL_VERBOSE, partial-override isolation gap) vs Architect and Steward PROCEED-WITH-FINDINGS; every finding from both iterations remediated and machine-covered in this commit; escalated to the project owner — a fresh gate on this remediation commit is the owner's call (the G1 → G1-iter3 → G1-iter4 precedent).
