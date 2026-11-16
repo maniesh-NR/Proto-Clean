@@ -89,6 +89,14 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   G1-iter3 hermetic-cycle lesson, re-learned at G1-iter4-i2 by the
   new main-push test. EVERY git commit inside a test carries
   `-c user.name=… -c user.email=…`.
+- Never run the test suite against a script that has UNCOMMITTED
+  edits: the G1-iter4-i2 opt-in probe ran while the backup script sat
+  between editor batches — the only (never-committed) state in which
+  the gate did not fire — and completed a production checkpoint
+  (manifest seq 7, annotated invalid). Test from HEAD: stash first,
+  or point the test at a clean clone. Three incidents, three
+  variants: env loss (t5, E9c), half-edited script (seq 7) — the
+  common factor is a production-capable path reachable by accident.
 
 ## CI / GitHub
 

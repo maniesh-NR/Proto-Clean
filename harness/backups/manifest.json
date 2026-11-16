@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "note": "Append-only audit trail (branch-owned; SHAs live in git log of this branch; entries keyed by the (seq, timestamp, message) triple — seq may repeat after a divergence union).",
+  "note": "Append-only audit trail (branch-owned; SHAs live in git log of this branch; entries keyed by the (seq, timestamp, message) triple \u2014 seq may repeat after a divergence union).",
   "backups": [
     {
       "seq": 1,
@@ -29,7 +29,7 @@
       "git_branch": "main",
       "main_push": "ok",
       "invalid": true,
-      "invalid_reason": "accidental test-run push of the v3 script during G1-iter3 fix-cycle verification (test harness invoked the clone's committed old script; v3 had no isolation guard). Content verified clean — audit-trail pollution only. Disclosed in 2026-11-13-S1-material-you-gate-iter3.md."
+      "invalid_reason": "accidental test-run push of the v3 script during G1-iter3 fix-cycle verification (test harness invoked the clone's committed old script; v3 had no isolation guard). Content verified clean \u2014 audit-trail pollution only. Disclosed in 2026-11-13-S1-material-you-gate-iter3.md."
     },
     {
       "seq": 4,
@@ -81,6 +81,16 @@
       "trigger": "event",
       "message": "G1-iter4-i2 remediation checkpoint: backup v6 + declaration-bound gate-record authority at bf0c74e/c00f647 (727+9 local; CI 7/7 at c00f647, per-leg verified 736 x4 POSIX / 605+131 windows; 22/22 v6 scratch matrix; gate closed NO CONSENSUS at cap, escalated to owner; CI-break fix disclosed in record)",
       "git_head": "c00f647",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
+    },
+    {
+      "seq": 9,
+      "timestamp": "2026-11-16T17:55:19Z",
+      "trigger": "event",
+      "message": "G1-iter4-i2 disclosure + close-out checkpoint: seq-7 incident (mid-edit-script probe) annotated invalid on branch (c6f7e24), disclosed in record/README/lessons with the test-from-HEAD process rule at a02db67 (727+9 local, CI 7/7); gate G1-iter4 closed NO CONSENSUS at cap, escalated to owner for the G1-iter5 decision",
+      "git_head": "a02db67",
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "ok"

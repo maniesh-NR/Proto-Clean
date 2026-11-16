@@ -564,4 +564,26 @@ reached the template but not the production artifact.
   windows/Android/wheel unaffected). Disclosed here; fixed with an
   inline identity in the follow-up commit that carries this note.
 
+### Incident during the fix cycle (disclosed — orchestrator error,
+production side-effect)
+
+Manifest seq 7 ("must refuse by default", commit `3bea49d`,
+2026-11-16T16:19:06Z, git_head `ad3b4e1`): the opt-in test's refusal
+probe executed while `scripts/sandbox_backup.sh` sat in an
+UNCOMMITTED mid-edit state between MultiEdit batches — the only
+state (never committed) in which the opt-in gate did not fire — and
+completed a full production checkpoint under the test's fallback
+identity. All scan layers ran and passed: content verified clean
+(manifest + state.json only; the harness tree was byte-identical to
+seq 6). The damage is audit-trail pollution — the same class as
+G1-iter3's "t5" (seq 3) and G1-iter4's "E9c" (seq 5), a third
+variant: those were env-loss accidents, this one was
+**testing-a-half-edited-script**. Remediation: entry #7 annotated
+invalid via an append-only branch commit (`c6f7e24`, the seq-3/seq-5
+precedent); the FINAL committed script is verified clean of the
+defect (four full integrity-suite runs and the 22/22 v6 scratch
+matrix all assert the same probe refuses exit 6); process rule
+recorded in lessons: never run the suite against a script with
+uncommitted edits — test from HEAD (stash or a clean clone).
+
 FINAL OUTCOME: NO CONSENSUS — iteration cap reached (2 of 2); Red Team BLOCK on two criticals (github-subdomain guard bypass, FINAL-OUTCOME backing still forgeable) and two majors (main-push credential leak under GIT_CURL_VERBOSE, partial-override isolation gap) vs Architect and Steward PROCEED-WITH-FINDINGS; every finding from both iterations remediated and machine-covered in this commit; escalated to the project owner — a fresh gate on this remediation commit is the owner's call (the G1 → G1-iter3 → G1-iter4 precedent).
