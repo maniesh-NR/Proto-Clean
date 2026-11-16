@@ -1,5 +1,7 @@
 # Consensus Gate — S1 (iteration 2)
 
+Stage: S1
+
 Date: 2026-11-13 · Gate ID: G1-iter2 (second and final iteration — cap
 reached, outcome escalated to the project owner)
 Reviewed commit (pinned): `31c8ca0` (the iter-1 fix cycle, on main).

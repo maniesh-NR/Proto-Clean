@@ -1,6 +1,8 @@
 # Consensus Gate — S1 (iteration 4, owner-ordered fresh gate)
 
-Date: 2026-11-15 · Gate ID: G1-iter4 (fresh gate ordered by the project
+Stage: S1
+Date: 2026-11-15 (iteration 1) · 2026-11-16 (iteration 2 and closure)
+Gate ID: G1-iter4 (fresh gate ordered by the project
 owner on 2026-11-15 after G1-iter3 exhausted its 2-iteration cap
 without consensus; this gate has its own cap of 2).
 Reviewed commit (pinned): `6324a4d` (main, CI 7/7 green — run
@@ -271,4 +273,290 @@ the verdict blocks above):
 
 Iteration 2 outcome: recorded below after the re-run — not before.
 
-FINAL OUTCOME: NO CONSENSUS (iteration 1 of 2) — Red Team and Devil's Architect BLOCK; all findings remediated and execution-verified; iteration 2 re-judges this fix commit.
+> Iteration-1 interim outcome (superseded by the gate outcome at the
+> end of this record): NO CONSENSUS — Red Team and Devil's Architect
+> BLOCK; all findings remediated and execution-verified; iteration 2
+> re-judged the fix commit `ad3b4e1`.
+
+## Iteration 2 — re-judgment of the fix commit `ad3b4e1` (2026-11-16)
+
+Pre-gate verification (orchestrator, before the agents launched):
+tree clean at `ad3b4e1` == origin/main; local suite 723 passed +
+9 skipped exact; GitHub check-runs 7/7 success; the fix cycle's
+mandated closing backup completed as manifest seq 6 (branch tip
+`551fce3`, main_push ok, branch_push ok — the prior session was cut
+off mid-step and the event backup ran as this session's first action
+after cleaning a stale-era tree overlay left by the sandbox recycle).
+
+Roles launched independently in parallel (no shared context). The
+first Red Team launch timed out mid-matrix; its replacement ran a
+fresh bounded priority-ordered matrix (see RT-m4 — the dead run left
+an orphaned worktree that the next run's `git worktree prune`
+self-healed).
+
+| Task | Role | Verdict | Method |
+|---|---|---|---|
+| G1-iter4-i2-R | Red Team | **BLOCK** | ~35 bounded experiments in fresh `/tmp/rt-scratch2` clones (~20 full script runs, all via the sanctioned three-override pattern; md5-verified script; zero pushes outside scratch; production checkout verified clean before/after): P1 opt-in gate executed (env-less rc 6, `=0`/`=yes` rc 6, missing-default-repo sim rc 6, conflicting exit 2); P2 20-spelling guard matrix — 11 refused / 9 ALLOWED (the critical); P3 divergence ×3 (nested-value poison scrubbed rc 0, `-s ours` file isolation, key-poison exit 8 alarms-first); P4 hook-rejection double-run + the 401-challenge lane that produced M1 (raw token ×2); P5 10-scenario forgery matrix — 7 silent passes (the second critical); P6 alarm double-runs rc 0→7; P7 `verify_backup_v5.sh` 20/20 re-run; P8 shaped names; P9 canary sabotage / dead-PID lock / racer / message-scan |
+| G1-iter4-i2-A | Devil's Architect | PROCEED-WITH-FINDINGS | full v5 script read (807 lines) + `6324a4d..ad3b4e1` (13 files, +1005/−195); scratch-clone baseline reproduced (723+9 in 88.6s, integrity 11/11); CI verified read-only (run 43721768665, 7/7); forgery matrix: unbacked flip caught, cross-stage/dateless/fenced silent (Major 1); three deliberate check weakenings each caught by the self-falsification suite (it genuinely pins what it covers); backup-script mutations: reverting opt-in / canonicalizer / unreachable-alarm each made its new machine test fail; offline guard probe: gist./api. ALLOWED, 8 spellings + `:8443`/`GitHub.Com.` refused; E2E partial-env-loss run pushed a test checkpoint rc 0 (Major 2); doc cross-checks found README:112/115, :45/:53/:189 falsified and runbook §5 / lessons stale |
+| G1-iter4-i2-S | Ship Steward | PROCEED-WITH-FINDINGS | full suite twice (723+9 in 89.35s and 91.44s, tree clean before/after, 9 skips identified Qt-binding-gated); CI per-leg counts from all 7 downloaded job logs — 732 × 4 POSIX (ubuntu 87.54s, macos 78.34s, PySide2-Qt5 33.33s, PySide6-6.2 35.33s) + windows 605+127, all EXACT; all 21 iteration-1 resolution items mapped to hunks with exactly one claim/code mismatch (the major); test math confirmed (11 integrity tests, forgery suite = one test, 5 classes); 20/20 scratch matrix re-executed (8.5s); docs/ledger/runbook audited; audit trail verified (seq 6 faithful, seq 5 still invalid, failcount 0 after the seq-6 reset — investigated, no anomaly); release-risk pass: no technical blocker to an S2 pre-gate beyond the closeout ritual |
+
+**Consensus: NOT reached (one BLOCK — Red Team). This was iteration 2
+of 2: the gate's cap is exhausted and the decision escalates to the
+project owner. Per the G1-iter3 precedent, every finding from both
+iterations is remediated in this commit, which carries this record.**
+
+### Red Team — BLOCK (verbatim from the verdict block)
+
+CRITICAL:
+- C1. The v5 github-refusal guard misses github SUBDOMAIN hosts —
+  `www.github.com` is a live git endpoint for the production repo.
+  The refusal case matched only `github.com`, `github.com/*`,
+  `ssh.github.com`, `ssh.github.com/*`. Verbatim guard extraction +
+  full runs show ALLOWED (rc 0) for `gist.github.com/<id>.git`,
+  `www.github.com/maniesh-NR/Proto-Clean.git`, `api.github.com/x`,
+  `education.github.com/x`, credentialed/scp/case/trailing-dot/:443//
+  variants of all of these, and remote NAMES resolving to them.
+  Reachability verified anonymously: `git ls-remote
+  https://www.github.com/maniesh-NR/Proto-Clean` returned production
+  HEAD `ad3b4e1` (git follows the 301); a gist target ran end-to-end
+  rc 0 under a safe `url.insteadOf` rewrite. Falsifies the README
+  "a TEST run never reaches github — ANY github host, however the
+  target is spelled" and the machine test's docstring.
+- C2. The hardened FINAL-OUTCOME ☑ check is still silently forgeable
+  — four distinct silent passes executed (pytest green with an
+  unbacked S2 ☐→☑ flip): undated records (no filename date, no
+  `Date:` header — escapes the must-carry rule yet still backs
+  glyphs, including with TWO closure lines and/or the line inside a
+  fence); substring stage-id matching (`S20` backs `S2`); prose
+  mention (a record for another stage that mentions S2); fenced
+  documentation example at column 0. The self-falsification canary
+  tests none of the four vectors — the A-C1 remediation claim
+  ("hardened and self-falsified … can never silently weaken")
+  falsified by execution.
+
+MAJOR:
+- M1. `GIT_CURL_VERBOSE` is not unset (the enumerated list covered
+  GIT_TRACE*/TRACE2* but not the legacy alias) and the MAIN-push
+  redaction lacks the token-shape scrub (inline at :309-312, unlike
+  `_push_branch` :656) — executed raw-token leak: main-ahead lane +
+  `GIT_CURL_VERBOSE=1` + credentialed local 401/500 server printed
+  the raw token twice. README "the FULL trace families are unset" /
+  "every push goes through one guarded helper" / "the main-push
+  redaction gained the same token-shape scrub" all false.
+- M2. Test-mode isolation guards only the push TARGET: a partial
+  override set (PUSH_REMOTE set, REPO left default) entered TEST mode
+  against the PRODUCTION checkout, committed an
+  "ACCIDENTAL TEST CHECKPOINT" on its local `sandbox/backups` (rc 0,
+  tree clean, no warning beyond a later "keeping them" echo), and the
+  next production run pushed it to the production remote (simulated
+  end-to-end). The E9c/t5 accident class is NOT removed — the
+  env-less variant is, the partial-override variant is not.
+
+MINOR: m1 union scrub covers string VALUES only — a token in a dict
+KEY rode the union, correctly exit-8-aborted by the pre-commit
+re-scan (nothing pushed) but the divergence could then never
+self-heal (exit-8 loop, loud via BRANCH-PUSH-ALARM) until a human
+repaired the remote manifest; m2 `api.github.com` /
+`education.github.com` spellings pass the guard (anonymous contact
+possible); m3 under `GIT_CURL_VERBOSE`, "Server auth using Basic with
+user 'u'" prints even through the guarded branch-push helper; m4
+[ENVIRONMENT] the timed-out first Red Team launch left an orphaned
+worktree `/tmp/pc-backup.94wwVs` — pruned automatically on the next
+run; no production contamination.
+
+### Devil's Architect — PROCEED-WITH-FINDINGS (findings)
+
+MAJOR:
+1. The A-C1 defect class survives in the hardened ☑-check: backing
+   is still incidence-based — a genuine `FINAL OUTCOME: CONSENSUS
+   REACHED` record for stage S1 machine-blesses ☑ flips for any
+   OTHER stage it mentions in prose (S2, S6 — proven in scratch by
+   simulating this gate's own closure; arms the moment the first
+   consensus record lands), dateless records back any stage, and a
+   column-0 fenced example both satisfies exactly-one and backs a ☑
+   (falsifying the process doc's "inline mentions never back a ☑").
+   The self-falsification suite pins what it enumerates but its
+   enumeration misses these three classes. Fix must land in the same
+   commit that records this gate's outcome — before the first
+   CONSENSUS REACHED record exists.
+2. The v5 guard's production/github identity model is incomplete:
+   github subdomains escape the any-host denylist (gist. is a real
+   git-push endpoint), and production identity is the github spelling
+   only — a partial env-override loss (two of three overrides set,
+   PUSH_REMOTE forgotten, clone origin = the production checkout
+   path) pushed a full test checkpoint RC 0 into the production repo
+   (E2E-proven); the next production run's LOCAL_AHEAD logic
+   propagates it to github. "Removing the entire accident class"
+   overclaims. Recommend all-three-or-none overrides + host-suffix
+   github deny + production-local-path compare.
+
+MINOR: 1) README false claims about the main-push path (no shared
+helper, no token scrub at :312); 2) invalid-remote exit-6 prints the
+raw target (:141) vs README "never prints the target"; 3) runbook §5
+close-out invocation stale (exits 6 under v5); 4) lessons baseline
+still 712+6/718 (third stale copy); 5) exactly-one-closure-line
+forces interim-line rewrites between iterations and implicitly bans
+fenced format examples — neither documented; 6) the bash→Python port
+hedge is an unleveraged "consider" note — make it a ledger row gated
+at S6; [SPECULATIVE] each gate's remediation enlarges the harness
+attack surface the next gate attacks (v2→v4→v5 each yielded new
+criticals/majors), with no bounded exit criterion for the harness
+subsystem; 7) S1's closure criterion is implicit and the closure
+choreography (glyph flip vs closure-line record vs state-doc commit
+order) is defined nowhere.
+
+### Ship Steward — PROCEED-WITH-FINDINGS (findings)
+
+MAJOR:
+1. RT-M5's resolution claim "the main push's redaction gains the same
+   token-shape scrub" (this record's Resolution cycle §RT-M5; repeated
+   in the backups README) is not implemented at `ad3b4e1`:
+   `scripts/sandbox_backup.sh:312` still scrubs only the userinfo form
+   (byte-identical to `6324a4d` — zero diff hunks on the main-push
+   path) while `_push_branch` :653 has the full token-shape scrub. A
+   false remediation claim in the gate record + README is the
+   documented-guarantee-vs-code class this process cannot carry
+   silently.
+
+MINOR: 1) stale baseline in `02-lessons.md` (712+6 / 718 / 596+122 vs
+actual 723+9 / 732 / 605+127); 2) the live manifest note on
+`sandbox/backups` still reads "keyed by seq" — the v5 script writes
+the triple-key note only on fresh-create/migration, so A-m7's fix
+reached the template but not the production artifact.
+
+### Verified-good (all three agents, evidence in their reports)
+
+- Local suite 723 passed + 9 skipped exact (Steward twice, Architect
+  once); CI 7/7 on `ad3b4e1` with per-leg counts exact from the
+  downloaded logs (732 × 4 POSIX, 605+127 windows); wheel +
+  Android legs green.
+- All six G1-iter3-i2 remediation surfaces verified-good at v5 by
+  execution: opt-in gate (every variant), the eight machine-tested
+  guard spellings + `:8443`/`GitHub.Com.`, unreachable-aware alarm
+  (double-runs rc 0→7 both lanes), `-s ours` divergence union with
+  value scrubbing (nested-value poison → `[REDACTED]`, no brick),
+  remote-only files never enter, TRACE2/TRACE family redaction,
+  hook-rejection handling, shaped names both surfaces (count 2, never
+  printed), canary self-test (pattern+flag drift → exit 5), lock
+  stealing (exactly one racer), message-scan (secret in message →
+  exit 4 pre-echo), `verify_backup_v5.sh` exists on the branch and
+  passes 20/20 (re-executed by RT and Steward independently).
+- The three G1-iter4 machine tests are genuinely mutation-covering
+  (Architect: reverting opt-in / canonicalizer / alarm each made its
+  test fail); the pre-hardening forgery check genuinely pins what it
+  enumerates (three deliberate weakenings all caught).
+- Manifest seq 6 faithful; seq 5 still annotated invalid; seq 1-6
+  monotonic append-only; failcount 0 (the seq-6 run reset the stale
+  streak the cut-off session left); exactly one line-anchored FINAL
+  OUTCOME line; no pre-recording anywhere; ledger rows #1-#8 real;
+  roadmap/runbook/ledger S2 scope consistent; the release surface
+  internally consistent pre-v0.6.3; Material You architecture
+  untouched by the fix commit and sound at design level (Qt-free md3
+  engine, accessor discipline, time-boxed probes with brand
+  fallback).
+
+## Resolution cycle (fixes applied in THIS commit — every finding from both iterations)
+
+- **RT-C1 / A-M2(i) / RT-m2:** host-suffix denial — the guard now
+  extracts the HOST from the normalized target and matches
+  `github.com|*.github.com` (any subdomain: gist./www./api./
+  education./…), replacing the enumerated list; enumeration was the
+  hole. Machine test extended with 5 subdomain variants (plain,
+  credentialed, remote-name).
+- **RT-C2 / A-M1 (the Architect's condition honored: the fix lands in
+  the same commit that records this outcome, before any CONSENSUS
+  REACHED record exists):** backing redesigned — a record backs a ☑
+  only when it DECLARES the stage (`Stage: S<n>` lines), is dated,
+  and carries its closure as the LAST non-empty line after fenced
+  code blocks are stripped; mention matching is word-boundary
+  (`S20` no longer mentions `S2`); records dated on/after 2026-11-16
+  must declare their stage(s). All four records carry `Stage: S1`
+  (the 2026-11-13 ones voluntarily, for uniformity). Forgery suite
+  extended: fenced, undated, cross-stage, substring, non-terminal,
+  undeclared — 10 classes, each asserted caught, plus a positive
+  proper-closure lane.
+- **RT-M1 / A-m1 / S-M1:** trace/config env neutralized by PATTERN
+  over the live environment (every `GIT_TRACE*` variant,
+  `GIT_CURL_VERBOSE`, and git's env-config injection
+  `GIT_CONFIG_KEY*`/`VALUE*`/`COUNT`/`PARAMETERS` — enumeration was
+  exactly how the legacy alias escaped); the main push now goes
+  through `_push_main` with the same userinfo + token-shape redaction
+  as `_push_branch` (the parity the record and README claimed at v5
+  is now real). Machine test: 401-server lane with the exact hostile
+  env (CURL_VERBOSE + TRACE2 + TRACE + config injection) — raw token
+  absent, verbose output absent, redaction label present.
+- **RT-M2 / A-M2(ii):** overrides are ALL-THREE or NONE — a partial
+  set (any 1-of-3 or 2-of-3 combination) refuses exit 2 before any
+  action; a TEST run additionally refuses the production checkout
+  itself (exit 6, literal + canonicalized path compare). Machine test
+  covers all six partial combinations and three production-path
+  spellings.
+- **RT-m1:** the divergence-union scrub now covers dict KEYS as well
+  as values — a poisoned key is neutralized to `[REDACTED]` and the
+  branch heals on the spot instead of exit-8-looping. Machine test:
+  full four-run scenario (healthy → poisoned remote → unreachable →
+  union heal → clean append).
+- **RT-m3:** covered by the pattern-matched env scrub (the leak
+  printed only under curl verbose).
+- **RT-m4 (environment):** no code change — the orphaned worktree was
+  pruned automatically by the next run's `git worktree prune`
+  (observed self-healing); recorded here for the audit trail.
+- **A-m2 / RT echo:** the not-a-configured-remote refusal redacts the
+  target it echoes (userinfo + token-shape). Machine test: scp-syntax
+  credentialed target → exit 6 with `[REDACTED]`, never the raw
+  target.
+- **A-m3:** runbook §5 close-out invocation corrected to the opt-in
+  form (`PC_BACKUP_ALLOW_PRODUCTION=1 scripts/sandbox_backup.sh
+  "release vX.Y.Z"`).
+- **A-m4 / S-m1:** lessons baseline updated (third stale copy).
+- **S-m2:** the manifest note is normalized on every append AND in
+  the union path (idempotent) — the live branch's "keyed by seq"
+  note self-corrects at the next checkpoint.
+- **A-m5:** the exactly-one rule's consequence — the interim closure
+  line is rewritten at each iteration's conclusion (iteration
+  outcomes remain in the verdict prose and git history; this record
+  demonstrates the pattern) — is now documented in the process doc,
+  along with the fenced-example ban.
+- **A-m6 / A-m7 (speculative):** ledger row #9 — port the backup
+  merge/alarm core to a tested Python module, gated at S6, with an
+  explicit bounded exit criterion for the harness subsystem (the
+  port + a frozen verification matrix); the speculative
+  attack-surface-growth observation is recorded in the row.
+- **A-m8:** closure choreography defined in the process doc: (1)
+  verdicts recorded, (2) closure line written/rewritten as the last
+  line, (3) roadmap glyph flip lands in the SAME commit, (4) state
+  doc + session log, (5) commit + push main, (6) event backup. A
+  glyph flip never precedes its backing record in any push.
+
+## Fix-cycle completion (evidence, at this commit)
+
+- **Script v6** (same single file, `scripts/sandbox_backup.sh`):
+  pattern-matched env scrub, all-or-none overrides +
+  production-checkout refusal, host-suffix github denial, redacted
+  refusal echo, guarded `_push_main`, key-covering union scrub, note
+  normalization. `bash -n` clean; live probes: gist/www/api targets
+  exit 6, clean local lane rc 0, partial override exit 2,
+  TEST-on-production-repo exit 6.
+- **Machine coverage:** `tests/test_harness_integrity.py` now runs
+  15 tests — the four new ones cover partial overrides +
+  production-checkout refusal, subdomain spellings (5 new variants +
+  remote name), main-push redaction + trace/config-env hygiene
+  (401-server lane), and the union key-scrub heal; the guard and
+  forgery suites were extended in place.
+- **Suite:** 727 passed + 9 skipped locally (was 723+9; +4). CI
+  expectation for this commit: 736 per POSIX leg, windows 605
+  passed + 131 skipped — to be confirmed by CI before any further
+  stage work.
+- **Docs:** backups README rewritten for v6; process doc (closure
+  choreography + rewrite rule + Stage-declaration rule); runbook §5;
+  lessons; ledger #9; decisions #17; roadmap gate history; project
+  state; session log
+  `memory/session-log/2026-11-16-g1-iter4-iteration2.md`.
+- **Scratch matrix:** `scripts/verify_backup_v6.sh` (sandbox
+  snapshot) covers the new scenarios end-to-end: E9 subdomain
+  refusal matrix, E10 partial-override refusals, E11
+  CURL_VERBOSE/config-injection + main-push redaction lane, E12
+  key-poison union heal, E13 refusal-echo redaction — 22/22 executed
+  green before commit (E9 x8, E10 x8, E11 x1, E12 x4, E13 x1).
+
+FINAL OUTCOME: NO CONSENSUS — iteration cap reached (2 of 2); Red Team BLOCK on two criticals (github-subdomain guard bypass, FINAL-OUTCOME backing still forgeable) and two majors (main-push credential leak under GIT_CURL_VERBOSE, partial-override isolation gap) vs Architect and Steward PROCEED-WITH-FINDINGS; every finding from both iterations remediated and machine-covered in this commit; escalated to the project owner — a fresh gate on this remediation commit is the owner's call (the G1 → G1-iter3 → G1-iter4 precedent).

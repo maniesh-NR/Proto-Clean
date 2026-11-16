@@ -40,14 +40,33 @@ its results before the NEXT stage proceeds. Status legend:
   documentation) vs Ship Steward PROCEED-WITH-FINDINGS; every finding
   remediated and execution-verified (backup v5, hardened +
   self-falsified integrity check, +4 machine tests, 20/20 scratch
-  matrix) — iteration 2 re-judges the fix commit (record:
-  `2026-11-15-S1-material-you-gate-iter4.md`).**
+  matrix) — iteration 2 re-judged the fix commit (record:
+  `2026-11-15-S1-material-you-gate-iter4.md`).
+  Iteration 2 (2026-11-16): Red Team BLOCK** (2 criticals: the
+  github-SUBDOMAIN guard bypass — `www.github.com` verified a live
+  anonymous git endpoint for the production repo, a gist target ran
+  end-to-end past the guard; the FINAL-OUTCOME ☑ check still
+  forgeable four ways — undated/cross-stage/substring/fenced) **+ 2
+  majors (GIT_CURL_VERBOSE raw-credential leak through the
+  then-inline main push; partial-override test runs polluting the
+  production checkout) vs Architect + Steward
+  PROCEED-WITH-FINDINGS → iteration cap reached, NO CONSENSUS —
+  escalated to the project owner.** All findings from both
+  iterations remediated and machine-covered in the remediation
+  commit carrying the closed record (backup v6: pattern-matched
+  trace/config env scrub, all-or-none overrides +
+  production-checkout refusal, host-suffix github denial, guarded
+  main push, union key-scrub, manifest-note normalization;
+  declaration-bound gate-record authority — Stage: lines,
+  last-line closure, fence-stripping; +4 machine tests, 727+9
+  local). **A fresh gate (G1-iter5) on the remediation commit is
+  the owner's call.**
   - Desktop: dynamic-color seed (brand / system accent / custom hex),
     OS accent detection (GNOME 47 accent-color, Windows DWM
     AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,
     settings UI + persistence
   - Android: `dynamicColorScheme()` on 12+, DataStore toggle
-  - Agent harness + event-driven backups (v4 remediated) + adversarial
+  - Agent harness + event-driven backups (v6 remediated) + adversarial
     process
 
 ## Near term
@@ -79,8 +98,10 @@ its results before the NEXT stage proceeds. Status legend:
   server surface, blocklist download chain, **bond server exposure
   (must gate or accompany S3's packaging work — do not promote the
   attack surface before reviewing it)**; also decide whether to port
-  the backup merge/alarm core from bash to a tested Python module
-  (G1-iter4 Architect observation)
+  the backup merge/alarm/guard core from bash to a tested Python
+  module — now ledger row #9, with the port + a frozen verification
+  matrix as the harness subsystem's bounded exit criterion
+  (G1-iter4-i2 Architect)
 - ☐ **S7. Legacy-stack sunset decision** — Python 3.8 is EOL; decide
   keep/drop for the PySide2-Qt5 / PySide6-6.2 legs (every UI change
   pays the compat tax until decided). Decision due by v0.7 — S2's

@@ -1,5 +1,7 @@
 # Consensus Gate — S1 "Material You + agent harness" (iteration 1)
 
+Stage: S1
+
 Date: 2026-11-13 · Gate ID: G1-iter1
 Reviewed commits (pinned): `fd94450` (harness + backup v1), `a10369b`
 (Material You) — both already on main; this was the first gate run under

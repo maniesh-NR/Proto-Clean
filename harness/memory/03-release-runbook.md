@@ -74,4 +74,5 @@ deb+portable+flatpak bundle, android apk x2).
 
 - Update `harness/memory/00-project-state.md` (version, baseline).
 - Append a session-log entry.
-- Run `scripts/sandbox_backup.sh "release vX.Y.Z"`.
+- Run `PC_BACKUP_ALLOW_PRODUCTION=1 scripts/sandbox_backup.sh "release vX.Y.Z"`
+  (v5+: production is OPT-IN — a bare invocation refuses exit 6).

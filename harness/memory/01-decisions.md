@@ -123,3 +123,23 @@ Format: **decision** — context — date. Newest last.
     both rsyncs are checksummed, and the FINAL-OUTCOME check is
     line-anchored, exactly-one and self-falsified. (2026-11-15,
     G1-iter4)
+
+17. **Backup script v6 + gate-record authority model (G1-iter4-i2,
+    2026-11-16).** Defenses are PATTERN-matched, never enumerated:
+   the trace/config env scrub sweeps every `GIT_TRACE*` variant plus
+   `GIT_CURL_VERBOSE` and git's env-config injection
+   (`GIT_CONFIG_KEY*`/`VALUE*`/`COUNT`/`PARAMETERS`) off the live
+   environment; the github refusal matches the target HOST against
+   `github.com|*.github.com` (every subdomain) after canonicalization.
+   Overrides are ALL-THREE or NONE (a partial set refuses exit 2) and
+   a TEST run never operates on the production checkout. EVERY push
+   — main and branch — goes through a guarded helper with userinfo +
+   token-shape redaction. The divergence-union scrub covers dict keys
+   as well as values. Gate-record authority is DECLARATION-bound: a
+   record carries `Stage: S<n>` lines, its closure line is its last
+   non-empty line after fence-stripping, undated records back
+   nothing, and stage matching is exact — replacing the
+   incidence-based check the G1-iter4-i2 Red Team forged four ways.
+   Closure choreography (verdicts → closure line → same-commit glyph
+   flip → state/session docs → push → event backup) is defined in
+   `process/adversarial-consensus.md`. (2026-11-16, G1-iter4-i2)

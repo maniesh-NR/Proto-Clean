@@ -1,5 +1,7 @@
 # Consensus Gate — S1 (iteration 3, owner-ordered fresh gate)
 
+Stage: S1
+
 Date: 2026-11-13 · Gate ID: G1-iter3 (fresh gate ordered by the project
 owner after G1 hit its 2-iteration cap; this gate has its own cap of 2).
 Reviewed commit (pinned): `74bea1e` (main, CI 7/7 green — independently

@@ -22,11 +22,22 @@
 #     neither pattern drift nor flag drift can pass silently
 #     (G1-iter3 criticals #1+#2) — and covers the sandbox scripts dir,
 #     the checkpoint message, and the exact backup tree
-#   * test isolation (G1-iter3 major #1): any env override
-#     (PC_BACKUP_REPO / PC_SANDBOX_HOME / PC_BACKUP_PUSH_REMOTE) marks
-#     the run as a TEST run, and a test run whose push target resolves
-#     to the production origin ABORTS (exit 6) — test traffic can never
-#     reach github, not even via a clone's origin
+#   * test isolation (G1-iter3 major #1, hardened G1-iter4-i2):
+#     overrides are ALL-THREE or NONE (a partial set — the exact
+#     accident shape of the seq-3/seq-5 incidents — refuses exit 2);
+#     a TEST run refuses ANY github host (github.com, ssh.github.com
+#     and EVERY subdomain — gist./www./api./… — matched by host
+#     suffix, not enumeration) AND the production checkout itself
+#     (exit 6), so test traffic can touch neither github nor the
+#     production repo, not even via a clone's origin
+#   * trace/config env is neutralized by PATTERN over the live
+#     environment (G1-iter4-i2 RT major #1: v5's enumerated unset list
+#     missed the legacy alias GIT_CURL_VERBOSE, which printed the raw
+#     credential twice through the then-inline main push; git's env
+#     config injection GIT_CONFIG_KEY*/VALUE*/COUNT/PARAMETERS could
+#     re-enable http.verbose the same way) — and EVERY push, main AND
+#     branch, goes through one guarded helper with userinfo +
+#     token-shape redaction
 #   * divergence self-heals (G1-iter3 major #1): if the remote branch
 #     has commits we lack, the script merges it inside the worktree
 #     with a programmatic manifest union — append-only preserved, no
@@ -41,13 +52,23 @@
 #   * the manifest is written atomically; a corrupt copy is recovered
 #     from the branch's git history, never silently reset
 set -euo pipefail
-# GIT_TRACE* would make git print full push URLs — INCLUDING embedded
-# credentials — into captured/pushed stderr (proven by the G1-iter3-i2
-# Red Team; G1-iter4 RT major #5 proved the TRACE2 family leaks through
-# v4's UNCAPPED re-pushes — every trace family is unset, and EVERY
-# push captures + redacts its stderr).
-unset GIT_TRACE GIT_TRACE_PACKET GIT_TRACE_EVENT GIT_TRACE_CURL GIT_TRACE_SHALLOW \
-      GIT_TRACE2 GIT_TRACE2_EVENT GIT_TRACE2_PERF GIT_TRACE2_BRIEF
+# Trace/config env would make git print full push URLs — INCLUDING
+# embedded credentials — into captured/pushed stderr (proven by the
+# G1-iter3-i2 Red Team; G1-iter4 RT major #5 proved the TRACE2 family
+# leaks through v4's UNCAPPED re-pushes; G1-iter4-i2 RT major #1
+# proved the enumerated unset list itself was the hole — the legacy
+# alias GIT_CURL_VERBOSE printed the raw token twice through the main
+# push). The scrub is PATTERN-matched over the live environment, not
+# an enumeration: every GIT_TRACE* variant (present and future),
+# GIT_CURL_VERBOSE, and git's env-based config injection (which could
+# re-enable http.verbose or inject any config) all die here.
+while IFS='=' read -r _tv _; do
+  case "$_tv" in
+    GIT_TRACE*|GIT_CURL_VERBOSE|GIT_CONFIG_KEY*|GIT_CONFIG_VALUE*|GIT_CONFIG_COUNT|GIT_CONFIG_PARAMETERS)
+      unset "$_tv" || true
+      ;;
+  esac
+done < <(env)
 
 REPO="${PC_BACKUP_REPO:-/home/z/my-project/cleanroom}"
 REPO="${REPO#file://}"          # accept file:// URLs (G1-iter3 major #1)
@@ -56,6 +77,7 @@ PUSH_URL="${PC_BACKUP_PUSH_REMOTE:-origin}"
 BRANCH="sandbox/backups"
 SANDBOX_SCRIPTS="$SANDBOX_HOME/scripts"
 LOCK="/tmp/pc-sandbox-backup.lock"
+PROD_CHECKOUT="/home/z/my-project/cleanroom"
 
 MSG="${1:-checkpoint}"
 if [ "$#" -gt 1 ]; then
@@ -64,11 +86,28 @@ if [ "$#" -gt 1 ]; then
   exit 2
 fi
 
-# -- test-mode detection (any env override marks a TEST run) ----------
+# -- override discipline: ALL-THREE or NONE (G1-iter4-i2 RT major #2 /
+#    Architect major #2) ---------------------------------------------
+# A PARTIAL override set is the exact accident shape of the seq-3 "t5"
+# and seq-5 "E9c" incidents (a broken && chain loses SOME overrides):
+# v5 entered TEST mode on any single override, so e.g. a lone
+# PC_BACKUP_PUSH_REMOTE committed a test checkpoint onto the
+# PRODUCTION checkout's local sandbox/backups — which the next
+# production run then pushed to github (executed end-to-end in
+# scratch by the G1-iter4-i2 Red Team). Overrides move together or
+# not at all.
+_PC_OV_N=0
+[ -n "${PC_BACKUP_REPO:-}" ]        && _PC_OV_N=$((_PC_OV_N+1))
+[ -n "${PC_SANDBOX_HOME:-}" ]       && _PC_OV_N=$((_PC_OV_N+1))
+[ -n "${PC_BACKUP_PUSH_REMOTE:-}" ] && _PC_OV_N=$((_PC_OV_N+1))
+if [ "$_PC_OV_N" -ne 0 ] && [ "$_PC_OV_N" -ne 3 ]; then
+  echo "!! partial overrides: PC_BACKUP_REPO / PC_SANDBOX_HOME / PC_BACKUP_PUSH_REMOTE" >&2
+  echo "   must be set TOGETHER (a TEST run) or none of them (production). A partial" >&2
+  echo "   set is the exact accident shape of the seq-3/seq-5 incidents — refusing." >&2
+  exit 2
+fi
 TEST_MODE=0
-[ "$REPO" != "/home/z/my-project/cleanroom" ] && TEST_MODE=1
-[ "$SANDBOX_HOME" != "/home/z/my-project" ] && TEST_MODE=1
-[ -n "${PC_BACKUP_PUSH_REMOTE:-}" ] && TEST_MODE=1
+[ "$_PC_OV_N" = 3 ] && TEST_MODE=1
 
 # -- production is OPT-IN (G1-iter4 RT major #1) ----------------------
 # Two consecutive gates produced two accidental production pushes by
@@ -89,6 +128,24 @@ if [ "$TEST_MODE" = 0 ] && [ "$ALLOW_PRODUCTION" != "1" ]; then
   echo "   Test run:  set PC_BACKUP_REPO / PC_SANDBOX_HOME / PC_BACKUP_PUSH_REMOTE to scratch paths" >&2
   echo "   (see harness/backups/README.md)." >&2
   exit 6
+fi
+
+# -- a TEST run never operates on the PRODUCTION CHECKOUT either
+#    (G1-iter4-i2 RT major #2, belt-and-braces with the all-or-none
+#    rule): test traffic must never commit onto the production repo's
+#    local sandbox/backups branch, however the path is spelled — the
+#    literal compare catches file:// and trailing-slash spellings, the
+#    canonicalized compare (cd + pwd) catches relative and symlinked
+#    spellings where the path exists.
+if [ "$TEST_MODE" = 1 ]; then
+  _nrepo="${REPO%/}"
+  _crepo="$(cd "$REPO" 2>/dev/null && pwd || true)"
+  if [ "$_nrepo" = "$PROD_CHECKOUT" ] || [ "$_crepo" = "$PROD_CHECKOUT" ]; then
+    echo "!! refusing: env overrides mark this as a TEST run, but PC_BACKUP_REPO" >&2
+    echo "   is the production checkout — test traffic never touches it (clone" >&2
+    echo "   to scratch first; see harness/backups/README.md)." >&2
+    exit 6
+  fi
 fi
 
 cd "$REPO"
@@ -137,10 +194,15 @@ case "$PUSH_URL" in
     : # a URL or filesystem path — git addresses it directly
     ;;
   *)
-    git remote get-url "$PUSH_URL" >/dev/null 2>&1 || {
-      echo "!! push target '$PUSH_URL' is not a configured remote (set PC_BACKUP_PUSH_REMOTE to a remote name, path or URL)" >&2
+    if ! git remote get-url "$PUSH_URL" >/dev/null 2>&1; then
+      # the target is never echoed raw — it may embed a credential
+      # (G1-iter4-i2 Architect minor #2: a credentialed scp-syntax
+      # target was printed verbatim by this exact message under v5)
+      _safe_tgt="$(printf '%s\n' "$PUSH_URL" | sed -E \
+        's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/(ghp_|gho_|ghs_|ghv_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g')"
+      echo "!! push target '$_safe_tgt' is not a configured remote (set PC_BACKUP_PUSH_REMOTE to a remote name, path or URL)" >&2
       exit 6
-    }
+    fi
     ;;
 esac
 FETCH_OK=0
@@ -163,10 +225,18 @@ _GITDIR="$(git -C "$REPO" rev-parse --absolute-git-dir)"
 # -- production-target refusal for TEST runs (G1-iter3-i2 RT major;
 #    NORMALIZED at G1-iter4 after the Red Team bypassed v4's
 #    case-sensitive spelling grep with :443, //, case, scp and
-#    trailing-dot variants — one executed end-to-end on a decoy). Two
-#    rules:
-#      1. a TEST run never pushes to ANY github host, however
-#         spelled (scratch is always local);
+#    trailing-dot variants — one executed end-to-end on a decoy; and
+#    WIDENED at G1-iter4-i2 after the Red Team proved github
+#    SUBDOMAINS are live git endpoints that sailed through v5's
+#    enumerated host list — `git ls-remote https://www.github.com/<the
+#    production repo>` returned production HEAD anonymously, and a
+#    full run with a gist.github.com target passed the guard
+#    end-to-end). Two rules:
+#      1. a TEST run never pushes to ANY github host — github.com,
+#         ssh.github.com and EVERY subdomain (gist., www., api.,
+#         education., …), however spelled and whatever the repo; the
+#         HOST is extracted from the normalized target and matched by
+#         SUFFIX, not enumerated
 #      2. a TEST run never pushes to the production repo, however
 #         spelled (canonical comparison after normalization).
 #    The resolved URL is NEVER printed (it may embed a token); nor is
@@ -192,11 +262,16 @@ if [ "$TEST_MODE" = 1 ]; then
   esac
   if [ -n "${_tgt:-}" ]; then
     _nt="$(_norm_url "$_tgt")"
-    case "$_nt" in
-      github.com|github.com/*|ssh.github.com|ssh.github.com/*)
+    # host-suffix denial (G1-iter4-i2 RT critical #1): match the HOST
+    # (everything before the first '/') against github.com and ANY
+    # *.github.com subdomain — enumeration was the v5 hole
+    _host="${_nt%%/*}"
+    case "$_host" in
+      github.com|*.github.com)
         echo "!! refusing: env overrides mark this as a TEST run, but the push" >&2
         echo "   target resolves to a github host — test traffic never reaches" >&2
-        echo "   github, whatever the spelling. Point PC_BACKUP_PUSH_REMOTE at a" >&2
+        echo "   github (github.com, ssh.github.com or ANY subdomain: gist.," >&2
+        echo "   www., api., …), whatever the spelling. Point PC_BACKUP_PUSH_REMOTE at a" >&2
         echo "   scratch bare repo (see harness/backups/README.md)." >&2
         exit 6
         ;;
@@ -295,6 +370,45 @@ fi
 echo $$ > "$LOCK/pid"
 trap 'rm -rf "$LOCK" 2>/dev/null || true' EXIT
 
+# _push_main / _push_branch: EVERY push — main AND branch — goes
+# through a guarded helper (G1-iter4 RT major #5 + minor #1 /
+# Architect major #2 for the branch side; G1-iter4-i2 RT major #1 /
+# Steward major #1 for the main side: v5 left the main push INLINE
+# with only a userinfo scrub — no token-shape rule — while the README
+# and the gate record claimed parity with _push_branch; under the
+# then-unneutralized GIT_CURL_VERBOSE the raw credential printed
+# twice in an executed probe). stderr is captured and printed
+# credential-redacted (userinfo AND token-shape) on failure; the
+# caller's status var stays accurate; no bare `set -e` death; alarms
+# are never masked. No push anywhere in this script bypasses these
+# helpers.
+_push_main() {
+  local _pe
+  _pe="$(mktemp /tmp/pc-mainpush.XXXXXX)"
+  if git push "$PUSH_URL" main 2>"$_pe"; then
+    rm -f "$_pe"
+    return 0
+  fi
+  MAIN_PUSH="failed"
+  echo "!! main push failed (diverged? network?) — stderr (credentials redacted):" >&2
+  sed -E 's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/(ghp_|gho_|ghs_|ghv_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g; s/^/   /' "$_pe" >&2
+  rm -f "$_pe"
+  return 1
+}
+_push_branch() {
+  local _pe
+  _pe="$(mktemp /tmp/pc-branchpush.XXXXXX)"
+  if git push "$PUSH_URL" "$BRANCH" 2>"$_pe"; then
+    rm -f "$_pe"
+    return 0
+  fi
+  BRANCH_PUSH="failed"
+  echo "!! branch push failed — stderr (credentials redacted):" >&2
+  sed -E 's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/(ghp_|gho_|ghs_|ghv_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g; s/^/   /' "$_pe" >&2
+  rm -f "$_pe"
+  return 1
+}
+
 # -- 1. main ahead? push it (product code + memory = part of backup) --
 # A FAILED MAIN PUSH DOES NOT ABORT THE BACKUP: warn, record it in the
 # manifest entry, continue — but 2+ consecutive failures raise a loud
@@ -305,14 +419,9 @@ if git rev-parse --verify "$RMAIN" >/dev/null 2>&1; then
   AHEAD=$(git rev-list --count "$RMAIN..main" 2>/dev/null || echo 0)
   if [ "$AHEAD" -gt 0 ]; then
     echo "== pushing main ($AHEAD commit(s))"
-    _mperr="$(mktemp /tmp/pc-mainpush.XXXXXX)"
-    if ! git push "$PUSH_URL" main 2>"$_mperr"; then
-      MAIN_PUSH="failed"
-      echo "!! main push failed (diverged? network?) — stderr:" >&2
-      sed -E 's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/^/   /' "$_mperr" >&2
+    if ! _push_main; then
       echo "!! backing up the sandbox snapshot anyway" >&2
     fi
-    rm -f "$_mperr"
   fi
 fi
 
@@ -520,11 +629,14 @@ if not usable:
 if not isinstance(doc, dict) or doc.get("schema") != 2:
     # migrate (e.g. the schema-1 seed from main) KEEPING prior entries
     prev = doc.get("backups", []) if isinstance(doc, dict) else []
-    doc = {"schema": 2, "note": "Append-only audit trail (branch-owned; "
-                                "SHAs live in git log of this branch; entries "
-                                "keyed by the (seq, timestamp, message) triple "
-                                "— seq may repeat after a divergence union).",
-           "backups": prev}
+    doc = {"schema": 2, "note": "Append-only audit trail.", "backups": prev}
+# normalize the note on EVERY append (G1-iter4-i2 Steward minor #2):
+# the live branch's manifest was created pre-v5 and still said
+# "keyed by seq" — the v5 fix reached the template but not the
+# production artifact. Idempotent.
+doc["note"] = ("Append-only audit trail (branch-owned; SHAs live in git log "
+               "of this branch; entries keyed by the (seq, timestamp, message) "
+               "triple — seq may repeat after a divergence union).")
 seq = (doc["backups"][-1]["seq"] + 1) if doc["backups"] else 1
 entry = {
     "seq": seq, "timestamp": ts, "trigger": "event", "message": msg,
@@ -637,27 +749,8 @@ _alarms() {
   return "$flagged"
 }
 
-# _push_branch: EVERY branch push goes through here (G1-iter4 RT
-# major #5 + RT minor #1 / Architect major #2: v4's post-merge
-# re-pushes were UNCAPPED — a set -e rc-1 death that masked pending
-# alarm banners and, under GIT_TRACE2, printed the credentialed push
-# URL raw). stderr is captured and printed credential-redacted on
-# failure; BRANCH_PUSH stays accurate; the caller decides the next
-# step. No push anywhere in this script bypasses this helper.
-_push_branch() {
-  local _pe
-  _pe="$(mktemp /tmp/pc-branchpush.XXXXXX)"
-  if git push "$PUSH_URL" "$BRANCH" 2>"$_pe"; then
-    rm -f "$_pe"
-    return 0
-  fi
-  BRANCH_PUSH="failed"
-  echo "!! branch push failed — stderr (credentials redacted):" >&2
-  sed -E 's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/(ghp_|gho_|ghs_|ghv_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g; s/^/   /' "$_pe" >&2
-  rm -f "$_pe"
-  return 1
-}
-
+# (both push helpers live above step 1 — the main push needs the
+#  same guarding as the branch pushes; see _push_main / _push_branch)
 BRANCH_PUSH="ok"
 if [ -z "$(git status --porcelain harness)" ]; then
   echo "== nothing new to back up on $BRANCH"
@@ -705,7 +798,12 @@ def scrub(x):
     if isinstance(x, list):
         return [scrub(v) for v in x]
     if isinstance(x, dict):
-        return {k: scrub(v) for k, v in x.items()}
+        # KEYS are scrubbed too (G1-iter4-i2 RT minor #1: v5 scrubbed
+        # values only, so a token in a dict key rode the union, was
+        # caught by the pre-commit re-scan (correct exit-8 abort) —
+        # but the divergence could then NEVER self-heal: every future
+        # run died exit 8 until a human repaired the remote manifest)
+        return {scrub(k): scrub(v) for k, v in x.items()}
     return x
 def show(ref):
     try:
@@ -747,6 +845,11 @@ else:
            "note": ours.get("note", "Append-only audit trail."),
            "backups": sorted(merged.values(), key=lambda e: (e.get("seq", 0), e.get("timestamp", ""))),
            "merged_divergence": True}
+    # normalize the note (same G1-iter4-i2 Steward minor #2 fix as the
+    # append path — the union output must not resurrect a stale note)
+    doc["note"] = ("Append-only audit trail (branch-owned; SHAs live in git log "
+                   "of this branch; entries keyed by the (seq, timestamp, message) "
+                   "triple — seq may repeat after a divergence union).")
     raw_ours = _flat(ours); raw_theirs = _flat(theirs)
     for e in doc["backups"]:
         if json.dumps(e, sort_keys=True) not in raw_ours and json.dumps(e, sort_keys=True) not in raw_theirs:

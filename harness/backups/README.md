@@ -21,7 +21,7 @@ each checkpoint), and the sandbox state. If a run records
 `main_push: failed`, product code is NOT on the remote that checkpoint
 — two consecutive failures raise a loud exit-7 alarm.
 
-## v5 design (hardened by gates G1-iter2 → G1-iter4, 2026-11-13/15)
+## v5/v6 design (hardened by gates G1-iter2 → G1-iter4-i2, 2026-11-13/16)
 
 The v1 design leaked credentials into a would-be push and could brick
 itself; v2 could never complete (`git add` collided with the ignore
@@ -30,8 +30,19 @@ patterns invoked with `grep -E`); v4's production-as-default caused
 two accidental production pushes across two gates, its refusal guard
 was a spelling blocklist, its alarm froze under persistent
 unreachability, and its content-merging self-heal pushed unscanned
-remote content — all caught by adversarial agents executing
-scratch-clone attacks. v5, in execution order:
+remote content; v5 made production opt-in, canonicalized the
+refusal, took `-s ours` sanitized unions with a pre-commit re-scan,
+and hardened the FINAL-OUTCOME check — and G1-iter4-i2 still found
+four holes (github SUBDOMAINS passed the enumerated host list —
+`www.github.com` was verified a live anonymous git endpoint for the
+production repo; the main push stayed inline with no token-shape
+scrub while its docs claimed parity, and the legacy alias
+`GIT_CURL_VERBOSE` leaked the raw credential through it; a PARTIAL
+override set entered TEST mode against the production checkout and
+seeded the next production push; the ☑ backing was still
+incidence-based — undated/cross-stage/fenced forgeries passed).
+All caught by adversarial agents executing scratch-clone attacks.
+The current script, in execution order:
 
 - **Production is OPT-IN (v5, G1-iter4 RT major #1)**: without
   `PC_BACKUP_ALLOW_PRODUCTION=1` the script refuses (exit 6) BEFORE
@@ -41,18 +52,23 @@ scratch-clone attacks. v5, in execution order:
   a conflicting mode (exit 2). The gate sits above the `cd`, so it
   fires even where the default repo path does not exist.
 - **Test isolation** (`PC_BACKUP_REPO` / `PC_SANDBOX_HOME` /
-  `PC_BACKUP_PUSH_REMOTE`): any env override marks the run as a TEST
-  run, and a TEST run never reaches github — ANY github host
-  (github.com / ssh.github.com), however the target is spelled and
-  whatever the repo (v5: both sides are canonicalized — lowercase,
+  `PC_BACKUP_PUSH_REMOTE`): overrides are **ALL-THREE or NONE** (v6,
+  G1-iter4-i2 RT major #2 — a PARTIAL set, the exact accident shape
+  of the seq-3/seq-5 incidents, used to enter TEST mode against the
+  PRODUCTION checkout and seed the next production push; any 1-of-3
+  or 2-of-3 combination now refuses exit 2 before any action). A
+  TEST run never reaches github — ANY github host (github.com,
+  ssh.github.com and EVERY subdomain — gist. / www. / api. / … —
+  matched by host SUFFIX, not enumeration, after the G1-iter4-i2 Red
+  Team proved `www.github.com` a live anonymous git endpoint and ran
+  a gist target end-to-end past the v5 guard), however the target is
+  spelled and whatever the repo, both sides canonicalized (lowercase,
   scheme/userinfo/default-port/trailing-dot/`.git` stripping, `//`
-  collapsing, scp-syntax folding — after the G1-iter4 Red Team pushed
-  a case-variant decoy end-to-end and proved `:443`, `//`, scp and
-  trailing-dot spellings all passed v4's literal grep); the canonical
-  production compare remains as belt-and-braces. Refusal is exit 6,
-  pre-network, and never prints the target. Off-domain redirector
-  URLs are a documented residual — no client-side spelling check can
-  catch them.
+  collapsing, scp-syntax folding); a TEST run also never operates on
+  the PRODUCTION CHECKOUT itself (exit 6, literal + canonicalized
+  path compare). Refusal is exit 6, pre-network, and never prints the
+  target. Off-domain redirector URLs are a documented residual — no
+  client-side spelling check can catch them.
 - **Secret scan, self-tested per run**: one `secret_scan` invocation
   used by every surface (sandbox scripts dir, checkpoint message,
   **the ENTIRE pushed delta — all of `harness/`, because the commit
@@ -73,23 +89,26 @@ scratch-clone attacks. v5, in execution order:
   force-push; SHAs live in `git log sandbox/backups`; a local branch
   ahead of origin keeps its unpushed commits.
 - **Divergence self-heals — without ever taking remote content (v5,
-  G1-iter4 RT major #4)**: if the remote branch has commits we
-  lack, the script merges with `-s ours` inside the worktree —
-  remote commits become ancestors (append-only preserved, no
-  force-push) but the TREE stays exactly ours, so remote-only files
-  can never ride the merge — then takes the programmatic manifest
-  union (dedup by the (seq, timestamp, message) triple; unparseable
-  remote manifest keeps our entries with a marker) with EVERY string
-  value scrubbed against the secret patterns (`[REDACTED]`, scrub
-  count recorded), re-scans the merged surface, and only then
-  commits and pushes. v4's content merge was proven to push an
-  injected manifest token RC 0 and then brick every future run with
-  an exit-4 loop; dirty merged content now aborts exit 8 with
-  nothing committed and nothing pushed.
+  G1-iter4 RT major #4; v6 key-scrub, G1-iter4-i2 RT minor #1)**: if
+  the remote branch has commits we lack, the script merges with
+  `-s ours` inside the worktree — remote commits become ancestors
+  (append-only preserved, no force-push) but the TREE stays exactly
+  ours, so remote-only files can never ride the merge — then takes
+  the programmatic manifest union (dedup by the (seq, timestamp,
+  message) triple; unparseable remote manifest keeps our entries with
+  a marker) with EVERY string scrubbed against the secret patterns —
+  KEYS as well as VALUES (`[REDACTED]`, scrub count recorded; v5
+  scrubbed values only, so a poisoned KEY rode the union into a
+  correct exit-8 abort but then bricked every future run — the
+  self-heal now actually heals), re-scans the merged surface, and
+  only then commits and pushes.
 - **Manifest resilience**: atomic write (tmpfile + os.replace); a
   corrupt working copy is recovered by walking the branch's git
   history for the last usable copy (loudly, with a recovery marker) —
-  never a silent seq reset.
+  never a silent seq reset; the note field is normalized to the
+  current triple-key wording on every append and in every union
+  output (v6, G1-iter4-i2 Steward minor #2 — the live branch's note
+  still said "keyed by seq").
 - **Main-push resilience**: a failed main push warns, is recorded in
   the manifest, and the sandbox backup proceeds; **2+ consecutive
   failures exit 7 with a banner** after the backup is safely pushed.
@@ -106,13 +125,20 @@ scratch-clone attacks. v5, in execution order:
   remote is unreachable, while a fetch blip on a run that pushed fine
   or backed nothing up is still never punished. "Safe on this
   machine" is not the bar — the audit trail must survive the machine.
-- **Credential-hygiene under tracing (v5)**: the FULL trace families
-  are unset (`GIT_TRACE*` AND `GIT_TRACE2*` — trace2 leaked the
-  credentialed push URL 4× through v4's uncaptured re-pushes), every
-  push in the script goes through one guarded helper (stderr captured
-  and printed redacted on failure — `://user:pass@` and token-shaped
-  strings — no bare `set -e` death, alarms never masked), and the
-  main-push redaction gained the same token-shape scrub.
+- **Credential-hygiene under tracing (v5; v6 pattern-matched,
+  G1-iter4-i2 RT major #1)**: trace/config env is neutralized by
+  PATTERN over the live environment — every `GIT_TRACE*` variant
+  (present and future), the legacy alias `GIT_CURL_VERBOSE` (which
+  leaked the raw credential twice through v5's then-inline main
+  push, in an executed probe), and git's env-based config injection
+  (`GIT_CONFIG_KEY*` / `GIT_CONFIG_VALUE*` / `GIT_CONFIG_COUNT` /
+  `GIT_CONFIG_PARAMETERS`, which could re-enable http.verbose the
+  same way) — enumeration was exactly how `GIT_CURL_VERBOSE`
+  escaped. EVERY push in the script — main AND branch — goes through
+  one of the two guarded helpers (`_push_main` / `_push_branch`):
+  stderr captured and printed redacted on failure (`://user:pass@`
+  AND token-shaped strings), status vars kept accurate, no bare
+  `set -e` death, alarms never masked.
 - **Lock**: mkdir lock; live locks are never touched; a dead-PID or
   >5-minute-old lock is stolen atomically (exactly one racer wins);
   every contention path exits cleanly with code 3.
@@ -144,13 +170,16 @@ scratch-clone attacks. v5, in execution order:
   names are never recorded or printed).
 
 Exit codes: 0 ok · 2 usage / invalid input (bare or HEAD-less repo;
-conflicting mode flags) · 3 lock contention · 4 secret detected ·
+conflicting mode flags; **partial overrides — 1-of-3 or 2-of-3**, v6) ·
+3 lock contention · 4 secret detected ·
 5 scan self-test failed · 6 refused (production not opted in; TEST
-run → github; TEST run → production) · 7 main-push and/or branch-push
+run → github, however spelled incl. subdomains; TEST run → the
+production checkout itself) · 7 main-push and/or branch-push
 alarm · 8 unresolvable divergence (incl. dirty merged content) ·
 1/128 unexpected git or environment failure (stderr names the cause —
 the push-stderr capture was added precisely because a silent failure
-burned a CI debugging cycle). Note: after a divergence-union merge,
+burned a CI debugging cycle; refusal and failure messages never print
+the raw target). Note: after a divergence-union merge,
 manifest `seq` values are no longer unique (two sides may both carry a
 seq N); the (seq, timestamp, message) triple is the dedup key.
 An exit-8 abort runs the alarm checks first, so a pending alarm banner

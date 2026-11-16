@@ -52,10 +52,38 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   close a loop that `is_running()` (macOS CI caught this, `bdefec5`).
 - Full suite runtime ≈ 80-90 s locally; `python -m pytest tests/ -q
   -p no:asyncio`.
-- Baseline (post Material You): local 712 passed + 6 skipped; CI
-  718 per leg (windows 596 + 122 platform skips). A changed skip
-  count on a leg means a test silently changed behavior — check
-  before/after when adding tests.
+- Baseline (after the G1-iter4-i2 fix cycle): local 727 passed +
+  9 skipped; CI 736 per POSIX leg (windows 605 passed + 131
+  platform skips). A changed skip count on a leg means a test
+  silently changed behavior — check before/after when adding tests.
+
+## Harness / adversarial process (gates G1 → G1-iter4-i2)
+
+- Enumeration is how defenses die. v5's unset list enumerated trace
+  variables and missed the legacy alias `GIT_CURL_VERBOSE` (raw
+  credential leaked through the main push in an executed probe); its
+  guard enumerated github hosts and missed every SUBDOMAIN
+  (`www.github.com` was verified a live anonymous git endpoint for
+  the production repo). Pattern-match the defense (unset
+  `GIT_TRACE*`, deny host-suffix `*.github.com`) instead of
+  enumerating it (G1-iter4-i2 RT M1/C1).
+- A remediation claim is itself a finding surface: "the main push
+  gained the same token-shape scrub" was documented at v5 but never
+  implemented — caught only by the Steward mapping every claim to its
+  diff hunk. Verify each claim against the code that allegedly
+  changed, not against the record that says it did (G1-iter4-i2
+  Steward major #1).
+- "Any single override marks a TEST run" was itself the hole: the
+  seq-3/seq-5 accident class is a PARTIAL env loss, so the override
+  contract must be all-three-or-none (G1-iter4-i2 RT M2) — an
+  interface whose failure mode is "silently narrower than intended"
+  must fail closed on partial configuration.
+- An integrity check that matches by incidence (substring presence)
+  will be satisfied by documentation, cross-stage prose, and forged
+  examples; bind machine authority to explicit declarations
+  (`Stage:` lines, last-line closure, fence-stripping) — the check's
+  own forgery suite must enumerate the attack classes the check's
+  history actually produced (G1-iter4-i2 RT C2 / Architect M1).
 
 ## CI / GitHub
 
