@@ -49,8 +49,8 @@ MINOR:     [list or none]   — fix-or-file
   finding's resolution (fixed / deferred with ledger entry /
   accepted with reason). Deferred findings go to
   `memory/deferred-findings.md` and are re-examined at the next gate.
-- Verdicts are judged against the **current test baseline** (718 per
-  CI leg / 712+6 local at the time of writing — see
+- Verdicts are judged against the **current test baseline** (732 per
+  POSIX CI leg / 723+9 local at the time of writing — see
   `memory/00-project-state.md` for the live number).
 
 ## Record
@@ -75,7 +75,13 @@ FINAL OUTCOME: NO CONSENSUS — <short reason>
 It is written ONLY after the independent verdicts return. A roadmap
 stage may be marked done (☑) only if a record that names it carries
 `FINAL OUTCOME: CONSENSUS REACHED`; `tests/test_harness_integrity.py`
-enforces both rules. Cap-exhausted gates record
+enforces both rules — G1-iter4 hardening: the closure line must be
+LINE-ANCHORED at column 0 and the ONLY such line in the record
+(inline mentions of the phrase never back a ☑ — the iter-3 record's
+own prose defeated the substring check until the G1-iter4 Architect
+caught it); the record's date is the later of its filename and its
+`Date:` header; and the check itself is self-falsified with synthetic
+forgeries in the same test file. Cap-exhausted gates record
 `FINAL OUTCOME: NO CONSENSUS — iteration cap reached` and escalate to
 the project owner; a fresh gate may then be ordered by the owner on
 the remediation commit (the G1 → G1-iter3 precedent).
@@ -83,6 +89,7 @@ the remediation commit (the G1 → G1-iter3 precedent).
 ## Scope of review per gate
 
 - The **current stage's** diff/plan (implementation vs stated intent)
-- **Regression risk** against the test baseline (700/leg) and CI matrix
+- **Regression risk** against the test baseline (see
+  `memory/00-project-state.md` for the live number) and CI matrix
 - **Work done so far** (retrospective drift, tech debt, doc rot)
 - **The roadmap** (sequencing, missing stages, unrealistic items)

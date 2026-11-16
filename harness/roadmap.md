@@ -5,7 +5,7 @@ starts (see `process/adversarial-consensus.md`) and another covering
 its results before the NEXT stage proceeds. Status legend:
 ☐ queued · ◐ gated/in-progress · ☑ done+gated.
 
-## Shipped (gated retroactively 2026-11-13 — G1, see consensus-log)
+## Shipped (retrospectively assessed at gate G1 — zero findings against the released line; see consensus-log)
 
 - ☑ v0.6.0–v0.6.2 line: interop hardening, perf/stability pass,
   region-grouped servers, guest-mode fixes, uBO-parity blocklists
@@ -33,6 +33,15 @@ its results before the NEXT stage proceeds. Status legend:
   check); each fix execution-verified in scratch. **S1 stays open: a
   fresh gate (G1-iter4) must re-judge the remediation commit before
   closure — per process, that re-gate is the owner's call.**
+  **G1-iter4 (owner-ordered 2026-11-15): iteration 1 — Red Team BLOCK
+  (production-as-default + guard-spelling bypass + unreachable-alarm
+  + unscanned divergence merge + GIT_TRACE2) and Devil's Architect
+  BLOCK (the FINAL-OUTCOME machine check defeated by its own
+  documentation) vs Ship Steward PROCEED-WITH-FINDINGS; every finding
+  remediated and execution-verified (backup v5, hardened +
+  self-falsified integrity check, +4 machine tests, 20/20 scratch
+  matrix) — iteration 2 re-judges the fix commit (record:
+  `2026-11-15-S1-material-you-gate-iter4.md`).**
   - Desktop: dynamic-color seed (brand / system accent / custom hex),
     OS accent detection (GNOME 47 accent-color, Windows DWM
     AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,
@@ -69,7 +78,9 @@ its results before the NEXT stage proceeds. Status legend:
 - ☐ **S6. Security/threat-model review** — helper privileges, DNS
   server surface, blocklist download chain, **bond server exposure
   (must gate or accompany S3's packaging work — do not promote the
-  attack surface before reviewing it)**
+  attack surface before reviewing it)**; also decide whether to port
+  the backup merge/alarm core from bash to a tested Python module
+  (G1-iter4 Architect observation)
 - ☐ **S7. Legacy-stack sunset decision** — Python 3.8 is EOL; decide
   keep/drop for the PySide2-Qt5 / PySide6-6.2 legs (every UI change
   pays the compat tax until decided). Decision due by v0.7 — S2's

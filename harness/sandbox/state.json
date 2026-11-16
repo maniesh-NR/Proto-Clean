@@ -1,6 +1,6 @@
 {
   "git_branch": "main",
-  "git_head": "6324a4d",
+  "git_head": "ad3b4e1",
   "main_push": "ok",
   "sandbox": {
     "download": [
@@ -45,6 +45,7 @@
       "proton-clean-ui-light-preview.png",
       "proton-clean-ui-preview.png"
     ],
+    "harness_skipped_shaped_count": 0,
     "scripts": [
       "__pycache__",
       "bench_crypto.py",
@@ -77,7 +78,8 @@
       "rename_proton_clean.py",
       "socks_min.py",
       "tnacl_mirror.py",
-      "verify_backup_v4.sh"
+      "verify_backup_v4.sh",
+      "verify_backup_v5.sh"
     ],
     "scripts_skipped_shaped_count": 0,
     "skills": [
@@ -111,5 +113,5 @@
       "xlsx"
     ]
   },
-  "timestamp": "2026-11-15T13:14:21Z"
+  "timestamp": "2026-11-16T16:08:32Z"
 }
