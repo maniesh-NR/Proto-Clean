@@ -117,17 +117,23 @@ if printf '%s' "$OUT" | grep -q '://u:'; then bad "E3 userinfo URL fragment leak
 if [ "$RC" = 0 ]; then ok "E3 run itself completed rc 0 (push kept locally)"; else bad "E3 unexpected rc=$RC"; fi
 
 echo "=== E4: canary self-test sabotage regression ==="
+# (lane fixed at G1-iter5: the v5-era lanes ran with PC_BACKUP_REPO=$ROOT
+#  — the PRODUCTION checkout — which v6's production-checkout refusal
+#  correctly refuses exit 6 before the self-test runs; the stale lanes
+#  had not been re-run since v6. The sabotage now runs against a
+#  scratch clone, as every other lane always has.)
 d4="$S/e4"; mkdir -p "$d4"
+git clone -q "$ROOT" "$d4/clone"
 sed 's/gho_\[A-Za-z0-9\]{30,}/ghx_[A-Za-z0-9]{30,}/' "$SCRIPT" > "$d4/sabotaged1.sh"
-( export $(base_env) PC_BACKUP_REPO="$ROOT" PC_SANDBOX_HOME="$d4" \
+( export $(base_env) PC_BACKUP_REPO="$d4/clone" PC_SANDBOX_HOME="$d4" \
     PC_BACKUP_PUSH_REMOTE="$d4/nope.git"
-  cd "$ROOT" && bash "$d4/sabotaged1.sh" "sabotage canary" ) > "$d4/out1" 2>&1
+  cd "$d4/clone" && bash "$d4/sabotaged1.sh" "sabotage canary" ) > "$d4/out1" 2>&1
 RC=$?
 if [ "$RC" = 5 ]; then ok "E4 pattern sabotage (gho_ branch) exits 5"; else bad "E4 pattern sabotage rc=$RC"; fi
 sed 's/grep -rEn/grep -rn/' "$SCRIPT" > "$d4/sabotaged2.sh"
-( export $(base_env) PC_BACKUP_REPO="$ROOT" PC_SANDBOX_HOME="$d4" \
+( export $(base_env) PC_BACKUP_REPO="$d4/clone" PC_SANDBOX_HOME="$d4" \
     PC_BACKUP_PUSH_REMOTE="$d4/nope.git"
-  cd "$ROOT" && bash "$d4/sabotaged2.sh" "sabotage flags" ) > "$d4/out2" 2>&1
+  cd "$d4/clone" && bash "$d4/sabotaged2.sh" "sabotage flags" ) > "$d4/out2" 2>&1
 RC=$?
 if [ "$RC" = 5 ]; then ok "E4 flag drift (-rEn -> -rn) exits 5"; else bad "E4 flag drift rc=$RC"; fi
 

@@ -143,3 +143,33 @@ Format: **decision** — context — date. Newest last.
    Closure choreography (verdicts → closure line → same-commit glyph
    flip → state/session docs → push → event backup) is defined in
    `process/adversarial-consensus.md`. (2026-11-16, G1-iter4-i2)
+
+18. **Backup script v7 + the harness subsystem's bounded exit
+    criterion (G1-iter5, 2026-11-19).** The v7 remediations (every
+    one executed end-to-end in scratch before commit):
+    empty-credential URL spellings (`https://@github.com/…`,
+    `github.com:/…`, scp `git@github.com:/…`) normalize away in
+    `_norm_url`; the production-path compares are PHYSICAL (`pwd -P`
+    + leading-`//` collapse) and cover the push TARGET (and its
+    `.git`), not just the repo operand; the push target is RESOLVED
+    the way git resolves it (`remote get-url --push` for remote
+    names, `ls-remote --get-url` for URL/path operands —
+    insteadOf-aware) before it is judged; `GIT_CONFIG_GLOBAL` and
+    `GIT_CONFIG_SYSTEM` join the pattern env scrub (config-by-FILE
+    injection via env is inert); every pre-push `git add` is followed
+    by an INDEX re-scan (`git grep --cached` — anything committed was
+    staged and scanned); the scrub is mutation-covered by a
+    zero-trace-lines observability lane; and the ☑-backing check
+    gained stale-consensus withdrawal (a newer non-consensus record
+    retracts the glyph) plus the id-less-☑-outside-Shipped rule.
+    Alongside (the Architect's bounded-exit recommendation, adopted):
+    (a) the bash script's capability set is FROZEN — only
+    refusal-class fixes and port prep until the port; (b) the
+    merge/alarm/guard core ports to a tested Python module BEFORE
+    S2's stage gate (the 16 machine tests + the 67 matrix checks
+    across v5/v6/v7 pin the behavior to port better than it will
+    ever be pinned again); (c) a FROZEN residual-threat list
+    (backups README) bounds what future gates judge against — each
+    gate no longer re-derives the attack surface from scratch, and
+    adding to the list requires a gate finding. (2026-11-19,
+    G1-iter5)

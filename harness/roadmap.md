@@ -61,6 +61,35 @@ its results before the NEXT stage proceeds. Status legend:
   last-line closure, fence-stripping; +4 machine tests, 727+9
   local). **A fresh gate (G1-iter5) on the remediation commit is
   the owner's call.**
+  **G1-iter5 (owner-ordered 2026-11-19, on the G1-iter4-i2
+  remediation line `bf0c74e`→`c00f647`→`a02db67`): iteration 1 —
+  Red Team BLOCK** (2 criticals: empty-credential apex spellings
+  — `https://@github.com/…`, `github.com:/…`, scp
+  `git@github.com:/…` — parsed past the v6 normalization, executed
+  end-to-end past the guard incl. a real receive-pack attempt
+  against git@github.com; symlink and `//` spellings defeated the
+  production-checkout compare — logical pwd, not `pwd -P`; 1 major:
+  `url.*.insteadOf` config-file rewrites + the unscrubbed
+  `GIT_CONFIG_GLOBAL` evaded the raw-operand guard) **and Devil's
+  Architect BLOCK** (the push TARGET was never compared against the
+  production path — the v6 guard checked only the REPO operand,
+  falsifying the script header; the trace-scrub machine test was
+  not mutation-covering — reverting the entire env scrub left CI
+  green) vs Ship Steward PROCEED-WITH-FINDINGS (3 doc-currency
+  minors; per-leg CI counts exact from job logs, claim/code map
+  clean, audit trail faithful). **No consensus — iteration 1 of 2.**
+  The v7 fix cycle (empty-credential normalization, physical
+  path compares on repo AND push target incl. `.git`,
+  insteadOf/pushurl-aware target resolution,
+  `GIT_CONFIG_GLOBAL`/`SYSTEM` scrub, post-add INDEX re-scan,
+  zero-trace-lines mutation-covering lane, stale-consensus
+  withdrawal + id-less-☑ rules; 16 machine tests, matrices
+  v5 20/20 + v6 22/22 + v7 25/25; decision #18 adopts the bash
+  capability freeze + Python port before S2's stage gate + the
+  frozen residual-threat list) lands in the commit carrying the
+  iteration-1 record
+  (`2026-11-19-S1-material-you-gate-iter5.md`); **iteration 2
+  re-judges that commit — no outcome pre-recorded.**
   - Desktop: dynamic-color seed (brand / system accent / custom hex),
     OS accent detection (GNOME 47 accent-color, Windows DWM
     AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,

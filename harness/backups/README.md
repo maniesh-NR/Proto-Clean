@@ -9,8 +9,8 @@ fixed time interval. (Project owner directive, 2026-11-13.)
 | Layer | Where it lives | Mechanism |
 |---|---|---|
 | Product code + docs + `harness/` memory | `main` branch | normal commits (already part of every plan) |
-| Sandbox-only state (`/home/z/my-project/scripts/`, sandbox inventory) | `sandbox/backups` branch, under `harness/sandbox/` | `scripts/sandbox_backup.sh` (v5) |
-| Backup audit trail | `harness/backups/manifest.json` — **branch-owned, append-only, seq-keyed** | same script |
+| Sandbox-only state (`/home/z/my-project/scripts/`, sandbox inventory) | `sandbox/backups` branch, under `harness/sandbox/` | `scripts/sandbox_backup.sh` (v7) |
+| Backup audit trail | `harness/backups/manifest.json` — **branch-owned, append-only, keyed by the (seq, timestamp, message) triple** | same script |
 
 The `sandbox/backups` branch intentionally does not trigger CI
 (`ci.yml` runs on `main` only) so frequent backups don't burn runner
@@ -21,7 +21,7 @@ each checkpoint), and the sandbox state. If a run records
 `main_push: failed`, product code is NOT on the remote that checkpoint
 — two consecutive failures raise a loud exit-7 alarm.
 
-## v5/v6 design (hardened by gates G1-iter2 → G1-iter4-i2, 2026-11-13/16)
+## v5/v6/v7 design (hardened by gates G1-iter2 → G1-iter4-i2 → G1-iter5, 2026-11-13/16/19)
 
 The v1 design leaked credentials into a would-be push and could brick
 itself; v2 could never complete (`git add` collided with the ignore
@@ -41,8 +41,18 @@ scrub while its docs claimed parity, and the legacy alias
 override set entered TEST mode against the production checkout and
 seeded the next production push; the ☑ backing was still
 incidence-based — undated/cross-stage/fenced forgeries passed).
-All caught by adversarial agents executing scratch-clone attacks.
-The current script, in execution order:
+G1-iter5 then found four more (empty-credential apex spellings —
+`https://@github.com/…`, `github.com:/…`, scp `git@github.com:/…` —
+parsed past the v6 normalization because the @-strip needed ≥1 char
+before the `@` and the port strips needed content after the `:`;
+the production-checkout compare used bash's LOGICAL pwd, so symlink
+and `//` spellings sailed through; the guard inspected push targets
+RAW, so `url.*.insteadOf` rewrites in config files — or injected via
+the unscrubbed `GIT_CONFIG_GLOBAL` — rewrites an innocent local
+path to github at push time; and the push TARGET was never compared
+against the production path at all). All caught by adversarial
+agents executing scratch-clone attacks. The current script, in
+execution order:
 
 - **Production is OPT-IN (v5, G1-iter4 RT major #1)**: without
   `PC_BACKUP_ALLOW_PRODUCTION=1` the script refuses (exit 6) BEFORE
@@ -59,16 +69,23 @@ The current script, in execution order:
   or 2-of-3 combination now refuses exit 2 before any action). A
   TEST run never reaches github — ANY github host (github.com,
   ssh.github.com and EVERY subdomain — gist. / www. / api. / … —
-  matched by host SUFFIX, not enumeration, after the G1-iter4-i2 Red
-  Team proved `www.github.com` a live anonymous git endpoint and ran
-  a gist target end-to-end past the v5 guard), however the target is
-  spelled and whatever the repo, both sides canonicalized (lowercase,
-  scheme/userinfo/default-port/trailing-dot/`.git` stripping, `//`
-  collapsing, scp-syntax folding); a TEST run also never operates on
-  the PRODUCTION CHECKOUT itself (exit 6, literal + canonicalized
-  path compare). Refusal is exit 6, pre-network, and never prints the
-  target. Off-domain redirector URLs are a documented residual — no
-  client-side spelling check can catch them.
+  matched by host SUFFIX, not enumeration, and since G1-iter5 also
+  after empty-credential spellings — `https://@github.com/…`,
+  `github.com:/…`, scp `git@github.com:/…` — are normalized away),
+  however the target is spelled and whatever the repo; the target is
+  **RESOLVED THE WAY GIT RESOLVES IT** before judging (remote names
+  via `git remote get-url --push` — pushurl-aware; URL/path operands
+  via `git ls-remote --get-url` — `url.*.insteadOf`-aware, so a
+  config-FILE rewrite to github is refused even though the raw
+  operand looks local, G1-iter5 RT major #1); a TEST run also never
+  operates on the PRODUCTION CHECKOUT — as the push TARGET as well
+  as the repo, the path compared PHYSICALLY (`pwd -P` + leading-`//`
+  collapse, so symlinked and `//` spellings cannot alias it, and its
+  `.git` is compared too) — refusing exit 6 pre-network, never
+  printing the target. Off-domain redirector URLs and
+  `pushInsteadOf` rewrites on direct URL operands are documented
+  residuals (see the frozen residual list below) — no client-side
+  spelling check can catch them.
 - **Secret scan, self-tested per run**: one `secret_scan` invocation
   used by every surface (sandbox scripts dir, checkpoint message,
   **the ENTIRE pushed delta — all of `harness/`, because the commit
@@ -126,19 +143,25 @@ The current script, in execution order:
   or backed nothing up is still never punished. "Safe on this
   machine" is not the bar — the audit trail must survive the machine.
 - **Credential-hygiene under tracing (v5; v6 pattern-matched,
-  G1-iter4-i2 RT major #1)**: trace/config env is neutralized by
-  PATTERN over the live environment — every `GIT_TRACE*` variant
-  (present and future), the legacy alias `GIT_CURL_VERBOSE` (which
-  leaked the raw credential twice through v5's then-inline main
-  push, in an executed probe), and git's env-based config injection
-  (`GIT_CONFIG_KEY*` / `GIT_CONFIG_VALUE*` / `GIT_CONFIG_COUNT` /
-  `GIT_CONFIG_PARAMETERS`, which could re-enable http.verbose the
-  same way) — enumeration was exactly how `GIT_CURL_VERBOSE`
-  escaped. EVERY push in the script — main AND branch — goes through
-  one of the two guarded helpers (`_push_main` / `_push_branch`):
-  stderr captured and printed redacted on failure (`://user:pass@`
-  AND token-shaped strings), status vars kept accurate, no bare
-  `set -e` death, alarms never masked.
+  G1-iter4-i2 RT major #1; v7 widened, G1-iter5 Architect minor #1)**:
+  trace/config env is neutralized by PATTERN over the live
+  environment — every `GIT_TRACE*` variant (present and future), the
+  legacy alias `GIT_CURL_VERBOSE` (which leaked the raw credential
+  twice through v5's then-inline main push, in an executed probe),
+  git's env-based config injection (`GIT_CONFIG_KEY*` /
+  `GIT_CONFIG_VALUE*` / `GIT_CONFIG_COUNT` / `GIT_CONFIG_PARAMETERS`,
+  which could re-enable http.verbose the same way), AND since G1-iter5
+  `GIT_CONFIG_GLOBAL` / `GIT_CONFIG_SYSTEM` (config-by-FILE injection
+  via env — the same class; the tests' ambient-config neutralization
+  convention moved to an empty `HOME` accordingly) — enumeration was
+  exactly how `GIT_CURL_VERBOSE` escaped. EVERY push in the script —
+  main AND branch — goes through one of the two guarded helpers
+  (`_push_main` / `_push_branch`): stderr captured and printed
+  redacted on failure (`://user:pass@` AND token-shaped strings),
+  status vars kept accurate, no bare `set -e` death, alarms never
+  masked. The scrub is mutation-covered by the zero-trace-lines
+  observability lane (a hostile `GIT_TRACE=1` clean-lane run must emit
+  NO git trace lines — with the scrub removed, 26 leak).
 - **Lock**: mkdir lock; live locks are never touched; a dead-PID or
   >5-minute-old lock is stolen atomically (exactly one racer wins);
   every contention path exits cleanly with code 3.
@@ -162,6 +185,16 @@ The current script, in execution order:
 - **Checksummed refresh (v5)**: both rsyncs run with `-c` — a
   same-size edit made in the same second as the worktree checkout
   can never be silently skipped.
+- **INDEX re-scan (v7, G1-iter5 RT minor #3)**: after every `git add`
+  that precedes a push, the STAGED content is re-scanned with the
+  same secret patterns (`git grep --cached`) — the index is exactly
+  what the commit will contain, so a file written into the worktree
+  between the worktree scan and the add (the sub-100 ms TOCTOU the
+  G1-iter5 Red Team proved with an instrumented copy) can never ride
+  the commit: anything committed was staged, and anything staged was
+  scanned. Machine-covered structurally (position test, honestly
+  labeled — no deterministic behavioral lane exists for a sub-ms
+  race) plus the widened-window probe in `verify_backup_v7.sh` E18.
 - **Credential-SHAPED filenames never enter the pushed tree** (even
   with clean content) — from ANY surface (v5, G1-iter4 RT minor #2:
   v4 excluded only the scripts snapshot while the harness/ refresh
@@ -171,10 +204,12 @@ The current script, in execution order:
 
 Exit codes: 0 ok · 2 usage / invalid input (bare or HEAD-less repo;
 conflicting mode flags; **partial overrides — 1-of-3 or 2-of-3**, v6) ·
-3 lock contention · 4 secret detected ·
+3 lock contention · 4 secret detected (worktree, staged content, or
+merged content) ·
 5 scan self-test failed · 6 refused (production not opted in; TEST
-run → github, however spelled incl. subdomains; TEST run → the
-production checkout itself) · 7 main-push and/or branch-push
+run → github, however spelled incl. subdomains and empty-credential
+forms; TEST run → the production checkout itself, as the repo OR the
+push target, however spelled) · 7 main-push and/or branch-push
 alarm · 8 unresolvable divergence (incl. dirty merged content) ·
 1/128 unexpected git or environment failure (stderr names the cause —
 the push-stderr capture was added precisely because a silent failure
@@ -184,6 +219,39 @@ manifest `seq` values are no longer unique (two sides may both carry a
 seq N); the (seq, timestamp, message) triple is the dedup key.
 An exit-8 abort runs the alarm checks first, so a pending alarm banner
 is never masked by the abort.
+
+## Frozen residual-threat list (adopted G1-iter5, decision #18)
+
+These are the KNOWN residuals future gates judge against — a fixed
+list, so each gate no longer re-derives the attack surface from
+scratch (the Architect's bounded-exit recommendation; adding to this
+list requires a gate finding, not prose):
+
+1. **Off-domain redirectors** — a push target on a non-github domain
+   that 301-redirects to github. No client-side spelling check can
+   catch it; the credential never enters a TEST push and production
+   pushes are opt-in, so the residual is reachability, not leakage.
+2. **`url.<base>.pushInsteadOf` on direct URL operands** — the guard
+   resolves remote NAMES pushurl-aware (`get-url --push`) and
+   URL/path operands insteadOf-aware (`ls-remote --get-url`), but a
+   pushInsteadOf rewrite of a direct URL operand applies only at
+   push time; requires crafted config in the clone (beyond the
+   accident threat model).
+3. **Scan→add TOCTOU below ~100 ms** — closed STRUCTURALLY by the
+   index re-scan (anything committed was staged and scanned); the
+   residual window is between the index scan and the commit itself
+   (nothing stages there — staging is the script's own `git add`),
+   and exploitation requires a concurrent hostile process on the
+   machine.
+4. **Orchestrator file-write authority** — an orchestrator that can
+   edit any file can author a fully-consistent forged gate record;
+   the declaration-bound model raises the cost to a multi-artifact
+   forgery visible in a pushed diff, anchored by git history,
+   independent agents, and CI on main. That is the design's ceiling.
+5. **Config-level indirection beyond env** — repo/global config FILES
+   in the scratch clone are visible to the guard's own resolution
+   (that is the fix), but a hostile non-git wrapper around the script
+   is outside the threat model entirely.
 
 ## Running
 
@@ -197,7 +265,13 @@ PC_BACKUP_PUSH_REMOTE=/path/to/bare.git scripts/sandbox_backup.sh "msg"
 
 The hermetic cycle (fresh-create → append → planted-secret abort) is
 also machine-checked in `tests/test_harness_integrity.py` on every
-push to main (POSIX legs).
+push to main (POSIX legs), and the sandbox matrix
+(`scripts/verify_backup_v7.sh`, extending the still-valid v5/v6
+matrices — **re-run ALL of them after any script change**, see
+lessons) covers the v7 surfaces end-to-end: E14 empty-credential
+spellings, E15 physical production-path compares (repo + push
+target), E16 insteadOf resolution + env-config inertness, E17 the
+zero-trace-lines scrub signal, E18 the widened-window TOCTOU probe.
 
 ## Restore
 

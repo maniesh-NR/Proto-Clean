@@ -49,9 +49,20 @@ MINOR:     [list or none]   — fix-or-file
   finding's resolution (fixed / deferred with ledger entry /
   accepted with reason). Deferred findings go to
   `memory/deferred-findings.md` and are re-examined at the next gate.
-- Verdicts are judged against the **current test baseline** (732 per
-  POSIX CI leg / 723+9 local at the time of writing — see
+- Verdicts are judged against the **current test baseline** (737 per
+  POSIX CI leg / 728+9 local at the time of writing — see
   `memory/00-project-state.md` for the live number).
+- **Fix-cycle doc checklist (G1-iter5, after the same stale-baseline
+  class recurred in THREE consecutive gates — G1-iter4 A-m6,
+  G1-iter4-i2 A-m4/S-m1, G1-iter5 A-m3/S-m1-3):** every fix cycle
+  refreshes, in the SAME commit as its remediation — (a) the
+  baseline parenthetical HERE, (b) `00-project-state.md` numbers and
+  CI confirmations (replace "to be confirmed" hedges once CI ran),
+  (c) `02-lessons.md` baseline lines, (d) the backups-README table
+  labels (script version, manifest key wording), (e) re-runs ALL
+  sandbox matrices (v5/v6/v7…), not just the new one — the v5 E4
+  lanes sat stale through an entire gate because nobody re-ran the
+  old matrix after v6 changed the behavior it probes.
 
 ## Record
 

@@ -1,13 +1,15 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-16 (G1-iter4 iteration 2 — NO CONSENSUS at the
-iteration cap: Red Team BLOCK (github-subdomain guard bypass,
-FINAL-OUTCOME backing still forgeable, main-push credential leak
-under GIT_CURL_VERBOSE, partial-override isolation gap) vs Architect
-+ Steward PROCEED-WITH-FINDINGS; all findings from both iterations
-remediated and machine-covered in the remediation commit, which
-carries the record; escalated to the project owner — a fresh gate on
-the remediation commit is the owner's call)
+Last updated: 2026-11-19 (G1-iter5 iteration 1 — NO CONSENSUS:
+Red Team BLOCK (2 criticals — empty-credential spelling bypass of the
+github guard, symlink/`//` bypass of the production-checkout
+compare; 1 major — insteadOf/config-file guard evasion) and Devil's
+Architect BLOCK (2 majors — the push-target production-path lane
+open, the trace-scrub machine test not mutation-covering) vs Ship
+Steward PROCEED-WITH-FINDINGS (3 doc minors). Every finding
+remediated and machine/matrix-covered in the v7 fix cycle that
+lands in the commit carrying the record; iteration 2 re-judges the
+remediation commit within this gate's cap of 2.)
 
 ## Identity
 
@@ -15,15 +17,14 @@ the remediation commit is the owner's call)
   (Linux / Windows / macOS desktop + Android)
 - **Repo**: `maniesh-NR/Proto-Clean`
 - **Version**: 0.6.2 (released) — see `03-release-runbook.md`
-- **Test baseline**: local sandbox **727 passed + 9 skipped** after the
-  G1-iter4-i2 fix cycle (723+9 plus 4 new machine tests: partial-
-  override + production-checkout refusals, subdomain guard
-  spellings, main-push redaction + trace/config-env hygiene, union
-  key-scrub heal). CI confirmed at `ad3b4e1`: 732 × 4
-  POSIX legs, 605 passed + 127 skipped on windows. Expectation for
-  the G1-iter4-i2 remediation commit: 736 × 4 POSIX, 605+131
-  windows — to be confirmed by CI. Any change must keep the suite
-  green; new features add tests to the baseline.
+- **Test baseline**: local sandbox **728 passed + 9 skipped** after
+  the G1-iter5 fix cycle (727+9 plus one new structural test:
+  index-rescan positions). CI confirmed at `c00f647`/`a02db67`:
+  **736 × 4 POSIX legs, 605 passed + 131 skipped on windows**
+  (job-log-verified by the G1-iter5 Steward). Expectation for the
+  G1-iter5 remediation commit: 737 × 4 POSIX, 605+132 windows — to
+  be confirmed by CI. Any change must keep the suite green; new
+  features add tests to the baseline.
 
 ## Feature inventory
 
@@ -68,21 +69,20 @@ the remediation commit is the owner's call)
 
 ## Known open threads
 
-- **S1 gate: G1-iter4 cap exhausted (2026-11-16)** — iteration 2
-  re-judged the iteration-1 fix commit `ad3b4e1`: Red Team BLOCK
-  (2 criticals — the github-subdomain guard bypass, with
-  `www.github.com` verified a live anonymous git endpoint for the
-  production repo, and the FINAL-OUTCOME ☑ check still forgeable four
-  ways; 2 majors — the `GIT_CURL_VERBOSE` raw-credential leak through
-  the then-inline main push, and partial-override test runs polluting
-  the production checkout's backup branch) vs Architect and Steward
-  PROCEED-WITH-FINDINGS → **NO CONSENSUS at the 2-iteration cap →
-  escalated to the project owner**. Every finding from both
-  iterations is remediated and machine-covered in the remediation
-  commit that carries the closed record
-  (`memory/consensus-log/2026-11-15-S1-material-you-gate-iter4.md`).
-  A fresh gate (G1-iter5) on the remediation commit is the owner's
-  call — the G1 → G1-iter3 → G1-iter4 precedent.
+- **S1 gate: G1-iter5 in flight (2026-11-19)** — the owner-ordered
+  fresh gate on the G1-iter4-i2 remediation line (`bf0c74e` →
+  `c00f647` → `a02db67`; pre-gate verification: tree clean ==
+  origin/main, 727+9 local exact, CI 7/7 both commits, backup seq 9
+  faithful). Iteration 1 verdicts: Red Team BLOCK, Devil's Architect
+  BLOCK, Ship Steward PROCEED-WITH-FINDINGS → no consensus (1 of 2).
+  The v7 fix cycle (backup script v7 + declaration-bound check
+  extensions + 16 machine tests + the v7 matrix + decision #18's
+  bounded-exit adoption) lands in the commit carrying the iteration-1
+  record; iteration 2 re-judges THAT commit. No outcome
+  pre-recorded anywhere — the record is
+  `memory/consensus-log/2026-11-19-S1-material-you-gate-iter5.md`.
+- Harness port scheduling (decision #18): bash capability-frozen;
+  the merge/alarm/guard core ports to Python before S2's stage gate.
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan
