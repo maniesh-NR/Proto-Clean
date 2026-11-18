@@ -19,7 +19,9 @@
       "git_head": "517ad3f",
       "git_branch": "main",
       "main_push": "ok",
-      "prev_branch_push": "ok"
+      "prev_branch_push": "ok",
+      "invalid": true,
+      "invalid_reason": "accidental production side-effect during the G1-iter5-i2 CLOSING fix cycle (the fifth incident of the class, a NEW variant): the orchestrator's mutC mutation probe (relative-refusal removed) patched PROD_CHECKOUT to a scratch stand-in in the mutated copy \u2014 per the seq-10 rule \u2014 but did NOT patch the TEST LANES that reference the real production path. With the constant patched, the real-path lanes no longer matched anything and were NOT refused: the guard test's push-target lanes pushed a scratch lineage INTO the production checkout (the divergence self-heal then merged it \u2014 a -s ours merge and manifest union, exactly as designed, on the wrong base; this entry and its siblings are that lineage), and the override test's symlink REPO lane executed a full backup directly against the production checkout. Patching the guarded constant ALONE NEUTRALIZES the guard for every lane that still references the real path \u2014 the correct rule (now recorded): patch BOTH SIDES, the constant AND every test lane that references the real protected path, or run guard-mutation probes only where the production path does not exist. Content verified clean: all scan layers ran in every involved run; the manifest union followed the documented triple-key semantics; the production checkout's working tree was never touched (only its local branch ref). Audit-trail pollution only. Disclosed in the G1-iter5 record amendment, README anomaly log, lessons, and the post-closure session log."
     },
     {
       "seq": 2,
@@ -38,7 +40,9 @@
       "git_head": "517ad3f",
       "git_branch": "main",
       "main_push": "ok",
-      "prev_branch_push": "failed"
+      "prev_branch_push": "failed",
+      "invalid": true,
+      "invalid_reason": "accidental production side-effect during the G1-iter5-i2 CLOSING fix cycle (the fifth incident of the class, a NEW variant): the orchestrator's mutC mutation probe (relative-refusal removed) patched PROD_CHECKOUT to a scratch stand-in in the mutated copy \u2014 per the seq-10 rule \u2014 but did NOT patch the TEST LANES that reference the real production path. With the constant patched, the real-path lanes no longer matched anything and were NOT refused: the guard test's push-target lanes pushed a scratch lineage INTO the production checkout (the divergence self-heal then merged it \u2014 a -s ours merge and manifest union, exactly as designed, on the wrong base; this entry and its siblings are that lineage), and the override test's symlink REPO lane executed a full backup directly against the production checkout. Patching the guarded constant ALONE NEUTRALIZES the guard for every lane that still references the real path \u2014 the correct rule (now recorded): patch BOTH SIDES, the constant AND every test lane that references the real protected path, or run guard-mutation probes only where the production path does not exist. Content verified clean: all scan layers ran in every involved run; the manifest union followed the documented triple-key semantics; the production checkout's working tree was never touched (only its local branch ref). Audit-trail pollution only. Disclosed in the G1-iter5 record amendment, README anomaly log, lessons, and the post-closure session log."
     },
     {
       "seq": 3,
@@ -155,7 +159,9 @@
       "git_head": "517ad3f",
       "git_branch": "main",
       "main_push": "ok",
-      "prev_branch_push": "failed"
+      "prev_branch_push": "failed",
+      "invalid": true,
+      "invalid_reason": "accidental production side-effect during the G1-iter5-i2 CLOSING fix cycle (the fifth incident of the class, a NEW variant): the orchestrator's mutC mutation probe (relative-refusal removed) patched PROD_CHECKOUT to a scratch stand-in in the mutated copy \u2014 per the seq-10 rule \u2014 but did NOT patch the TEST LANES that reference the real production path. With the constant patched, the real-path lanes no longer matched anything and were NOT refused: the guard test's push-target lanes pushed a scratch lineage INTO the production checkout (the divergence self-heal then merged it \u2014 a -s ours merge and manifest union, exactly as designed, on the wrong base; this entry and its siblings are that lineage), and the override test's symlink REPO lane executed a full backup directly against the production checkout. Patching the guarded constant ALONE NEUTRALIZES the guard for every lane that still references the real path \u2014 the correct rule (now recorded): patch BOTH SIDES, the constant AND every test lane that references the real protected path, or run guard-mutation probes only where the production path does not exist. Content verified clean: all scan layers ran in every involved run; the manifest union followed the documented triple-key semantics; the production checkout's working tree was never touched (only its local branch ref). Audit-trail pollution only. Disclosed in the G1-iter5 record amendment, README anomaly log, lessons, and the post-closure session log."
     },
     {
       "seq": 14,
