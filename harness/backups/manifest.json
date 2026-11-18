@@ -4,6 +4,15 @@
   "backups": [
     {
       "seq": 1,
+      "timestamp": "2026-11-13T09:40:02Z",
+      "trigger": "event",
+      "message": "during true main divergence",
+      "git_head": "31c8ca0",
+      "git_branch": "main",
+      "main_push": "ok"
+    },
+    {
+      "seq": 1,
       "timestamp": "2026-11-18T18:23:15Z",
       "trigger": "event",
       "message": "guard clean lane",
@@ -14,6 +23,15 @@
     },
     {
       "seq": 2,
+      "timestamp": "2026-11-13T09:46:28Z",
+      "trigger": "event",
+      "message": "Material You S1 + harness G1 complete: gate iter-1 BLOCK (PAT near-miss) + iter-2 resolutions applied (backup v3 verified end-to-end); suite 712+6 local / 718 CI per leg; owner escalation on iteration cap",
+      "git_head": "74bea1e",
+      "git_branch": "main",
+      "main_push": "ok"
+    },
+    {
+      "seq": 2,
       "timestamp": "2026-11-18T18:23:16Z",
       "trigger": "event",
       "message": "push-target probe",
@@ -21,6 +39,114 @@
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "failed"
+    },
+    {
+      "seq": 3,
+      "timestamp": "2026-11-13T16:35:33Z",
+      "trigger": "event",
+      "message": "t5",
+      "git_head": "74bea1e",
+      "git_branch": "main",
+      "main_push": "ok",
+      "invalid": true,
+      "invalid_reason": "accidental test-run push of the v3 script during G1-iter3 fix-cycle verification (test harness invoked the clone's committed old script; v3 had no isolation guard). Content verified clean \u2014 audit-trail pollution only. Disclosed in 2026-11-13-S1-material-you-gate-iter3.md."
+    },
+    {
+      "seq": 4,
+      "timestamp": "2026-11-14T03:03:59Z",
+      "trigger": "event",
+      "message": "S1 remediation: G1-iter3-i2 findings fixed (scan coverage, guard, alarms, trace hygiene), gate cap reached - escalated to owner; CI 7/7 on 6324a4d",
+      "git_head": "6324a4d",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
+    },
+    {
+      "seq": 5,
+      "timestamp": "2026-11-15T13:14:21Z",
+      "trigger": "event",
+      "message": "E9c case variant prod remote",
+      "git_head": "6324a4d",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok",
+      "invalid": true,
+      "invalid_reason": "accidental production-default run during the G1-iter4 Red Team's guard experiments (a broken && chain lost the PC_BACKUP_* env overrides; v4 made production the default). All v4 scan layers ran and passed - content verified clean, audit-trail pollution only. Disclosed in 2026-11-15-S1-material-you-gate-iter4.md; this accident class is removed by v5's opt-in gate."
+    },
+    {
+      "seq": 6,
+      "timestamp": "2026-11-16T16:08:32Z",
+      "trigger": "event",
+      "message": "G1-iter4 fix-cycle output checkpoint (backup was cut off when the prior session ended): backup script v5 + hardened self-falsified FINAL-OUTCOME check + 4 machine tests at ad3b4e1; baseline re-verified after sandbox recycle (local 723+9, CI 7/7); stale-era tree overlay cleaned, branch in sync",
+      "git_head": "ad3b4e1",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
+    },
+    {
+      "seq": 7,
+      "timestamp": "2026-11-16T16:19:06Z",
+      "trigger": "event",
+      "message": "must refuse by default",
+      "git_head": "ad3b4e1",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok",
+      "invalid": true,
+      "invalid_reason": "accidental production run during the G1-iter4-i2 fix cycle: the opt-in test's 'must refuse by default' probe executed while the backup script sat in an UNCOMMITTED mid-edit state between MultiEdit batches (the only state, never committed, in which the gate did not fire); it completed a full production checkpoint (commit 3bea49d, test message, fallback identity). All scan layers ran and passed - content verified clean (manifest+state.json only, harness tree byte-identical to seq 6); audit-trail pollution only. The FINAL committed script is verified clean of this: 4 full integrity-suite runs + the 22/22 v6 scratch matrix all assert the same probe refuses exit 6. Disclosed in 2026-11-15-S1-material-you-gate-iter4.md; process rule recorded: never run the suite against a script with uncommitted edits - test from HEAD (stash or a clean clone)."
+    },
+    {
+      "seq": 8,
+      "timestamp": "2026-11-16T17:43:36Z",
+      "trigger": "event",
+      "message": "G1-iter4-i2 remediation checkpoint: backup v6 + declaration-bound gate-record authority at bf0c74e/c00f647 (727+9 local; CI 7/7 at c00f647, per-leg verified 736 x4 POSIX / 605+131 windows; 22/22 v6 scratch matrix; gate closed NO CONSENSUS at cap, escalated to owner; CI-break fix disclosed in record)",
+      "git_head": "c00f647",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
+    },
+    {
+      "seq": 9,
+      "timestamp": "2026-11-16T17:55:19Z",
+      "trigger": "event",
+      "message": "G1-iter4-i2 disclosure + close-out checkpoint: seq-7 incident (mid-edit-script probe) annotated invalid on branch (c6f7e24), disclosed in record/README/lessons with the test-from-HEAD process rule at a02db67 (727+9 local, CI 7/7); gate G1-iter4 closed NO CONSENSUS at cap, escalated to owner for the G1-iter5 decision",
+      "git_head": "a02db67",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
+    },
+    {
+      "seq": 10,
+      "timestamp": "2026-11-18T17:12:49Z",
+      "trigger": "event",
+      "message": "override probe",
+      "git_head": "a02db67",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "failed",
+      "invalid": true,
+      "invalid_reason": "accidental production checkpoint during the G1-iter5 fix cycle: the orchestrator's mut2 mutation probe (a logical-pwd revert of the v7 physical-compare fix, run in a scratch CLONE against the mutated COPY) executed test_backup_script_overrides_all_or_none's symlink lanes, which point at the real production checkout; with the path guard deliberately broken BY THE MUTATION, the REPO compare passed and the probe completed a full test backup against the production checkout (commit 3eeb00e, 'override probe'; its push to the scratch tmp_path failed, so the checkpoint stayed local until the next production run propagated it). Content verified clean: the checkpoint touched manifest.json + state.json only (empty inventories), the harness tree is byte-identical to seq 9, all scan layers ran; audit-trail pollution only - the fourth incident of the class (env-loss 't5'/'E9c', half-edited script seq 7, now guard-mutation probes). Root cause and process rule: a mutation probe of a path-guard lane is production-touching by design unless the guarded constant is patched to a scratch path in the mutated copy (the Architect's identity-constant patch pattern - recorded in lessons and the G1-iter5 record)."
+    },
+    {
+      "seq": 11,
+      "timestamp": "2026-11-18T17:23:08Z",
+      "trigger": "event",
+      "message": "G1-iter5 iteration-1 fix cycle: backup v7 + mutation-covered integrity suite at 1f3d1cf (728+9 local; CI expectation 737x4 POSIX / 605+132 windows - to be confirmed; matrices v7 25/25 + v6 22/22 + v5 20/20 with the stale E4 lanes fixed; gate record + session log carry iteration 1: RT+Architect BLOCK, Steward PWF; iteration 2 re-judges this commit)",
+      "git_head": "1f3d1cf",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "failed"
+    },
+    {
+      "seq": 12,
+      "timestamp": "2026-11-18T17:27:03Z",
+      "trigger": "event",
+      "message": "G1-iter5 seq-10 incident disclosure checkpoint: mut2 guard-mutation probe side-effect annotated invalid on branch (cc51c7d), disclosed in record/README/lessons/process doc at this commit; iteration-2 CI confirmation (737x4 POSIX / 605+132 windows) pending before the re-gate launches",
+      "git_head": "517ad3f",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
     }
-  ]
+  ],
+  "merged_divergence": true
 }
