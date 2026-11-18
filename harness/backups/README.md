@@ -283,6 +283,25 @@ zero-trace-lines scrub signal, E18 the widened-window TOCTOU probe.
 
 ## Known audit-trail anomalies
 
+- `3eeb00e` (manifest seq 10, "override probe"): during the G1-iter5
+  fix cycle the orchestrator's mut2 mutation probe (a logical-pwd
+  revert of the v7 physical-compare fix, run in a scratch clone
+  against the mutated copy) executed the override test's symlink
+  REPO lanes, which point at the real production checkout — with the
+  path guard deliberately broken by the mutation, the REPO compare
+  passed and the probe completed a full test backup against the
+  production checkout; its push to the scratch tmp_path failed, so
+  the checkpoint stayed local until the next production run
+  propagated it. Content verified clean (manifest + state.json only,
+  harness byte-identical to seq 9); audit-trail pollution only —
+  the fourth incident of the class, a new variant: env-loss
+  ("t5"/"E9c"), half-edited script (seq 7), now guard-mutation
+  probes. Annotated in the manifest; disclosed in the G1-iter5
+  record. Process rule: a mutation probe of a path-guard lane is
+  production-touching by design — patch the guarded constant to a
+  scratch path in the mutated copy (the Architect's
+  identity-constant pattern).
+
 - `3bea49d` (manifest seq 7, "must refuse by default"): during the
   G1-iter4-i2 fix cycle the opt-in test's refusal probe executed
   while the script sat in an uncommitted mid-edit state between

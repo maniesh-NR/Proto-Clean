@@ -62,7 +62,13 @@ MINOR:     [list or none]   — fix-or-file
   labels (script version, manifest key wording), (e) re-runs ALL
   sandbox matrices (v5/v6/v7…), not just the new one — the v5 E4
   lanes sat stale through an entire gate because nobody re-ran the
-  old matrix after v6 changed the behavior it probes.
+  old matrix after v6 changed the behavior it probes, (f) mutation
+  probes of PATH-GUARD lanes patch the guarded constant
+  (PROD_CHECKOUT / default REPO / SANDBOX_HOME) to scratch paths in
+  the mutated copy — a guard deliberately broken by mutation lets
+  the lane's production-path reference through, and the probe
+  executes a real backup against the production checkout (the seq-10
+  incident, G1-iter5).
 
 ## Record
 
