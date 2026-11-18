@@ -130,15 +130,20 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   anyone re-running the old matrix (found at G1-iter5; now a fix-cycle
   checklist item in the process doc).
 - A mutation probe of a PATH-GUARD lane is production-touching by
-  design: the guard-mutated copy lets the lane's production-path
-  reference through, and the probe executes a real backup against the
-  production checkout (the seq-10 incident — the orchestrator's mut2
-  logical-pwd probe ran the symlink REPO lanes straight into
-  production; caught only in the post-backup audit). ALWAYS patch the
-  guarded constant (PROD_CHECKOUT, default REPO/SANDBOX_HOME) to
-  scratch paths in the mutated copy before running guard-mutation
-  probes — the Architect's identity-constant patch pattern (G1-iter5,
-  disclosed in the iter5 record + README anomaly log).
+  design — and patching the guarded constant ALONE MAKES IT WORSE
+  (two incidents, two variants, one corrected rule): the guard-mutated
+  copy lets the lane's production-path reference through (the seq-10
+  incident — a logical-pwd revert ran the symlink REPO lanes straight
+  into production), and a one-sided constant patch NEUTRALIZES the
+  refusal for every OTHER lane that still references the real path
+  (the seq-1'/2'/13 cluster — the mutC relative-refusal probe patched
+  PROD_CHECKOUT but not the test lanes, so the push-target lanes
+  pushed a scratch lineage into the production checkout and the
+  self-heal merged it). The rule: a guard-mutation probe patches BOTH
+  SIDES — the guarded constant AND every test lane that references
+  the real protected path — or runs only where the production path
+  does not exist (G1-iter5 + G1-iter5-i2, disclosed in the records +
+  README anomaly log).
 - Judge an operand WHERE IT WILL BE USED, or refuse the ambiguous
   form: the G1-iter5-i2 relative push-target bypass (found
   independently by two agents, executed E2E) existed because the

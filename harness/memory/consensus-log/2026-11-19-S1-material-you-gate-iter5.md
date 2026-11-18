@@ -553,16 +553,16 @@ and in the session log.
   new coverage extended existing tests); local suite **728 passed
   + 9 skipped**; CI expectation unchanged — 737 × 4 POSIX, 605+132
   windows.
-- **Mutation coverage (scratch clones; the relative-target probe
-  patched BOTH the guarded constant and the test's production-path
-  lane per the seq-10 rule — no production contact):** (A)
-  leading-slash strip removed → the guard test FAILS; (B) multi-@
-  loop → single strip → FAILS; (C) relative refusal removed → BOTH
-  the override and guard tests FAIL (the landing contained in
-  scratch); (D) `--push` reverted → the guard test FAILS at the new
+- **Mutation coverage (scratch clones):** (A) leading-slash strip
+  removed → the guard test FAILS; (B) multi-@ loop → single strip →
+  FAILS; (C) relative refusal removed → BOTH the override and guard
+  tests FAIL; (D) `--push` reverted → the guard test FAILS at the new
   pushurl lane; (E) the Shipped-signature + fenced-mention rules
   reverted → the forgery test FAILS. Every v8 surface is
-  mutation-verified.
+  mutation-verified. (Probe (C)'s containment claim — "no production
+  contact" — was WRONG: see the post-closure incident below; the
+  mutation-detection results stand, the side-effect disclosure
+  supersedes the containment claim.)
 - **Sandbox matrices:** `verify_backup_v8.sh` (new) — 19/19: E19
   empty-authority + multi-@ spellings, E20 relative-target refusal
   + the stand-in mechanism demo, E21 pushurl divergence, E22
@@ -575,5 +575,43 @@ and in the session log.
   phantom-residual lesson, the baseline refresh); roadmap gate
   history; project state; session log
   `memory/session-log/2026-11-19-g1-iter5-closure.md`.
+
+### Post-closure incident (disclosed — orchestrator error, production
+side-effect; found in the closing backup's audit)
+
+Manifest entries seq 1' ("guard clean lane", 2026-11-18T18:23:15Z),
+seq 2' ("push-target probe", 18:23:16Z) and seq 13 ("override
+probe", 18:23:16Z), commits `5516e36`/`00c2ba9`/`2277469` on the
+branch: the orchestrator's **mutC mutation probe** (the
+relative-refusal revert) patched `PROD_CHECKOUT` to a scratch
+stand-in in the mutated copy — per the seq-10 rule — but did NOT
+patch the TEST LANES that reference the real production path.
+With the constant patched, the real-path lanes matched nothing and
+were NOT refused: the guard test's push-target lanes pushed a
+scratch lineage INTO the production checkout (the divergence
+self-heal then merged it — a `-s ours` merge + manifest union,
+exactly as designed, on the wrong base), and the override test's
+symlink REPO lane executed a full backup directly against the
+production checkout (its harness refresh snapshotting the
+then-uncommitted closing docs). The v8 script itself behaved
+correctly throughout — every involved lane refuses on the REAL
+script (16/16 + matrices); only the probe's patched-constant +
+real-path-lanes combination opened the lanes. **Patching the
+guarded constant ALONE NEUTRALIZES the guard for every lane that
+still references the real path** — the seq-10 rule was incomplete;
+the corrected rule (lessons + process doc item (f)): patch BOTH
+SIDES — the guarded constant AND every test lane that references
+the real protected path — or run guard-mutation probes only where
+the production path does not exist. Damage: content clean (all
+scan layers ran in every involved run; the manifest union followed
+the documented triple-key semantics; the production checkout's
+working tree untouched — only its local branch ref); audit-trail
+pollution: three test entries + a merge commit + the branch's
+frozen product snapshot replaced by the newer 517ad3f-era tree
+(preserved in history). All three entries annotated invalid on the
+branch (`bbbbd2f`); the branch's operative surfaces (manifest,
+harness/sandbox) remain consistent. The fifth incident of the
+accidental-checkpoint class, third variant: env loss, half-edited
+script, guard-mutation with a one-sided constant patch.
 
 FINAL OUTCOME: NO CONSENSUS — iteration cap reached (2 of 2): iteration 2's Red Team and Devil's Architect BLOCK (the relative push-target base mismatch, found and executed E2E independently by both, plus the empty-authority spelling family and the uncovered pushurl lane) vs Ship Steward PROCEED-WITH-FINDINGS; every finding from both iterations remediated and machine/matrix-covered in this commit, which carries this record; escalated to the project owner — a fresh gate (G1-iter6) on this remediation commit is the owner's call (the G1 → G1-iter3 → G1-iter4 → G1-iter5 precedent).
