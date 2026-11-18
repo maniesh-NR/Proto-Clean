@@ -63,12 +63,14 @@ MINOR:     [list or none]   — fix-or-file
   sandbox matrices (v5/v6/v7…), not just the new one — the v5 E4
   lanes sat stale through an entire gate because nobody re-ran the
   old matrix after v6 changed the behavior it probes, (f) mutation
-  probes of PATH-GUARD lanes patch the guarded constant
-  (PROD_CHECKOUT / default REPO / SANDBOX_HOME) to scratch paths in
-  the mutated copy — a guard deliberately broken by mutation lets
-  the lane's production-path reference through, and the probe
-  executes a real backup against the production checkout (the seq-10
-  incident, G1-iter5).
+  probes of PATH-GUARD lanes patch BOTH SIDES — the guarded constant
+  (PROD_CHECKOUT / default REPO / SANDBOX_HOME) AND every test lane
+  that references the real protected path — or run only where the
+  production path does not exist. A guard deliberately broken by
+  mutation lets the lane's production-path reference through, and a
+  one-sided constant patch NEUTRALIZES the refusal for every other
+  real-path lane (the seq-10 and seq-1'/2'/13 incidents, G1-iter5 /
+  G1-iter5-i2).
 
 ## Record
 

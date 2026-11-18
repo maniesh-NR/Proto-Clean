@@ -301,6 +301,28 @@ unresolvable targets.
 
 ## Known audit-trail anomalies
 
+- `5516e36`/`00c2ba9`/`2277469` (manifest seq 1' "guard clean lane",
+  seq 2' "push-target probe", seq 13 "override probe" — the
+  2026-11-18T18:23Z cluster): during the G1-iter5-i2 CLOSING fix
+  cycle the orchestrator's mutC mutation probe patched `PROD_CHECKOUT`
+  to a scratch stand-in in the mutated copy (per the seq-10 rule) but
+  did NOT patch the TEST LANES referencing the real production path
+  — with the constant patched, the real-path lanes matched nothing
+  and were not refused: the guard test's push-target lanes pushed a
+  scratch lineage INTO the production checkout (the divergence
+  self-heal merged it, as designed, on the wrong base), and the
+  override test's symlink REPO lane ran a full backup directly
+  against the production checkout. The v8 script refused every lane
+  involved when unpatched; only the probe's one-sided patch opened
+  them. Content clean (all scans ran; union semantics documented);
+  audit-trail pollution: three test entries + a merge + the branch's
+  frozen product snapshot replaced by the newer tree (preserved in
+  history). All three entries annotated invalid (`bbbbd2f`).
+  **Corrected rule (supersedes the seq-10 one-sided rule): patch BOTH
+  SIDES — the guarded constant AND every test lane that references
+  the real protected path — or run guard-mutation probes only where
+  the production path does not exist.**
+
 - `3eeb00e` (manifest seq 10, "override probe"): during the G1-iter5
   fix cycle the orchestrator's mut2 mutation probe (a logical-pwd
   revert of the v7 physical-compare fix, run in a scratch clone
