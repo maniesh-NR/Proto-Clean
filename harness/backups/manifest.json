@@ -1,5 +1,16 @@
 {
-  "schema": 1,
-  "note": "Append-only audit trail. Each entry is written by scripts/sandbox_backup.sh.",
-  "backups": []
+  "schema": 2,
+  "note": "Append-only audit trail (branch-owned; SHAs live in git log of this branch; entries keyed by the (seq, timestamp, message) triple \u2014 seq may repeat after a divergence union).",
+  "backups": [
+    {
+      "seq": 1,
+      "timestamp": "2026-11-18T18:23:15Z",
+      "trigger": "event",
+      "message": "guard clean lane",
+      "git_head": "517ad3f",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
+    }
+  ]
 }

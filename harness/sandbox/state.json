@@ -1,0 +1,15 @@
+{
+  "git_branch": "main",
+  "git_head": "517ad3f",
+  "main_push": "ok",
+  "sandbox": {
+    "download": [],
+    "harness_skipped_shaped_count": 0,
+    "scripts": [
+      "ok.py"
+    ],
+    "scripts_skipped_shaped_count": 0,
+    "skills": []
+  },
+  "timestamp": "2026-11-18T18:23:15Z"
+}
