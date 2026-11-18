@@ -57,7 +57,7 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   platform skips). A changed skip count on a leg means a test
   silently changed behavior — check before/after when adding tests.
 
-## Harness / adversarial process (gates G1 → G1-iter4-i2)
+## Harness / adversarial process (gates G1 → G1-iter5)
 
 - Enumeration is how defenses die. v5's unset list enumerated trace
   variables and missed the legacy alias `GIT_CURL_VERBOSE` (raw
@@ -97,6 +97,35 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   or point the test at a clean clone. Three incidents, three
   variants: env loss (t5, E9c), half-edited script (seq 7) — the
   common factor is a production-capable path reachable by accident.
+- Empty-credential URL spellings parse differently from their
+  populated forms: `https://@github.com/…`, `github.com:/…` and scp
+  `git@github.com:/…` all survived a normalizer whose @-strip needed
+  ≥1 char before the `@` and whose port strips needed content after
+  the `:` (G1-iter5 RT C1). Test normalizers with EMPTY segments, not
+  just populated variants.
+- Bash's plain `pwd` is LOGICAL — it preserves symlinks and a leading
+  `//` (G1-iter5 RT C2). Path-identity compares use `pwd -P` plus a
+  leading-`//` collapse loop, and must cover EVERY operand naming the
+  protected path (the repo AND the push target — the un-compared
+  operand was the hole, G1-iter5 Architect M1).
+- A raw-string guard never sees config-file rewrites: judge a push
+  target the way git resolves it (`remote get-url --push` for remote
+  names, `ls-remote --get-url` for URL/path operands), or an
+  `url.*.insteadOf` rule makes the guard inspect an operand git will
+  never use (G1-iter5 RT M1 — a local-looking target reached a real
+  `git-receive-pack` against git@github.com in scratch).
+- "Machine-covered" must mean MUTATION-covering, not incidence-true:
+  the G1-iter5 Architect reverted the ENTIRE env scrub and CI stayed
+  green — the guarded helpers absorbed the scrub's removal and the
+  marker asserts were vacuous on that git version. Every guarantee
+  claim needs a lane whose REMOVAL (not whose trigger) fails a test
+  (G1-iter5 Architect M2 — the zero-trace-lines lane is the pattern).
+- Re-run ALL verification matrices after any behavior change, not
+  just the newest one: the v5 matrix's E4 lanes probed the production
+  checkout as a TEST repo and had been silently stale since v6 added
+  the production-checkout refusal — an entire gate passed without
+  anyone re-running the old matrix (found at G1-iter5; now a fix-cycle
+  checklist item in the process doc).
 
 ## CI / GitHub
 

@@ -22,20 +22,31 @@
 #     neither pattern drift nor flag drift can pass silently
 #     (G1-iter3 criticals #1+#2) — and covers the sandbox scripts dir,
 #     the checkpoint message, and the exact backup tree
-#   * test isolation (G1-iter3 major #1, hardened G1-iter4-i2):
-#     overrides are ALL-THREE or NONE (a partial set — the exact
-#     accident shape of the seq-3/seq-5 incidents — refuses exit 2);
-#     a TEST run refuses ANY github host (github.com, ssh.github.com
-#     and EVERY subdomain — gist./www./api./… — matched by host
-#     suffix, not enumeration) AND the production checkout itself
-#     (exit 6), so test traffic can touch neither github nor the
-#     production repo, not even via a clone's origin
+#   * test isolation (G1-iter3 major #1, hardened G1-iter4-i2, then
+#     G1-iter5): overrides are ALL-THREE or NONE (a partial set — the
+#     exact accident shape of the seq-3/seq-5 incidents — refuses
+#     exit 2); a TEST run refuses ANY github host (github.com,
+#     ssh.github.com and EVERY subdomain — gist./www./api./… —
+#     matched by host SUFFIX, not enumeration; empty-credential
+#     spellings — https://@github.com/…, github.com:/…, scp
+#     git@github.com:/… — normalize away too, G1-iter5 RT critical
+#     #1) AND the production checkout itself (exit 6) — as the push
+#     TARGET as well as the repo, the target RESOLVED the way git
+#     resolves it (remote pushurl via `git remote get-url --push`;
+#     url.*.insteadOf rewrites via `git ls-remote --get-url` —
+#     G1-iter5 RT major #1 / Architect major #1), and the path
+#     compare is PHYSICAL (pwd -P — symlinks and // spellings cannot
+#     alias the production checkout, G1-iter5 RT critical #2) — so
+#     test traffic can touch neither github nor the production repo,
+#     not even via a clone's origin
 #   * trace/config env is neutralized by PATTERN over the live
 #     environment (G1-iter4-i2 RT major #1: v5's enumerated unset list
 #     missed the legacy alias GIT_CURL_VERBOSE, which printed the raw
 #     credential twice through the then-inline main push; git's env
 #     config injection GIT_CONFIG_KEY*/VALUE*/COUNT/PARAMETERS could
-#     re-enable http.verbose the same way) — and EVERY push, main AND
+#     re-enable http.verbose the same way; G1-iter5 added
+#     GIT_CONFIG_GLOBAL/GIT_CONFIG_SYSTEM — config-by-FILE injection,
+#     the same class — Architect minor #1) — and EVERY push, main AND
 #     branch, goes through one guarded helper with userinfo +
 #     token-shape redaction
 #   * divergence self-heals (G1-iter3 major #1): if the remote branch
@@ -64,7 +75,7 @@ set -euo pipefail
 # re-enable http.verbose or inject any config) all die here.
 while IFS='=' read -r _tv _; do
   case "$_tv" in
-    GIT_TRACE*|GIT_CURL_VERBOSE|GIT_CONFIG_KEY*|GIT_CONFIG_VALUE*|GIT_CONFIG_COUNT|GIT_CONFIG_PARAMETERS)
+    GIT_TRACE*|GIT_CURL_VERBOSE|GIT_CONFIG_KEY*|GIT_CONFIG_VALUE*|GIT_CONFIG_COUNT|GIT_CONFIG_PARAMETERS|GIT_CONFIG_GLOBAL|GIT_CONFIG_SYSTEM)
       unset "$_tv" || true
       ;;
   esac
@@ -135,11 +146,19 @@ fi
 #    rule): test traffic must never commit onto the production repo's
 #    local sandbox/backups branch, however the path is spelled — the
 #    literal compare catches file:// and trailing-slash spellings, the
-#    canonicalized compare (cd + pwd) catches relative and symlinked
-#    spellings where the path exists.
+#    PHYSICAL canonicalized compare (cd + pwd -P) catches relative,
+#    symlinked and // spellings where the path exists (G1-iter5 RT
+#    critical #2: the logical-pwd compare let symlinks and // through).
 if [ "$TEST_MODE" = 1 ]; then
   _nrepo="${REPO%/}"
-  _crepo="$(cd "$REPO" 2>/dev/null && pwd || true)"
+  # PHYSICAL canonicalization (G1-iter5 RT critical #2): bash's
+  # plain `pwd` is LOGICAL — it preserves symlinks and a leading //,
+  # so a symlinked spelling or //home/… sailed past the compare
+  # (executed end-to-end in scratch). pwd -P resolves symlinks; the
+  # loop then collapses the duplicate leading slashes bash still
+  # carries (POSIX lets implementations keep a leading //).
+  _crepo="$(cd "$REPO" 2>/dev/null && pwd -P || true)"
+  while [ "${_crepo:0:2}" = "//" ]; do _crepo="${_crepo#/}"; done
   if [ "$_nrepo" = "$PROD_CHECKOUT" ] || [ "$_crepo" = "$PROD_CHECKOUT" ]; then
     echo "!! refusing: env overrides mark this as a TEST run, but PC_BACKUP_REPO" >&2
     echo "   is the production checkout — test traffic never touches it (clone" >&2
@@ -245,9 +264,10 @@ _GITDIR="$(git -C "$REPO" rev-parse --absolute-git-dir)"
 _norm_url() {
   printf '%s\n' "$1" | tr 'A-Z' 'a-z' | sed -E \
     -e 's#^[a-z0-9+.-]+://##' \
-    -e 's#^[^/@]+@##' \
+    -e 's#^[^/@]*@##' \
     -e 's#:443(/|$)#\1#g' \
     -e 's#:22(/|$)#\1#g' \
+    -e 's#^([^/]+):(/|$)#\1\2#' \
     -e 's#^([^/]+):([^/].*)$#\1/\2#' \
     -e 's#//+#/#g' \
     -e 's#^([^/]+)\./#\1/#' \
@@ -256,15 +276,31 @@ _norm_url() {
     -e 's#^\./##'
 }
 if [ "$TEST_MODE" = 1 ]; then
-  case "$PUSH_URL" in
-    *://*|/*|./*|../*) _tgt="$PUSH_URL" ;;
-    *)                 _tgt="$(git remote get-url "$PUSH_URL" 2>/dev/null || true)" ;;
-  esac
+  # Resolve the target THE WAY GIT WILL at push time (G1-iter5 RT
+  # major #1 / Architect major #1): a raw-string guard never sees
+  # url.*.insteadOf rewrites living in config FILES — an innocent
+  # local-looking PC_BACKUP_PUSH_REMOTE was rewritten to
+  # git@github.com at push time and sailed past the v6 guard
+  # (executed in scratch with a real receive-pack attempt). Remote
+  # NAMES resolve through remote.<n>.pushurl when one exists
+  # (`git remote get-url --push` — the fetch-URL resolution v6 used
+  # never saw a pushurl divergence); URL and path operands resolve
+  # through insteadOf (`git ls-remote --get-url` — local, no
+  # network). pushInsteadOf on direct URL operands remains a
+  # documented residual (see harness/backups/README.md). The
+  # resolved value is NEVER printed (it may embed a credential).
+  _tgt="$PUSH_URL"
+  if git remote get-url --push "$PUSH_URL" >/dev/null 2>&1; then
+    _tgt="$(git remote get-url --push "$PUSH_URL")"
+  else
+    _tgt="$(git ls-remote --get-url "$PUSH_URL" 2>/dev/null || printf '%s' "$PUSH_URL")"
+  fi
   if [ -n "${_tgt:-}" ]; then
     _nt="$(_norm_url "$_tgt")"
-    # host-suffix denial (G1-iter4-i2 RT critical #1): match the HOST
-    # (everything before the first '/') against github.com and ANY
-    # *.github.com subdomain — enumeration was the v5 hole
+    # host-suffix denial (G1-iter4-i2 RT critical #1; empty-credential
+    # spellings normalized away at G1-iter5 RT critical #1): match the
+    # HOST (everything before the first '/') against github.com and
+    # ANY *.github.com subdomain — enumeration was the v5 hole
     _host="${_nt%%/*}"
     case "$_host" in
       github.com|*.github.com)
@@ -282,6 +318,32 @@ if [ "$TEST_MODE" = 1 ]; then
       echo "   PC_BACKUP_PUSH_REMOTE at a scratch bare repo (see harness/backups/README.md)." >&2
       exit 6
     fi
+    # production-PATH refusal (G1-iter5 Architect major #1, sibling
+    # of RT critical #2): a TEST run never pushes INTO the production
+    # checkout either. v6 checked only the REPO operand — a
+    # PC_BACKUP_PUSH_REMOTE pointing at the production path (plain,
+    # file://, via a symlink, or the checkout's .git) wrote a test
+    # checkpoint onto its local sandbox/backups, which the next
+    # production run then propagated to github (executed end-to-end
+    # in scratch). The compare is PHYSICAL (pwd -P + leading-//
+    # collapse — a logical-pwd compare let symlinked and // spellings
+    # through, G1-iter5 RT critical #2).
+    _ptgt="${_tgt#file://}"
+    _ptgt="${_ptgt%/}"
+    case "$_ptgt" in
+      /*|./*|../*)
+        _cpt="$(cd "$_ptgt" 2>/dev/null && pwd -P || true)"
+        while [ "${_cpt:0:2}" = "//" ]; do _cpt="${_cpt#/}"; done
+        if [ "$_ptgt" = "$PROD_CHECKOUT" ] || [ "$_cpt" = "$PROD_CHECKOUT" ] \
+           || [ "$_ptgt" = "$PROD_CHECKOUT/.git" ] || [ "$_cpt" = "$PROD_CHECKOUT/.git" ]; then
+          echo "!! refusing: env overrides mark this as a TEST run, but the push" >&2
+          echo "   target is the production checkout (or its .git) — test traffic" >&2
+          echo "   never touches it. Point PC_BACKUP_PUSH_REMOTE at a scratch bare" >&2
+          echo "   repo (see harness/backups/README.md)." >&2
+          exit 6
+        fi
+        ;;
+    esac
   fi
 fi
 
@@ -757,6 +819,23 @@ if [ -z "$(git status --porcelain harness)" ]; then
 else
   git add -A harness
   git add -f harness/sandbox harness/backups
+  # 5d-2. INDEX re-scan (G1-iter5 RT minor #3): a file written into
+  #       the worktree between the layer-2 scan and the add rode the
+  #       commit unscanned (mechanism proven with an instrumented
+  #       copy; the live window is sub-100 ms and needs a concurrent
+  #       writer — outside the accident threat model). The INDEX is
+  #       exactly what the commit will contain, so scanning it AFTER
+  #       the add closes the window structurally: anything committed
+  #       was staged here, and anything staged here was scanned.
+  #       Defense-in-depth over the worktree scan (which remains the
+  #       primary surface); machine-covered by a structural
+  #       position test (honestly labeled — no deterministic
+  #       behavioral lane exists for a sub-ms race) plus the
+  #       instrumented-window probe in scripts/verify_backup_v7.sh.
+  if git grep --cached -q -E "$SECRET_PATTERNS" -- harness; then
+    echo "!! SECRET DETECTED in staged content — ABORTED (nothing pushed)" >&2
+    exit 4
+  fi
   git commit -q -m "[sandbox-backup] $MSG" \
     -m "Event-driven checkpoint (see harness/backups/README.md). repo HEAD: $MAIN_HEAD ($MAIN_BRANCH). Append-only; no force-push."
   SHA="$(git rev-parse --short HEAD)"
@@ -881,6 +960,15 @@ PY
       if secret_scan harness; then
         git merge --abort 2>/dev/null || true
         echo "!! SECRET DETECTED in merged content — divergence ABORTED (exit 8); nothing committed, nothing pushed" >&2
+        _alarms || true
+        exit 8
+      fi
+      # INDEX re-scan of the merged surface (G1-iter5 RT minor #3,
+      # same structural closure as the normal path — scan what will
+      # actually be committed, after it is staged)
+      if git grep --cached -q -E "$SECRET_PATTERNS" -- harness; then
+        git merge --abort 2>/dev/null || true
+        echo "!! SECRET DETECTED in staged merged content — divergence ABORTED (exit 8); nothing committed, nothing pushed" >&2
         _alarms || true
         exit 8
       fi

@@ -97,10 +97,11 @@ def _gate_record_violations(per_record, roadmap):
     and closes with a line-anchored CONSENSUS REACHED as its last
     non-empty line."""
     violations = []
-    declared, backs_consensus = {}, {}
+    declared, backs_consensus, rec_date = {}, {}, {}
     for name, text in per_record.items():
         body = _strip_fences(text)
         d = _record_date(name, text)
+        rec_date[name] = d
         declared[name] = _declared_stages(body)
         if d is not None and d >= GATE_RULE_ADOPTION:
             outcome_lines = FINAL_OUTCOME_LINE.findall(body)
@@ -130,10 +131,24 @@ def _gate_record_violations(per_record, roadmap):
             and m.group(0).rstrip() == _last_line(body).rstrip())
     records = "\n".join(name + "\n" + text
                         for name, text in per_record.items())
+    section = ""
     for line in roadmap.splitlines():
+        if line.startswith("## "):
+            section = line[3:].strip().lower()
+            continue
         if ("☑" in line or "◐" in line):
             m = re.search(r"\bS(\d+)\b", line)
             if not m:
+                # G1-iter5 RT minor #2: only the retro-assessed
+                # "Shipped" section may carry id-less done lines —
+                # anywhere else a ☑ bullet without a stage id skipped
+                # the check entirely (an unbacked done-claim lane).
+                # Non-bullet lines (the status legend) never count.
+                if ("☑" in line and line.lstrip().startswith("- ")
+                        and not section.startswith("shipped")):
+                    violations.append(
+                        f"roadmap marks work done (☑) with no stage id "
+                        f"outside the 'Shipped' section: {line.strip()!r}")
                 continue  # shipped-line items without a stage id
             sid = "S" + m.group(1)
             mentioned = any(re.search(rf"\b{re.escape(sid)}\b", t)
@@ -153,6 +168,32 @@ def _gate_record_violations(per_record, roadmap):
                         f"REACHED' as its last line — prose mentions, "
                         f"fenced examples, substring stage ids and undated "
                         f"records do not back closure")
+                else:
+                    # G1-iter5 RT minor #1 (stale consensus): a NEWER
+                    # record declaring the stage that does not close
+                    # with CONSENSUS REACHED withdraws the backing —
+                    # a failed re-gate must retract a ☑ machine-green
+                    # (proven by synthetic execution at G1-iter5; same-
+                    # date ties withdraw on any non-consensus record —
+                    # fail-safe under ambiguous ordering)
+                    recs = sorted(
+                        ((rec_date[n], n) for n in per_record
+                         if sid in declared[n] and rec_date[n] is not None),
+                        key=lambda t: (t[0], t[1]))
+                    if recs:
+                        latest_date = recs[-1][0]
+                        withdrawn = [n for d, n in recs
+                                     if d == latest_date
+                                     and not backs_consensus[n]]
+                        if withdrawn:
+                            violations.append(
+                                f"roadmap marks {sid} done (☑), but the "
+                                f"latest record(s) declaring it "
+                                f"({', '.join(sorted(withdrawn))}) do not "
+                                f"close with 'FINAL OUTCOME: CONSENSUS "
+                                f"REACHED' — a newer non-consensus record "
+                                f"withdraws the backing (a failed re-gate "
+                                f"retracts the glyph)")
     return violations
 
 
@@ -179,6 +220,11 @@ def test_roadmap_glyphs_backed_by_gate_records():
       replaced substring matching (an S20 record no longer mentions
       S2). Records dated on/after 2026-11-16 must declare their
       stage(s).
+    - G1-iter5 (Red Team minors #1+#2): a NEWER record declaring the
+      stage that closes NON-consensus withdraws a ☑ (a failed re-gate
+      retracts the glyph — stale consensus), and a ☑ bullet with no
+      stage id OUTSIDE the 'Shipped' section is a violation (id-less
+      done-claims previously skipped the check entirely).
     """
     log_dir = HARNESS / "memory" / "consensus-log"
     per_record = {p.name: p.read_text(encoding="utf-8")
@@ -200,9 +246,10 @@ def test_final_outcome_check_cannot_be_forged():
     fenced format examples, undated records, cross-stage prose
     mentions, substring stage ids (S20 ≠ S2), non-terminal closure
     lines, and missing stage declarations — and accepts a proper
-    declared, dated, terminal closure. The check guards the check
-    (canary philosophy: a self-test that can go silently blind is
-    worse than none)."""
+    declared, dated, terminal closure. Extended at G1-iter5: stale-
+    consensus withdrawal and the id-less-☑-outside-Shipped class.
+    The check guards the check (canary philosophy: a self-test that
+    can go silently blind is worse than none)."""
     inline_only = ("# forged record\nDate: 2026-11-15\n\nThe rule says a "
                    "roadmap checkmark requires a `FINAL OUTCOME: CONSENSUS "
                    "REACHED` record naming the stage S100 — inline only.\n")
@@ -287,6 +334,47 @@ def test_final_outcome_check_cannot_be_forged():
     assert v == [], v
     v = _gate_record_violations({}, roadmap_line("S104", "\u25d0"))
     assert any("mentions it" in m for m in v), v
+    # G1-iter5 RT minor #1 (stale consensus): a newer record declaring
+    # the stage that closes NON-consensus withdraws the ☑ — a failed
+    # re-gate must retract the glyph machine-green (undated filenames,
+    # dated headers: effective dates 11-17 and 11-20)
+    older_consensus = ("# older record\nDate: 2026-11-17\nStage: S112\n\n"
+                       "verdicts returned PROCEED.\n\n"
+                       "FINAL OUTCOME: CONSENSUS REACHED\n")
+    newer_no_consensus = ("# newer record\nDate: 2026-11-20\nStage: S112\n\n"
+                          "verdicts returned BLOCK.\n\n"
+                          "FINAL OUTCOME: NO CONSENSUS — x\n")
+    v = _gate_record_violations(
+        {"notes-S112-old.md": older_consensus,
+         "notes-S112-new.md": newer_no_consensus},
+        roadmap_line("S112", "\u2611"))
+    assert any("withdraws the backing" in m for m in v), v
+    # the inverse — an older NO-CONSENSUS, a newer CONSENSUS — backs
+    # (the re-gate that reached consensus supersedes the earlier miss)
+    older_no_consensus = ("# older record\nDate: 2026-11-17\nStage: S112\n\n"
+                          "verdicts returned BLOCK.\n\n"
+                          "FINAL OUTCOME: NO CONSENSUS — x\n")
+    newer_consensus = ("# newer record\nDate: 2026-11-20\nStage: S112\n\n"
+                       "verdicts returned PROCEED.\n\n"
+                       "FINAL OUTCOME: CONSENSUS REACHED\n")
+    v = _gate_record_violations(
+        {"notes-S112-old.md": older_no_consensus,
+         "notes-S112-new.md": newer_consensus},
+        roadmap_line("S112", "\u2611"))
+    assert v == [], v
+    # G1-iter5 RT minor #2: a ☑ bullet with no stage id outside the
+    # 'Shipped' section skipped the check entirely — now a violation
+    v = _gate_record_violations(
+        {}, "## Near term\n\n- \u2611 everything shipped, trust us\n")
+    assert any("outside the 'Shipped' section" in m for m in v), v
+    # ...while the retro-assessed Shipped section may carry id-less
+    # done lines (by design), and the status legend (non-bullet) never
+    # counts as a done-claim
+    v = _gate_record_violations(
+        {}, "## Shipped (retrospectively assessed)\n\n"
+            "- \u2611 legacy line, no id\n\n"
+            "Status legend: \u2611 done.\n")
+    assert v == [], v
 
 
 def test_deferred_findings_reference_real_targets():
@@ -368,8 +456,10 @@ def test_backup_script_hermetic_cycle(tmp_path):
     push. The overrides were built for exactly this and are now
     consumed by CI on every push to main.
 
-    Ambient git config is NEUTRALIZED inside the runs
-    (GIT_CONFIG_GLOBAL/SYSTEM -> /dev/null): CI runners configure no
+    Ambient git config is NEUTRALIZED inside the runs by pointing
+    HOME at an empty dir (G1-iter5: the script scrubs
+    GIT_CONFIG_GLOBAL/SYSTEM from its own environment, so the old
+    os.devnull trick no longer reaches it): CI runners configure no
     git identity at all — the first CI execution of this test failed
     on 5/7 legs at the script's first `git commit` — so every machine
     now exercises the SAME path: the script's built-in identity
@@ -410,11 +500,13 @@ def test_backup_script_hermetic_cycle(tmp_path):
     def run_backup(message):
         e = dict(os.environ)
         e.update(env)
-        # no ambient identity/config: identical behavior on CI runners
-        # (which have none) and dev machines (which do) — the script's
-        # identity fallback commits on every platform
-        e["GIT_CONFIG_GLOBAL"] = os.devnull
-        e["GIT_CONFIG_SYSTEM"] = os.devnull
+        # ambient config neutralized via an empty HOME (G1-iter5 —
+        # the script now scrubs GIT_CONFIG_GLOBAL/SYSTEM itself, so
+        # the old os.devnull trick no longer reaches it; identical
+        # identity-fallback path on CI runners and dev machines)
+        empty_home = tmp_path / "home-env"
+        empty_home.mkdir(exist_ok=True)
+        e["HOME"] = str(empty_home)
         return subprocess.run(["bash", str(script), message],
                               cwd=str(repo), env=e,
                               capture_output=True, text=True, timeout=240)
@@ -499,8 +591,9 @@ def test_backup_script_production_is_opt_in(tmp_path):
 
     def env_no_pc(**extra):
         e = {k: v for k, v in os.environ.items() if not k.startswith("PC_")}
-        e["GIT_CONFIG_GLOBAL"] = os.devnull
-        e["GIT_CONFIG_SYSTEM"] = os.devnull
+        empty_home = tmp_path / "home-env"
+        empty_home.mkdir(exist_ok=True)
+        e["HOME"] = str(empty_home)
         e.update(extra)
         return e
 
@@ -564,17 +657,32 @@ def test_backup_script_guard_refuses_github_spellings(tmp_path):
         "https://api.github.com/repos/maniesh-NR/Proto-Clean",
         "https://education.github.com/x",
         "https://" + fake + "@gist.github.com/aa11bb22cc33dd44ee55ff6677aabbcc.git",  # credentialed subdomain
+        # G1-iter5 RT critical #1: empty-credential apex spellings
+        # parsed past v6's normalization — the @-strip needed ≥1 char
+        # before the @, the port strips needed content after the :,
+        # and all four sailed past the guard end-to-end in TEST mode
+        # (the scp variant via a configured remote name attempted a
+        # real git-receive-pack against git@github.com in the Red
+        # Team's probe, blocked only by a fake ssh)
+        "https://@github.com/maniesh-NR/Proto-Clean.git",      # empty userinfo
+        "https://github.com:/maniesh-NR/Proto-Clean.git",      # empty port
+        "https://@github.com:/maniesh-NR/Proto-Clean.git",     # both
+        "git@github.com:/maniesh-NR/Proto-Clean.git",          # scp, empty path
+        "https://@gist.github.com/aa11bb22cc33dd44ee55ff6677aabbcc.git",  # empty userinfo, subdomain
     ]
     subprocess.run(["git", "-C", str(repo), "remote", "add", "prodscp",
                     "git@github.com:maniesh-NR/Proto-Clean.git"], check=True)
     subprocess.run(["git", "-C", str(repo), "remote", "add", "gistscp",
                     "git@gist.github.com:aa11bb22cc33dd44ee55ff6677aabbcc.git"], check=True)
-    for target in list(variants) + ["prodscp", "gistscp"]:
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "prodscpempty",
+                    "git@github.com:/maniesh-NR/Proto-Clean.git"], check=True)
+    for target in list(variants) + ["prodscp", "gistscp", "prodscpempty"]:
         e = dict(os.environ)
+        empty_home = tmp_path / "home-env"
+        empty_home.mkdir(exist_ok=True)
         e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
                   "PC_BACKUP_PUSH_REMOTE": target,
-                  "GIT_CONFIG_GLOBAL": os.devnull,
-                  "GIT_CONFIG_SYSTEM": os.devnull})
+                  "HOME": str(empty_home)})
         r = subprocess.run(["bash", str(script), "guard probe"],
                            cwd=str(repo), env=e,
                            capture_output=True, text=True, timeout=120)
@@ -585,12 +693,77 @@ def test_backup_script_guard_refuses_github_spellings(tmp_path):
     e = dict(os.environ)
     e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
               "PC_BACKUP_PUSH_REMOTE": str(bare),
-              "GIT_CONFIG_GLOBAL": os.devnull,
-              "GIT_CONFIG_SYSTEM": os.devnull})
+              "HOME": str(empty_home)})
     r = subprocess.run(["bash", str(script), "guard clean lane"],
                        cwd=str(repo), env=e,
                        capture_output=True, text=True, timeout=240)
     assert r.returncode == 0, (r.returncode, r.stdout + r.stderr)
+
+    # G1-iter5 Architect major #1 / RT critical #2: the push TARGET
+    # must refuse the production checkout too — v6 checked only the
+    # REPO operand, so a PC_BACKUP_PUSH_REMOTE pointing at the
+    # production path wrote a test checkpoint onto its local
+    # sandbox/backups, which the next production run propagated to
+    # github (executed end-to-end in scratch). Literal spellings
+    # refuse on any machine; filesystem-dependent spellings (symlink,
+    # //) need the checkout to exist and run where it does.
+    prod = "/home/z/my-project/cleanroom"
+    prod_spellings = [prod, "file://" + prod, prod + "/", prod + "/.git"]
+    if Path(prod).exists():
+        tlink = tmp_path / "prod-target-link"
+        tlink.symlink_to(prod)
+        prod_spellings += [str(tlink), "//" + prod.lstrip("/")]
+    for target in prod_spellings:
+        e = dict(os.environ)
+        e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+                  "PC_BACKUP_PUSH_REMOTE": target,
+                  "HOME": str(empty_home)})
+        r = subprocess.run(["bash", str(script), "push-target probe"],
+                           cwd=str(repo), env=e,
+                           capture_output=True, text=True, timeout=120)
+        out = r.stdout + r.stderr
+        assert r.returncode == 6, (target, r.returncode, out)
+        assert "production checkout" in out, (target, out)
+
+    # G1-iter5 RT major #1: url.*.insteadOf rewrites live in config
+    # FILES — v6 inspected the raw operand, so an innocent
+    # local-looking push target was rewritten to a github host at
+    # push time (executed in scratch with a real receive-pack
+    # attempt). The guard now resolves the operand the way git does
+    # (git ls-remote --get-url applies insteadOf), so the REWRITE is
+    # what gets judged.
+    subprocess.run(["git", "-C", str(repo), "config",
+                    "url.https://github.com/maniesh-NR/Proto-Clean.git.insteadOf",
+                    str(tmp_path / "innocent-local")], check=True)
+    e = dict(os.environ)
+    e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+              "PC_BACKUP_PUSH_REMOTE": str(tmp_path / "innocent-local"),
+              "HOME": str(empty_home)})
+    r = subprocess.run(["bash", str(script), "insteadOf probe"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=120)
+    assert r.returncode == 6, (r.returncode, r.stdout + r.stderr)
+
+    # ...and env-injected config FILES are INERT: the scrub unsets
+    # GIT_CONFIG_GLOBAL before any git call, so an insteadOf injected
+    # that way never applies — the push goes to the local bare it was
+    # addressed to (no github rewrite, no push failures)
+    evil = tmp_path / "evil-gitconfig"
+    evil.write_text("[url \"git@github.com:/maniesh-NR/Proto-Clean.git\"]\n"
+                    "\tinsteadOf = " + str(bare) + "\n", encoding="utf-8")
+    e = dict(os.environ)
+    e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+              "PC_BACKUP_PUSH_REMOTE": str(bare),
+              "HOME": str(empty_home),
+              "GIT_CONFIG_GLOBAL": str(evil)})
+    r = subprocess.run(["bash", str(script), "config-inert probe"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=240)
+    out = r.stdout + r.stderr
+    assert r.returncode == 0, (r.returncode, out)
+    assert "push failed" not in out, (
+        "the env-injected insteadOf was not inert — the push did not "
+        "go to the local bare it was addressed to")
 
 
 @pytest.mark.skipif(os.name != "posix", reason="backup script is POSIX")
@@ -612,10 +785,11 @@ def test_backup_script_alarm_survives_unreachable_remote(tmp_path):
 
     def run(msg):
         e = dict(os.environ)
+        empty_home = tmp_path / "home-env"
+        empty_home.mkdir(exist_ok=True)
         e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
                   "PC_BACKUP_PUSH_REMOTE": str(unreachable),
-                  "GIT_CONFIG_GLOBAL": os.devnull,
-                  "GIT_CONFIG_SYSTEM": os.devnull})
+                  "HOME": str(empty_home)})
         return subprocess.run(["bash", str(script), msg], cwd=str(repo),
                               env=e, capture_output=True, text=True,
                               timeout=240)
@@ -643,8 +817,9 @@ def test_backup_script_overrides_all_or_none(tmp_path):
 
     def run(**extra):
         e = {k: v for k, v in os.environ.items() if not k.startswith("PC_")}
-        e["GIT_CONFIG_GLOBAL"] = os.devnull
-        e["GIT_CONFIG_SYSTEM"] = os.devnull
+        empty_home = tmp_path / "home-env"
+        empty_home.mkdir(exist_ok=True)
+        e["HOME"] = str(empty_home)
         e.update(extra)
         return subprocess.run(["bash", str(script), "override probe"],
                               cwd=str(ROOT), env=e,
@@ -670,8 +845,9 @@ def test_backup_script_overrides_all_or_none(tmp_path):
     # a TEST run (all three) whose PC_BACKUP_REPO is the production
     # checkout — however spelled — refuses exit 6 before touching it
     # (the literal compare catches file:// and trailing-slash forms on
-    # any machine; the canonicalized compare additionally catches
-    # relative/symlink spellings where the path exists)
+    # any machine; the PHYSICAL canonicalized compare (cd + pwd -P)
+    # additionally catches relative/symlink spellings where the path
+    # exists)
     prod = "/home/z/my-project/cleanroom"
     for spelling in (prod, "file://" + prod, prod + "/"):
         r = run(PC_BACKUP_REPO=spelling, PC_SANDBOX_HOME=str(tmp_path),
@@ -679,6 +855,24 @@ def test_backup_script_overrides_all_or_none(tmp_path):
         out = r.stdout + r.stderr
         assert r.returncode == 6, (spelling, r.returncode, out)
         assert "production checkout" in out, out
+    # G1-iter5 RT critical #2: SYMLINKED and // spellings of the
+    # production checkout sailed past the LOGICAL-pwd canonicalized
+    # compare (executed end-to-end in scratch) — the compare is now
+    # PHYSICAL. These spellings need the checkout to exist (dev
+    # sandbox); CI legs keep the literal spellings above.
+    if Path(prod).exists():
+        rlink = tmp_path / "prod-repo-link"
+        rlink.symlink_to(prod)
+        plink = tmp_path / "prod-parent-link"
+        plink.symlink_to(Path(prod).parent)
+        for spelling in (str(rlink), str(rlink) + "/",
+                         str(plink / Path(prod).name),
+                         "//" + prod.lstrip("/")):
+            r = run(PC_BACKUP_REPO=spelling, PC_SANDBOX_HOME=str(tmp_path),
+                    PC_BACKUP_PUSH_REMOTE=str(tmp_path))
+            out = r.stdout + r.stderr
+            assert r.returncode == 6, (spelling, r.returncode, out)
+            assert "production checkout" in out, out
 
 
 @pytest.mark.skipif(os.name != "posix", reason="backup script is POSIX")
@@ -694,12 +888,13 @@ def test_backup_script_refusal_never_echoes_target(tmp_path):
     subprocess.run(["git", "clone", "-q", str(ROOT), str(repo)],
                    check=True, timeout=120)
     fake = "gh" + "p_" + "z" * 36
+    empty_home = tmp_path / "home-env"
+    empty_home.mkdir(exist_ok=True)
     e = {k: v for k, v in os.environ.items() if not k.startswith("PC_")}
     e.update({"PC_BACKUP_REPO": str(repo),
               "PC_SANDBOX_HOME": str(tmp_path),
               "PC_BACKUP_PUSH_REMOTE": f"{fake}@dead.example.com:x.git",
-              "GIT_CONFIG_GLOBAL": os.devnull,
-              "GIT_CONFIG_SYSTEM": os.devnull})
+              "HOME": str(empty_home)})
     r = subprocess.run(["bash", str(script), "echo probe"],
                        cwd=str(repo), env=e, capture_output=True,
                        text=True, timeout=120)
@@ -754,11 +949,12 @@ def test_backup_script_mainpush_redaction_and_trace_hygiene(tmp_path):
         e = {k: v for k, v in os.environ.items()
              if not k.startswith("PC_") and k.lower() not in
              ("http_proxy", "https_proxy", "all_proxy", "ftp_proxy")}
+        empty_home = tmp_path / "home-env"
+        empty_home.mkdir(exist_ok=True)
         e.update({"PC_BACKUP_REPO": str(repo),
                   "PC_SANDBOX_HOME": str(home),
                   "PC_BACKUP_PUSH_REMOTE": push_remote or str(bare),
-                  "GIT_CONFIG_GLOBAL": os.devnull,
-                  "GIT_CONFIG_SYSTEM": os.devnull,
+                  "HOME": str(empty_home),
                   "GIT_TERMINAL_PROMPT": "0",
                   "NO_PROXY": "*", "no_proxy": "*"})
         e.update(extra)
@@ -799,6 +995,56 @@ def test_backup_script_mainpush_redaction_and_trace_hygiene(tmp_path):
         "the guarded main push must label its redacted stderr")
     assert r2.returncode == 0, (r2.returncode, out)
 
+    # G1-iter5 Architect major #2 (the mutation-covering scrub
+    # signal): the marker asserts above are calibrated to this git's
+    # 401 behavior and can go vacuous on other versions — this lane is
+    # the platform-independent signal. With the pattern scrub present,
+    # a hostile GIT_TRACE=1 clean-lane run emits ZERO git trace lines
+    # (removing the scrub made 26 leak through unredirected git stderr
+    # in the Architect's mutation probe — the test must fail then).
+    r3 = run_backup("trace probe", GIT_TRACE="1", GIT_TRACE2="1",
+                    GIT_CURL_VERBOSE="1")
+    out3 = r3.stdout + r3.stderr
+    assert r3.returncode == 0, (r3.returncode, out3)
+    assert "trace:" not in out3, (
+        "GIT_TRACE output leaked through the script — the pattern env "
+        "scrub did not neutralize it")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="backup script is POSIX")
+def test_backup_script_index_rescan_positions():
+    """G1-iter5 RT minor #3 (scan→add TOCTOU): the checkpoint commit
+    must be preceded by an INDEX scan (`git grep --cached`) of exactly
+    what will be committed — the index IS the commit content, so
+    scanning it after the add closes the race window structurally
+    (anything committed was staged; anything staged was scanned; the
+    live window is sub-100 ms and needs a concurrent writer — outside
+    the accident threat model). HONEST LABEL: this is a structural
+    position check, not a behavioral one — no deterministic behavioral
+    lane exists against the real script's timing (7 timed single-shot
+    races by the G1-iter5 Red Team all missed the window); the
+    behavioral surfaces are the planted-secret lanes (exit 4, both
+    scans exercised) and the widened-window probe in
+    scripts/verify_backup_v7.sh (sandbox matrix, E18)."""
+    src = (ROOT / "scripts" / "sandbox_backup.sh").read_text(encoding="utf-8")
+    lines = src.splitlines()
+    # normal path: add → index scan → commit
+    a = next(i for i, l in enumerate(lines)
+             if l.strip() == "git add -f harness/sandbox harness/backups")
+    c = next(i for i, l in enumerate(lines)
+             if "[sandbox-backup] $MSG" in l and i > a)
+    assert any("git grep --cached" in l for l in lines[a + 1:c]), (
+        "the index re-scan (git grep --cached) must sit between the "
+        "git add and the checkpoint commit")
+    # divergence path: manifest add → index scan → merge commit
+    a2 = next(i for i, l in enumerate(lines)
+              if l.strip() == "git add harness/backups/manifest.json")
+    c2 = next(i for i, l in enumerate(lines)
+              if l.strip() == "git commit --no-edit -q" and i > a2)
+    assert any("git grep --cached" in l for l in lines[a2 + 1:c2]), (
+        "the index re-scan must also sit between the merged manifest "
+        "add and the merge commit")
+
 
 @pytest.mark.skipif(os.name != "posix", reason="backup script is POSIX")
 def test_backup_script_union_scrubs_dict_keys(tmp_path):
@@ -825,11 +1071,12 @@ def test_backup_script_union_scrubs_dict_keys(tmp_path):
 
     def run_backup(message, push_remote=None):
         e = {k: v for k, v in os.environ.items() if not k.startswith("PC_")}
+        empty_home = tmp_path / "home-env"
+        empty_home.mkdir(exist_ok=True)
         e.update({"PC_BACKUP_REPO": str(repo),
                   "PC_SANDBOX_HOME": str(home),
                   "PC_BACKUP_PUSH_REMOTE": push_remote or str(bare),
-                  "GIT_CONFIG_GLOBAL": os.devnull,
-                  "GIT_CONFIG_SYSTEM": os.devnull})
+                  "HOME": str(empty_home)})
         return subprocess.run(["bash", str(script), message],
                               cwd=str(repo), env=e,
                               capture_output=True, text=True, timeout=240)
