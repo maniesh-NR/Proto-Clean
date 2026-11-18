@@ -94,6 +94,16 @@
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "ok"
+    },
+    {
+      "seq": 10,
+      "timestamp": "2026-11-18T17:12:49Z",
+      "trigger": "event",
+      "message": "override probe",
+      "git_head": "a02db67",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "failed"
     }
   ]
 }
