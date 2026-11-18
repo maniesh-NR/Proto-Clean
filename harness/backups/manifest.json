@@ -11,6 +11,16 @@
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "ok"
+    },
+    {
+      "seq": 2,
+      "timestamp": "2026-11-18T18:23:16Z",
+      "trigger": "event",
+      "message": "push-target probe",
+      "git_head": "517ad3f",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "failed"
     }
   ]
 }
