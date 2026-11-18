@@ -116,6 +116,16 @@
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "failed"
+    },
+    {
+      "seq": 12,
+      "timestamp": "2026-11-18T17:27:03Z",
+      "trigger": "event",
+      "message": "G1-iter5 seq-10 incident disclosure checkpoint: mut2 guard-mutation probe side-effect annotated invalid on branch (cc51c7d), disclosed in record/README/lessons/process doc at this commit; iteration-2 CI confirmation (737x4 POSIX / 605+132 windows) pending before the re-gate launches",
+      "git_head": "517ad3f",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
     }
   ]
 }

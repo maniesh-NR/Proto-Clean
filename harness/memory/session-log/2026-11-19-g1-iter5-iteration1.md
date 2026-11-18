@@ -78,6 +78,33 @@ tracked; the overlay never reached the gate records).
   `memory/consensus-log/2026-11-19-S1-material-you-gate-iter5.md`
   (interim closure line — iteration 2 rewrites it).
 
+## Incident during the fix cycle (disclosed — orchestrator error,
+production side-effect)
+
+The post-backup audit of manifest seq 11 surfaced an unexplained
+**seq 10 "override probe"** (commit `3eeb00e`, 2026-11-18T17:12:49Z,
+git_head `a02db67`): the orchestrator's **mut2 mutation probe** (the
+logical-pwd revert of the v7 physical-compare fix, run in a scratch
+clone against the mutated copy) executed the override test's symlink
+REPO lanes, which point at the REAL production checkout — with the
+path guard deliberately broken by the mutation, the REPO compare
+passed and the probe completed a full test backup AGAINST the
+production checkout, committing onto its local `sandbox/backups`
+(its push to the scratch tmp_path failed, so the checkpoint stayed
+local until the fix cycle's seq-11 production backup propagated it).
+Damage verified: manifest.json + state.json only (empty inventories),
+harness byte-identical to seq 9, all scans ran — audit-trail
+pollution only; the fourth incident of the accidental-checkpoint
+class (env-loss "t5"/"E9c", half-edited script seq 7, now
+guard-mutation probes). Remediation: entry #10 annotated invalid on
+the branch (`cc51c7d`, the seq-3/5/7 precedent); disclosure amended
+into the G1-iter5 record + README anomaly log + lessons + the process
+doc's fix-cycle checklist (item f: mutation probes of path-guard
+lanes patch the guarded constant to scratch paths in the mutated
+copy — the Architect's identity-constant pattern, which the
+Architect's own probes used and the orchestrator's mut2 probe did
+not).
+
 ## Next (iteration 2 — the gate's second and final)
 
 - CI confirmation for this remediation commit (expectation: 737 × 4

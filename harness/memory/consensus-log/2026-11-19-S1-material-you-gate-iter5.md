@@ -301,4 +301,37 @@ since the v5 triple-key change).
 Iteration 2 outcome: recorded in this file when the re-run's
 verdicts return — not before.
 
+### Incident during the fix cycle (disclosed — orchestrator error,
+production side-effect)
+
+Manifest seq 10 ("override probe", commit `3eeb00e`,
+2026-11-18T17:12:49Z, git_head `a02db67`): the orchestrator's
+**mut2 mutation probe** — a logical-pwd revert of the v7
+physical-compare fix, executed in a scratch CLONE against the
+mutated COPY — ran `test_backup_script_overrides_all_or_none`'s
+symlink lanes, which point at the REAL production checkout. With
+the path guard deliberately broken BY THE MUTATION, the REPO
+compare passed and the probe completed a full test backup AGAINST
+THE PRODUCTION CHECKOUT, committing onto its local
+`sandbox/backups` (the probe's push to its scratch `tmp_path`
+failed, so the checkpoint stayed local — until the fix cycle's
+next production backup propagated it; the probe's failing
+assertion is exactly what reported the mutation as caught).
+Content verified clean: the checkpoint touched manifest.json +
+state.json only (empty inventories; SANDBOX_HOME was the scratch
+tmp dir), the harness tree is byte-identical to seq 9, and all
+scan layers ran. The damage is audit-trail pollution — the same
+class as G1-iter3's "t5" (seq 3), G1-iter4's "E9c" (seq 5) and
+G1-iter4-i2's mid-edit-script probe (seq 7), a fourth variant:
+env-loss accidents, a half-edited script, now a **guard-mutation
+probe**. Remediation: entry #10 annotated invalid via an
+append-only branch commit (`cc51c7d`, the seq-3/5/7 precedent);
+process rule recorded in lessons: **a mutation probe of a
+path-guard lane is production-touching by design — the guarded
+constant must be patched to a scratch path in the mutated copy**
+(the Architect's identity-constant patch pattern, which the
+Architect's own G1-iter5 probes used and the orchestrator's mut2
+probe did not). Disclosed here, in the backups README anomaly log,
+and in the session log.
+
 FINAL OUTCOME: NO CONSENSUS — iteration 1 of 2 (Red Team and Devil's Architect BLOCK); the v7 fix cycle above lands in this commit, which carries this record; iteration 2 re-judges the remediation commit within the gate's cap.
