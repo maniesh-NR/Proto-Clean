@@ -5,9 +5,7 @@
   "sandbox": {
     "download": [],
     "harness_skipped_shaped_count": 0,
-    "scripts": [
-      "ok.py"
-    ],
+    "scripts": [],
     "scripts_skipped_shaped_count": 0,
     "skills": []
   },
