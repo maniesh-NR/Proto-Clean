@@ -156,6 +156,16 @@
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "failed"
+    },
+    {
+      "seq": 14,
+      "timestamp": "2026-11-18T18:30:37Z",
+      "trigger": "event",
+      "message": "G1-iter5 closure checkpoint: gate closed NO CONSENSUS at the 2-iteration cap, escalated to the owner (G1-iter6 on this commit is the owner's call); v8 remediation complete - relative-target refusal, fail-closed resolution, empty-authority + multi-@ normalization, pushurl lane, glyph-rule fixes, corrected residual list (728+9 local; CI expectation unchanged 737x4 / 605+132; matrices 86 checks green; mutation probes A-E caught)",
+      "git_head": "a1607ce",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "failed"
     }
   ],
   "merged_divergence": true

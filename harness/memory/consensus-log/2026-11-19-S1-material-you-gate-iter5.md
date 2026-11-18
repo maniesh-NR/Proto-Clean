@@ -298,8 +298,138 @@ since the v5 triple-key change).
   gate history; project state; session log
   `memory/session-log/2026-11-19-g1-iter5-iteration1.md`.
 
-Iteration 2 outcome: recorded in this file when the re-run's
-verdicts return — not before.
+Iteration 2 outcome: recorded below after the re-run — not before.
+
+## Iteration 2 — re-judgment of the fix commits `1f3d1cf`/`517ad3f` (2026-11-19)
+
+Pre-gate verification (orchestrator, before the agents launched):
+tree clean at `517ad3f` == origin/main; local suite 728 passed + 9
+skipped exact at `1f3d1cf`; CI confirmed from the downloaded job
+logs — 737 × 4 POSIX legs, 605 passed + 132 skipped on windows,
+wheel + Android green (run 44358063985); `517ad3f` (docs-only) 7/7
+as well, its ubuntu leg showing one documented environmental skip
+(bond-desktop loopback variance); backup manifest seq 12 faithful at
+`517ad3f`, failcount 0. Sequencing disclosure (audit trail): the
+orchestrator launched Red Team and Ship Steward first and the
+Devil's Architect only after the first two returned — an
+orchestration slip (the mandate is three parallel launches); the
+Architect ran independently with no visibility of the other two
+verdicts, so independence held; the slip is recorded here because
+the audit trail does not selectively omit orchestrator errors.
+
+| Task | Role | Verdict | Method |
+|---|---|---|---|
+| G1-iter5-i2-R | Red Team | **BLOCK** | ~28 bounded experiment groups in fresh `/tmp/g1i5i2-rt-*` scratch (md5-verified HEAD copy; all runs three-override; github targets neutralized by a local 502-proxy / fake ssh — 16 intercepted CONNECT attempts, zero real egress; the one production-path mutation-style demo used the identity-constant patch pattern): iteration-1 fixes re-verified (E1-E3); resolution-machinery attacks (E4-E10); relative-target cwd mismatch executed E2E twice (the critical — decoy landing + real-constants shim proof); empty-authority family executed via proxy (the second critical); double-@ ssh handoff executed, socket hop modeled (the major); index re-scan attacked (no gap); forgery matrix v3 (ties fail-safe; minors); matrices 25/22/20; suite 16/16; baseline 728+9 |
+| G1-iter5-i2-A | Devil's Architect | **BLOCK** | claim map (16 rows — all six mandated v7 surfaces verified with 6/7 mutation probes inverting, the seventh = the finding); the relative-base defect executed E2E independently with patched constants (the major — convergent with RT-C1); pushurl-awareness mutation-false (probe g — the second major); frozen residual list technically accurate except a phantom (see RT-m1) and a one-directional freeze; decision #18 sound but policy-only; S1 closure criteria explicit and mechanical; docs consistent except the "however spelled" claim (falsified by the relative family) |
+| G1-iter5-i2-S | Ship Steward | PROCEED-WITH-FINDINGS | suite twice (728+9 both, tree clean); CI per-leg tables from all 7 job logs on BOTH commits — 737 × 4 POSIX exact, 605+132 windows exact; claim/code map of all 15 resolution items — ZERO mismatches; all four mutation claims independently re-proven (probe (c) applied the seq-10 constant-patch rule and reproduced the mechanism in scratch); audit trail: 12 entries, seq 10 invalid-annotated faithfully, `cc51c7d` append-only, `3eeb00e` content re-verified (manifest+state only, harness byte-identical); incident disclosure complete across five artifacts; release-ready for S2 pre-gate; 2 minors (stale lessons baseline line; observational ubuntu skip) |
+
+**Consensus: NOT reached (two BLOCKs — Red Team and Devil's
+Architect, on convergent findings). This was iteration 2 of 2: the
+gate's cap is EXHAUSTED — the stage escalates to the project owner.
+Per the G1-iter3/G1-iter4 precedent, every finding from both
+iterations is remediated in this commit, which carries this record
+and closes the gate.**
+
+### Red Team — BLOCK (verbatim from the verdict block)
+
+CRITICAL:
+- C1. Relative push-target bypasses the v7 physical compare (guard
+cwd ≠ push cwd): the guard resolves `/*|./*|../*` operands at the
+REPO's cwd, but the pushes execute from the temporary worktree
+(`/tmp/pc-backup.XXXXXX` — predictable base, `../..` = `/`), so a
+relative operand resolves DIFFERENTLY at push time than at judgment
+time. Executed twice: E2E against a PROD_CHECKOUT-patched decoy — a
+`../..`-chain passed the guard (rc 0) and the branch push landed a
+test checkpoint on the decoy's local `sandbox/backups` (the
+A-M1/seq-3/5 accident class); and a real-constants proof with a
+logging git shim — `../../home/z/my-project/cleanroom` passes the
+real guard and would resolve to the real production checkout at
+push time. Falsifies "a TEST run never pushes to the production
+repo … however spelled / the compare is PHYSICAL" for the relative
+family; no machine test or matrix lane covered it.
+- C2. Empty-authority `///` spellings reach github:
+`https:///github.com/…` (and `http:///…`, `https:///gist.github…`)
+collapsed the host away in v7's `//+→/` normalization — extracted
+host EMPTY, no suffix match — while git/curl connect to
+github.com:443 (raw ls-remote through a proxy: CONNECT
+github.com:443; a full TEST-mode run: 0 refusals, checkpoint
+committed, 3 intercepted CONNECTs). Same family as iteration-1
+RT-C1: v7 normalized userinfo/port but not the empty authority.
+
+MAJOR:
+- M1. Double-`@` ssh spellings (`ssh://user@evil.com@github.com/…`,
+scp-like `user@evil.com@github.com:…`, direct or via remote name)
+pass the guard — the @-strip removes only the first segment, host
+reads `evil.com@github.com` — and git hands the full string to the
+ssh client (handoff executed; OpenSSH's last-@ parse targets
+github.com — final socket hop MODELED, no ssh binary in the
+sandbox). The https double-@ variant is inert (git rejects it,
+executed).
+
+MINOR: m1 frozen residual #2 (pushInsteadOf on direct operands) is
+a phantom — git 2.47.3 does not apply pushInsteadOf to CLI
+URL/path operands (executed; safe direction; remote NAMES are the
+covered side); m2 any `## Shipped*`-prefixed header exempts id-less
+☑ bullets anywhere (executed 4/4 smuggled); m3 a typo'd
+future-dated filename shields a ☑ from a later re-gate's withdrawal
+(max(filename, Date:) — executed); m4 undated non-consensus records
+never withdraw a ☑ (executed; low impact); m5 the ◐ mention rule
+scans raw text including fences (pre-existing; executed).
+
+### Devil's Architect — BLOCK (findings)
+
+MAJOR:
+1. The relative push-target lane that this very gate opened (A-M1)
+is closed for every spelling family EXCEPT the one the guard's own
+case-block claims to judge (relative operands) — judged at one cwd,
+used at another; executed E2E with identity-patched constants (the
+seq-10 rule): `../../tmp/…/<stand-in>` with a sufficiently-deep
+repo passed and landed a checkpoint on the stand-in's local branch.
+Fix (in freeze scope): refuse relative operands, or push the
+resolved absolute target — either closes the resolution/use TOCTOU
+as well.
+2. The pushurl-awareness half of the v7 resolution claim is
+incidence-true, mutation-false: reverting `get-url --push` to
+`get-url` leaves the entire suite green (probe executed). One
+machine lane (url=local, pushurl=github) closes it.
+
+MINOR: 1) fail-open shape — the target-refusal block wrapped in
+`if [ -n "$_tgt" ]` silently skips ALL target checks on an empty
+resolution; 2) resolution/use TOCTOU — the guard resolves once,
+pre-action; pushes re-resolve at push time, so a config rewrite in
+the window re-opens the lane (concurrent-writer class); 3)
+decision #18's bash freeze is policy-only (no machine pin), and the
+residual-list freeze is one-directional (removals bound by
+nothing); 4) project-state still carries the "to be confirmed by
+CI" hedge (CI was green at verdict time).
+
+### Ship Steward — PROCEED-WITH-FINDINGS (findings)
+
+MINOR: 1) lessons baseline line one cycle stale (727+9/736 vs
+728+9/737 — the fix-cycle checklist item (c) added in this very
+cycle prescribes the refresh); 2) observational: `517ad3f`'s
+ubuntu leg 736+1 (an environmental bond-desktop skip, documented
+runner variance; 7/7 success; no expectation violated).
+
+### Verified-good (all three agents, evidence in their reports)
+
+- Every iteration-1 remediation holds as implemented — re-verified
+by execution by all three agents independently: the four
+empty-credential spellings, all production-path spellings
+(absolute/symlink/`//`/`.git`/clone-origin), the insteadOf
+resolution (incl. prefix-match and non-chaining), env-config
+inertness, the index re-scan under attack (binary blobs, no-EOF,
+pathspec tricks — no gap found), the withdrawal ties fail-safe
+both directions, matrices v7 25/25 + v6 22/22 + v5 20/20, suite
+16/16, baseline 728+9 exact, bash -n clean.
+- The Steward's 15/15 claim map: ZERO mismatches; all four v7
+mutation-coverage claims independently re-proven (probe (c)
+applying the seq-10 rule and reproducing the mechanism in scratch).
+- The seq-10 incident handling verified complete across all five
+artifacts; the annotation append-only; `3eeb00e`'s content claims
+independently re-verified.
+- No G1-iter5 outcome pre-recorded anywhere; audit trail faithful
+through seq 12.
 
 ### Incident during the fix cycle (disclosed — orchestrator error,
 production side-effect)
@@ -334,4 +464,116 @@ Architect's own G1-iter5 probes used and the orchestrator's mut2
 probe did not). Disclosed here, in the backups README anomaly log,
 and in the session log.
 
-FINAL OUTCOME: NO CONSENSUS — iteration 1 of 2 (Red Team and Devil's Architect BLOCK); the v7 fix cycle above lands in this commit, which carries this record; iteration 2 re-judges the remediation commit within the gate's cap.
+> Iteration-1 interim outcome (superseded by the gate outcome at
+> the end of this record): NO CONSENSUS — Red Team and Devil's
+> Architect BLOCK; the v7 fix cycle landed in `1f3d1cf` and
+> iteration 2 re-judged it (plus the `517ad3f` disclosure).
+
+## Resolution cycle (iteration-2 fixes applied in THIS commit — every finding from all three roles)
+
+- **RT-C1 / A-M1 (convergent):** RELATIVE push targets are refused
+  outright in TEST mode (exit 6) — the guard judges the operand at
+  the REPO's cwd while the pushes execute from the temporary
+  worktree, so a relative operand resolves somewhere the guard
+  never judged; rather than judge at every base it will be used
+  from, the ambiguous form is refused (the Architect's offered
+  option, in freeze scope). Machine lanes: `../bare.git`,
+  `./bare.git`, the literal `../../home/z/my-project/cleanroom`
+  vector; matrix E20 additionally demonstrates the base-mismatch
+  MECHANISM on a stand-in (an identity-patched copy with the
+  refusal removed lands the checkpoint there — proving the refusal
+  is load-bearing) and refuses the same operand on the real script.
+  Bare-relative spellings (`sub/dir/bare.git`) refuse via the
+  earlier not-a-remote layer — either way, exit 6.
+- **RT-C2:** `_norm_url` strips leading slashes after the scheme
+  strip (`s#^/+##`) — the empty-authority family
+  (`https:///github.com/…`, `http:///…`, `https:///gist.…`, and the
+  four-slash variant) now extracts host `github.com` and refuses.
+  Machine-tested (3 spellings); matrix E19 (8 spellings + remote
+  name + clean lane).
+- **RT-M1:** the userinfo strip is a sed LOOP (`:a; s#^[^/@]*@##;
+  ta`) — every @-segment before the first `/` is stripped, so
+  multi-@ ssh spellings (`ssh://user@evil.com@github.com/…`, scp
+  forms, via remote names) normalize to `github.com/…` and refuse.
+  Machine-tested (2 direct spellings + the `doublescp` remote);
+  matrix E19. (The https double-@ variant is inert — git rejects
+  it; verified by both the RT and the matrix.)
+- **A-M1 (fail-open):** an unresolvable target refuses fail-closed
+  (exit 6) — the v7 `if [ -n "$_tgt" ]` wrapper that silently
+  skipped ALL target checks on an empty resolution is gone.
+- **A-M2:** the pushurl half of the resolution claim is
+  mutation-covered — a machine lane with a remote whose fetch url
+  is the local bare but whose pushurl is github refuses exit 6
+  (mutation-verified in scratch: reverting `--push` fails exactly
+  this lane); matrix E21.
+- **RT-m1 (phantom residual):** the frozen residual list's item 2
+  (pushInsteadOf on direct operands) mischaracterized git —
+  executed: pushInsteadOf does NOT apply to CLI URL/path operands
+  at push time, and remote names are covered pushurl-aware.
+  Corrected per the list's own freeze rule (a gate finding): the
+  item now records the verified behavior; the freeze sentence
+  binds REMOVALS to gate findings too (A-m3).
+- **RT-m2 (Shipped-prefix smuggling):** the id-less-☑ exemption
+  requires the section's full signature — the header must both
+  start with "shipped" AND carry "retrospectively assessed" (the
+  real section's marker); a smuggled `## Shipped something else`
+  header anywhere else is a violation. Forgery case added.
+- **RT-m5 / A-m2(i):** the ◐ mention rule now scans fence-stripped
+  text (a fenced stage mention no longer satisfies it); forgery
+  case added. The resolution/use TOCTOU (guard resolves once,
+  pushes re-resolve at push time — a config rewrite in the window
+  re-opens the lane, concurrent-writer class) is added to the
+  frozen residual list as a gate finding (A-m2's offered option).
+- **RT-m3 / RT-m4 (glyph-check date semantics):** filed as ledger
+  row #10 — a future-dated filename shields a ☑ from a later
+  re-gate's withdrawal (max(filename, Date:) ordering), and undated
+  non-consensus records never withdraw; both require writing a
+  malformed-dated artifact into the repo, which the no-pre-recording
+  discipline, pushed-diff visibility, and git history police; fix
+  deferred with the ledger row (no deterministic bound exists
+  without a clock, and a hardcoded epoch bound would break the
+  forgery suite's synthetic dates).
+- **A-m3:** the residual-list freeze is now two-directional
+  (additions AND removals require a gate finding); the bash-freeze
+  machine pin is explicitly deferred to the port (recorded in
+  decision #18's ledger row — a pin that fails CI on surface growth
+  lands with the port, when the frozen surface is what gets pinned).
+- **A-m4 / S-m1 / S-m2:** project state refreshed — the CI hedge
+  resolved (737 × 4 POSIX, 605+132 windows confirmed on `1f3d1cf`;
+  `517ad3f` 7/7 with the one documented environmental ubuntu skip);
+  the lessons baseline line refreshed (the checklist item (c) miss).
+
+## Fix-cycle completion (evidence, at this commit)
+
+- **Script v8** (same single file): relative-target refusal,
+  fail-closed unresolvable target, leading-slash normalization,
+  multi-@ userinfo loop. `bash -n` clean; 13 live refusal probes +
+  2 clean lanes executed before commit (all expected exits).
+- **Machine coverage:** the integrity suite stays at 16 tests (all
+  new coverage extended existing tests); local suite **728 passed
+  + 9 skipped**; CI expectation unchanged — 737 × 4 POSIX, 605+132
+  windows.
+- **Mutation coverage (scratch clones; the relative-target probe
+  patched BOTH the guarded constant and the test's production-path
+  lane per the seq-10 rule — no production contact):** (A)
+  leading-slash strip removed → the guard test FAILS; (B) multi-@
+  loop → single strip → FAILS; (C) relative refusal removed → BOTH
+  the override and guard tests FAIL (the landing contained in
+  scratch); (D) `--push` reverted → the guard test FAILS at the new
+  pushurl lane; (E) the Shipped-signature + fenced-mention rules
+  reverted → the forgery test FAILS. Every v8 surface is
+  mutation-verified.
+- **Sandbox matrices:** `verify_backup_v8.sh` (new) — 19/19: E19
+  empty-authority + multi-@ spellings, E20 relative-target refusal
+  + the stand-in mechanism demo, E21 pushurl divergence, E22
+  fail-closed unresolvable. ALL older matrices re-run per the
+  checklist: v7 25/25, v6 22/22, v5 20/20 — 86 checks green in
+  total.
+- **Docs:** backups README (v8 + corrected residual list +
+  two-directional freeze); ledger row #10; lessons (empty-authority
+  and multi-@ spelling classes, the relative-base lesson, the
+  phantom-residual lesson, the baseline refresh); roadmap gate
+  history; project state; session log
+  `memory/session-log/2026-11-19-g1-iter5-closure.md`.
+
+FINAL OUTCOME: NO CONSENSUS — iteration cap reached (2 of 2): iteration 2's Red Team and Devil's Architect BLOCK (the relative push-target base mismatch, found and executed E2E independently by both, plus the empty-authority spelling family and the uncovered pushurl lane) vs Ship Steward PROCEED-WITH-FINDINGS; every finding from both iterations remediated and machine/matrix-covered in this commit, which carries this record; escalated to the project owner — a fresh gate (G1-iter6) on this remediation commit is the owner's call (the G1 → G1-iter3 → G1-iter4 → G1-iter5 precedent).
