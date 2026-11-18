@@ -103,7 +103,9 @@
       "git_head": "a02db67",
       "git_branch": "main",
       "main_push": "ok",
-      "prev_branch_push": "failed"
+      "prev_branch_push": "failed",
+      "invalid": true,
+      "invalid_reason": "accidental production checkpoint during the G1-iter5 fix cycle: the orchestrator's mut2 mutation probe (a logical-pwd revert of the v7 physical-compare fix, run in a scratch CLONE against the mutated COPY) executed test_backup_script_overrides_all_or_none's symlink lanes, which point at the real production checkout; with the path guard deliberately broken BY THE MUTATION, the REPO compare passed and the probe completed a full test backup against the production checkout (commit 3eeb00e, 'override probe'; its push to the scratch tmp_path failed, so the checkpoint stayed local until the next production run propagated it). Content verified clean: the checkpoint touched manifest.json + state.json only (empty inventories), the harness tree is byte-identical to seq 9, all scan layers ran; audit-trail pollution only - the fourth incident of the class (env-loss 't5'/'E9c', half-edited script seq 7, now guard-mutation probes). Root cause and process rule: a mutation probe of a path-guard lane is production-touching by design unless the guarded constant is patched to a scratch path in the mutated copy (the Architect's identity-constant patch pattern - recorded in lessons and the G1-iter5 record)."
     },
     {
       "seq": 11,
