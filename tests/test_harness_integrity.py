@@ -145,13 +145,15 @@ def _gate_record_violations(per_record, roadmap):
                 # the check entirely (an unbacked done-claim lane).
                 # Non-bullet lines (the status legend) never count.
                 if ("☑" in line and line.lstrip().startswith("- ")
-                        and not section.startswith("shipped")):
+                        and not (section.startswith("shipped")
+                                 and "retrospectively assessed" in section)):
                     violations.append(
                         f"roadmap marks work done (☑) with no stage id "
                         f"outside the 'Shipped' section: {line.strip()!r}")
                 continue  # shipped-line items without a stage id
             sid = "S" + m.group(1)
-            mentioned = any(re.search(rf"\b{re.escape(sid)}\b", t)
+            mentioned = any(re.search(rf"\b{re.escape(sid)}\b",
+                                      _strip_fences(t))
                             for t in per_record.values())
             if not mentioned:
                 violations.append(
@@ -375,6 +377,23 @@ def test_final_outcome_check_cannot_be_forged():
             "- \u2611 legacy line, no id\n\n"
             "Status legend: \u2611 done.\n")
     assert v == [], v
+    # G1-iter5-i2 RT minor #2: a `## Shipped*`-prefixed header
+    # smuggled anywhere else ("Shipped something else") exempted
+    # id-less ☑ bullets from the done-claim check — the exemption now
+    # requires the section's full signature
+    v = _gate_record_violations(
+        {}, "## Shipped something else\n\n- \u2611 smuggled done-claim\n")
+    assert any("outside the 'Shipped' section" in m for m in v), v
+    # G1-iter5-i2 RT minor #5: a fenced stage mention no longer
+    # satisfies the ◐ mention rule (the raw-text scan used to count
+    # documentation examples inside fences)
+    fenced_mention = ("# record\nDate: 2026-11-20\nStage: S113\n\n"
+                      "```\nS114 mentioned only in a fence\n```\n\n"
+                      "FINAL OUTCOME: NO CONSENSUS — x\n")
+    v = _gate_record_violations(
+        {"2099-01-01-S113-forged.md": fenced_mention},
+        roadmap_line("S114", "\u25d0"))
+    assert any("mentions it" in m for m in v), v
 
 
 def test_deferred_findings_reference_real_targets():
@@ -669,6 +688,20 @@ def test_backup_script_guard_refuses_github_spellings(tmp_path):
         "https://@github.com:/maniesh-NR/Proto-Clean.git",     # both
         "git@github.com:/maniesh-NR/Proto-Clean.git",          # scp, empty path
         "https://@gist.github.com/aa11bb22cc33dd44ee55ff6677aabbcc.git",  # empty userinfo, subdomain
+        # G1-iter5-i2 RT critical #2: the EMPTY-AUTHORITY family —
+        # https:///github.com/… collapsed the host away in v7's
+        # normalization while git/curl still connected to github.com
+        # (raw ls-remote through a proxy: CONNECT github.com:443)
+        "https:///github.com/maniesh-NR/Proto-Clean.git",
+        "http:///github.com/maniesh-NR/Proto-Clean.git",
+        "https:///gist.github.com/aa11bb22cc33dd44ee55ff6677aabbcc.git",
+        # G1-iter5-i2 RT major #1: multi-@ ssh userinfo — the @-strip
+        # removed only the FIRST segment while OpenSSH parses the
+        # LAST @ (host=github.com); executed past the guard with the
+        # ssh handoff verified (final socket hop modeled — no ssh
+        # binary on the runners)
+        "ssh://user@evil.com@github.com/maniesh-NR/Proto-Clean",
+        "user@evil.com@github.com:maniesh-NR/Proto-Clean.git",
     ]
     subprocess.run(["git", "-C", str(repo), "remote", "add", "prodscp",
                     "git@github.com:maniesh-NR/Proto-Clean.git"], check=True)
@@ -676,7 +709,10 @@ def test_backup_script_guard_refuses_github_spellings(tmp_path):
                     "git@gist.github.com:aa11bb22cc33dd44ee55ff6677aabbcc.git"], check=True)
     subprocess.run(["git", "-C", str(repo), "remote", "add", "prodscpempty",
                     "git@github.com:/maniesh-NR/Proto-Clean.git"], check=True)
-    for target in list(variants) + ["prodscp", "gistscp", "prodscpempty"]:
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "doublescp",
+                    "user@evil.com@github.com:maniesh-NR/Proto-Clean.git"], check=True)
+    for target in list(variants) + ["prodscp", "gistscp", "prodscpempty",
+                                    "doublescp"]:
         e = dict(os.environ)
         empty_home = tmp_path / "home-env"
         empty_home.mkdir(exist_ok=True)
@@ -724,6 +760,45 @@ def test_backup_script_guard_refuses_github_spellings(tmp_path):
         out = r.stdout + r.stderr
         assert r.returncode == 6, (target, r.returncode, out)
         assert "production checkout" in out, (target, out)
+
+    # G1-iter5-i2 RT critical #1 / Architect major #1: RELATIVE push
+    # targets are refused outright — the guard judges the operand at
+    # the REPO's cwd while the push executes from the temporary
+    # worktree under /tmp, so a relative target resolves somewhere
+    # the guard never judged (executed E2E by two agents
+    # independently: a ../../-chain from the worktree delivered a
+    # test checkpoint onto a "production" stand-in's local branch)
+    for target in ("../bare.git", "./bare.git",
+                   "../../home/z/my-project/cleanroom"):
+        e = dict(os.environ)
+        e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+                  "PC_BACKUP_PUSH_REMOTE": target,
+                  "HOME": str(empty_home)})
+        r = subprocess.run(["bash", str(script), "relative-target probe"],
+                           cwd=str(repo), env=e,
+                           capture_output=True, text=True, timeout=120)
+        out = r.stdout + r.stderr
+        assert r.returncode == 6, (target, r.returncode, out)
+        assert "RELATIVE" in out, (target, out)
+
+    # G1-iter5-i2 Architect major #2: the pushurl-aware resolution
+    # (`get-url --push`) is mutation-covered — a remote whose FETCH
+    # url is an innocent local bare but whose pushurl is github must
+    # be refused (v6's fetch-URL resolution never saw the divergence;
+    # reverting --push to plain get-url must fail THIS lane)
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "urlpush",
+                    str(bare)], check=True)
+    subprocess.run(["git", "-C", str(repo), "remote", "set-url", "--push",
+                    "urlpush",
+                    "https://github.com/maniesh-NR/Proto-Clean.git"], check=True)
+    e = dict(os.environ)
+    e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+              "PC_BACKUP_PUSH_REMOTE": "urlpush",
+              "HOME": str(empty_home)})
+    r = subprocess.run(["bash", str(script), "pushurl probe"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=120)
+    assert r.returncode == 6, (r.returncode, r.stdout + r.stderr)
 
     # G1-iter5 RT major #1: url.*.insteadOf rewrites live in config
     # FILES — v6 inspected the raw operand, so an innocent

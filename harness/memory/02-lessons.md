@@ -52,10 +52,13 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   close a loop that `is_running()` (macOS CI caught this, `bdefec5`).
 - Full suite runtime ≈ 80-90 s locally; `python -m pytest tests/ -q
   -p no:asyncio`.
-- Baseline (after the G1-iter4-i2 fix cycle): local 727 passed +
-  9 skipped; CI 736 per POSIX leg (windows 605 passed + 131
+- Baseline (after the G1-iter5-i2 fix cycle): local 728 passed +
+  9 skipped; CI 737 per POSIX leg (windows 605 passed + 132
   platform skips). A changed skip count on a leg means a test
   silently changed behavior — check before/after when adding tests.
+  (One documented environmental variance: `517ad3f`'s ubuntu leg
+  showed 736+1 — the bond-desktop loopback-alias skip, runner
+  instance variance, not drift.)
 
 ## Harness / adversarial process (gates G1 → G1-iter5)
 
@@ -136,6 +139,27 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   scratch paths in the mutated copy before running guard-mutation
   probes — the Architect's identity-constant patch pattern (G1-iter5,
   disclosed in the iter5 record + README anomaly log).
+- Judge an operand WHERE IT WILL BE USED, or refuse the ambiguous
+  form: the G1-iter5-i2 relative push-target bypass (found
+  independently by two agents, executed E2E) existed because the
+  guard resolved the target at the repo's cwd while the push executed
+  from a temporary worktree — the same operand, two bases, two
+  meanings. When a guard cannot evaluate an operand at every base it
+  will be used from, the ambiguous form must be refused, not judged
+  at a convenient base (v8 refuses relative push targets outright).
+- Degenerate spellings come in FAMILIES, and each normalization fix
+  must probe the whole family: empty-credential apex forms
+  (G1-iter5), then the empty-AUTHORITY forms `https:///github.com/…`
+  and multi-@ ssh userinfo `ssh://user@evil.com@github.com/…`
+  (G1-iter5-i2 — the @-strip removed only the first segment while
+  OpenSSH parses the LAST @). After fixing one empty/degenerate
+  segment, enumerate the OTHERS before the next gate does.
+- Verify the tool's actual behavior before freezing a residual
+  characterization: the frozen residual list claimed pushInsteadOf
+  applies to direct URL operands at push time — git does NOT
+  (executed at G1-iter5-i2; the phantom was corrected per the list's
+  own gate-finding rule). A residual list is only as good as its
+  executed facts.
 
 ## CI / GitHub
 

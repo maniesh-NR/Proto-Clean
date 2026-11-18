@@ -9,7 +9,7 @@ fixed time interval. (Project owner directive, 2026-11-13.)
 | Layer | Where it lives | Mechanism |
 |---|---|---|
 | Product code + docs + `harness/` memory | `main` branch | normal commits (already part of every plan) |
-| Sandbox-only state (`/home/z/my-project/scripts/`, sandbox inventory) | `sandbox/backups` branch, under `harness/sandbox/` | `scripts/sandbox_backup.sh` (v7) |
+| Sandbox-only state (`/home/z/my-project/scripts/`, sandbox inventory) | `sandbox/backups` branch, under `harness/sandbox/` | `scripts/sandbox_backup.sh` (v8) |
 | Backup audit trail | `harness/backups/manifest.json` — **branch-owned, append-only, keyed by the (seq, timestamp, message) triple** | same script |
 
 The `sandbox/backups` branch intentionally does not trigger CI
@@ -21,7 +21,7 @@ each checkpoint), and the sandbox state. If a run records
 `main_push: failed`, product code is NOT on the remote that checkpoint
 — two consecutive failures raise a loud exit-7 alarm.
 
-## v5/v6/v7 design (hardened by gates G1-iter2 → G1-iter4-i2 → G1-iter5, 2026-11-13/16/19)
+## v5/v6/v7/v8 design (hardened by gates G1-iter2 → G1-iter4-i2 → G1-iter5 → G1-iter5-i2, 2026-11-13/16/19)
 
 The v1 design leaked credentials into a would-be push and could brick
 itself; v2 could never complete (`git add` collided with the ignore
@@ -77,15 +77,25 @@ execution order:
   via `git remote get-url --push` — pushurl-aware; URL/path operands
   via `git ls-remote --get-url` — `url.*.insteadOf`-aware, so a
   config-FILE rewrite to github is refused even though the raw
-  operand looks local, G1-iter5 RT major #1); a TEST run also never
-  operates on the PRODUCTION CHECKOUT — as the push TARGET as well
+  operand looks local, G1-iter5 RT major #1), RELATIVE targets are
+  REFUSED outright (the guard judges at the repo's cwd while the
+  push executes from the temporary worktree — a relative operand
+  resolves somewhere the guard never judged, G1-iter5-i2 RT critical
+  #1 / Architect major #1, executed E2E by both), an unresolvable
+  target refuses fail-closed, and a TEST run also never operates on
+  the PRODUCTION CHECKOUT — as the push TARGET as well
   as the repo, the path compared PHYSICALLY (`pwd -P` + leading-`//`
   collapse, so symlinked and `//` spellings cannot alias it, and its
-  `.git` is compared too) — refusing exit 6 pre-network, never
-  printing the target. Off-domain redirector URLs and
-  `pushInsteadOf` rewrites on direct URL operands are documented
-  residuals (see the frozen residual list below) — no client-side
-  spelling check can catch them.
+  `.git` is compared too) — so test traffic can touch neither
+  github nor the production repo, not even via a clone's origin.
+  Empty-credential spellings (`https://@github.com/…`,
+  `github.com:/…`, scp `git@github.com:/…`), the empty-AUTHORITY
+  family (`https:///github.com/…`) and multi-@ ssh userinfo
+  (`ssh://user@evil.com@github.com/…`) all normalize away too
+  (G1-iter5 RT critical #1, G1-iter5-i2 RT critical #2 + major #1).
+  Off-domain redirector URLs are a documented residual (see the
+  frozen residual list below) — no client-side spelling check can
+  catch them.
 - **Secret scan, self-tested per run**: one `secret_scan` invocation
   used by every surface (sandbox scripts dir, checkpoint message,
   **the ENTIRE pushed delta — all of `harness/`, because the commit
@@ -220,35 +230,43 @@ seq N); the (seq, timestamp, message) triple is the dedup key.
 An exit-8 abort runs the alarm checks first, so a pending alarm banner
 is never masked by the abort.
 
-## Frozen residual-threat list (adopted G1-iter5, decision #18)
+## Frozen residual-threat list (adopted G1-iter5, decision #18;
+corrected G1-iter5-i2 per gate findings)
 
 These are the KNOWN residuals future gates judge against — a fixed
 list, so each gate no longer re-derives the attack surface from
-scratch (the Architect's bounded-exit recommendation; adding to this
-list requires a gate finding, not prose):
+scratch (the Architect's bounded-exit recommendation). **Adding to
+or removing from this list requires a gate finding, not prose**
+(two-directional since G1-iter5-i2):
 
 1. **Off-domain redirectors** — a push target on a non-github domain
    that 301-redirects to github. No client-side spelling check can
    catch it; the credential never enters a TEST push and production
    pushes are opt-in, so the residual is reachability, not leakage.
-2. **`url.<base>.pushInsteadOf` on direct URL operands** — the guard
-   resolves remote NAMES pushurl-aware (`get-url --push`) and
-   URL/path operands insteadOf-aware (`ls-remote --get-url`), but a
-   pushInsteadOf rewrite of a direct URL operand applies only at
-   push time; requires crafted config in the clone (beyond the
-   accident threat model).
-3. **Scan→add TOCTOU below ~100 ms** — closed STRUCTURALLY by the
+2. **pushInsteadOf — VERIFIED NON-RESIDUAL for direct operands**
+   (corrected at G1-iter5-i2, RT minor #1, executed): git does NOT
+   apply `url.<base>.pushInsteadOf` to command-line URL/path
+   operands at push time; remote NAMES are resolved pushurl-aware
+   (`get-url --push`) and refused. Kept on the list (marked
+   non-residual) so no future gate re-derives it from the docs.
+3. **Resolution/use TOCTOU** (G1-iter5-i2 Architect minor #2) — the
+   guard resolves the target once, pre-action; the pushes re-resolve
+   at push time, so a config rewrite (insteadOf/pushurl/remote url)
+   in the multi-second window re-opens the lane. Requires a
+   concurrent writer on the machine (same boundary as item 4);
+   relative operands — the form that made the two bases DIFFER — are
+   refused outright since v8.
+4. **Scan→add TOCTOU below ~100 ms** — closed STRUCTURALLY by the
    index re-scan (anything committed was staged and scanned); the
-   residual window is between the index scan and the commit itself
-   (nothing stages there — staging is the script's own `git add`),
+   residual window is between the index scan and the commit itself,
    and exploitation requires a concurrent hostile process on the
    machine.
-4. **Orchestrator file-write authority** — an orchestrator that can
+5. **Orchestrator file-write authority** — an orchestrator that can
    edit any file can author a fully-consistent forged gate record;
    the declaration-bound model raises the cost to a multi-artifact
    forgery visible in a pushed diff, anchored by git history,
    independent agents, and CI on main. That is the design's ceiling.
-5. **Config-level indirection beyond env** — repo/global config FILES
+6. **Config-level indirection beyond env** — repo/global config FILES
    in the scratch clone are visible to the guard's own resolution
    (that is the fix), but a hostile non-git wrapper around the script
    is outside the threat model entirely.
@@ -265,13 +283,13 @@ PC_BACKUP_PUSH_REMOTE=/path/to/bare.git scripts/sandbox_backup.sh "msg"
 
 The hermetic cycle (fresh-create → append → planted-secret abort) is
 also machine-checked in `tests/test_harness_integrity.py` on every
-push to main (POSIX legs), and the sandbox matrix
-(`scripts/verify_backup_v7.sh`, extending the still-valid v5/v6
+push to main (POSIX legs), and the sandbox matrices
+(`scripts/verify_backup_v8.sh`, extending the still-valid v5/v6/v7
 matrices — **re-run ALL of them after any script change**, see
-lessons) covers the v7 surfaces end-to-end: E14 empty-credential
-spellings, E15 physical production-path compares (repo + push
-target), E16 insteadOf resolution + env-config inertness, E17 the
-zero-trace-lines scrub signal, E18 the widened-window TOCTOU probe.
+lessons) cover the v8 surfaces end-to-end: E19 empty-authority +
+multi-@ spellings, E20 relative-target refusal (+ the stand-in
+mechanism demo), E21 pushurl divergence, E22 fail-closed
+unresolvable targets.
 
 ## Restore
 

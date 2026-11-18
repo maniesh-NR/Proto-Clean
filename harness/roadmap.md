@@ -90,6 +90,32 @@ its results before the NEXT stage proceeds. Status legend:
   iteration-1 record
   (`2026-11-19-S1-material-you-gate-iter5.md`); **iteration 2
   re-judges that commit — no outcome pre-recorded.**
+  **Iteration 2 (2026-11-19): Red Team BLOCK** (2 criticals:
+  RELATIVE push targets bypass the physical compare — the guard
+  judges at the repo's cwd while the push executes from the
+  temporary worktree, executed E2E against a patched decoy AND with
+  real constants via a logging shim; the empty-AUTHORITY family
+  `https:///github.com/…` reached github through v7's `//`-collapse
+  — executed via a proxy, CONNECT github.com:443; 1 major:
+  double-`@` ssh spellings, handoff executed, socket hop modeled)
+  **and Devil's Architect BLOCK** (the same relative-base defect,
+  found and executed E2E INDEPENDENTLY with patched constants —
+  convergent with RT-C1; the pushurl-aware resolution not
+  mutation-covered — reverting `--push` left CI green) vs Ship
+  Steward PROCEED-WITH-FINDINGS (15/15 claim map clean, CI exact,
+  audit trail faithful, incident handling verified; 2 doc minors).
+  **NO CONSENSUS at the 2-iteration cap — G1-iter5 closed,
+  escalated to the project owner.** Every finding from both
+  iterations remediated and machine/matrix-covered in the closing
+  commit (backup v8: relative-target refusal + fail-closed
+  unresolvable targets, leading-slash normalization, multi-@
+  userinfo loop; pushurl-divergent machine lane; Shipped-signature
+  + fenced-mention glyph rules; corrected two-directional residual
+  list; ledger #10; 16 tests — 728+9 local, expectation 737×4 /
+  605+132; mutation probes A-E all caught; matrices v8 19/19 + v7
+  25/25 + v6 22/22 + v5 20/20). **A fresh gate (G1-iter6) on the
+  remediation commit is the owner's call — the G1 → G1-iter3 →
+  G1-iter4 → G1-iter5 precedent.**
   - Desktop: dynamic-color seed (brand / system accent / custom hex),
     OS accent detection (GNOME 47 accent-color, Windows DWM
     AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,

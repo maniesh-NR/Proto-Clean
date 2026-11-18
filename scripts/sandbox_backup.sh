@@ -23,22 +23,26 @@
 #     (G1-iter3 criticals #1+#2) — and covers the sandbox scripts dir,
 #     the checkpoint message, and the exact backup tree
 #   * test isolation (G1-iter3 major #1, hardened G1-iter4-i2, then
-#     G1-iter5): overrides are ALL-THREE or NONE (a partial set — the
-#     exact accident shape of the seq-3/seq-5 incidents — refuses
-#     exit 2); a TEST run refuses ANY github host (github.com,
-#     ssh.github.com and EVERY subdomain — gist./www./api./… —
-#     matched by host SUFFIX, not enumeration; empty-credential
-#     spellings — https://@github.com/…, github.com:/…, scp
-#     git@github.com:/… — normalize away too, G1-iter5 RT critical
-#     #1) AND the production checkout itself (exit 6) — as the push
-#     TARGET as well as the repo, the target RESOLVED the way git
-#     resolves it (remote pushurl via `git remote get-url --push`;
-#     url.*.insteadOf rewrites via `git ls-remote --get-url` —
-#     G1-iter5 RT major #1 / Architect major #1), and the path
-#     compare is PHYSICAL (pwd -P — symlinks and // spellings cannot
-#     alias the production checkout, G1-iter5 RT critical #2) — so
-#     test traffic can touch neither github nor the production repo,
-#     not even via a clone's origin
+#     G1-iter5 and G1-iter5-i2): overrides are ALL-THREE or NONE (a
+#     partial set — the exact accident shape of the seq-3/seq-5
+#     incidents — refuses exit 2); a TEST run refuses ANY github host
+#     (github.com, ssh.github.com and EVERY subdomain — gist./www./
+#     api./… — matched by host SUFFIX, not enumeration; empty-
+#     credential spellings — https://@github.com/…, github.com:/… —
+#     normalize away; the EMPTY-AUTHORITY family — https:///
+#     github.com/… — no longer collapses the host away; multi-@
+#     ssh userinfo — ssh://user@evil.com@github.com/… — strips every
+#     @-segment) AND the production checkout itself (exit 6) — as
+#     the push TARGET as well as the repo, the target RESOLVED the
+#     way git resolves it (remote pushurl via `git remote get-url
+#     --push`; url.*.insteadOf rewrites via `git ls-remote
+#     --get-url`), RELATIVE targets refused outright (the guard
+#     judges at the repo's cwd while the push executes from the
+#     temporary worktree — a relative operand resolves somewhere the
+#     guard never judged), the path compare PHYSICAL (pwd -P), and
+#     an unresolvable target refused fail-closed — so test traffic
+#     can touch neither github nor the production repo, not even via
+#     a clone's origin
 #   * trace/config env is neutralized by PATTERN over the live
 #     environment (G1-iter4-i2 RT major #1: v5's enumerated unset list
 #     missed the legacy alias GIT_CURL_VERBOSE, which printed the raw
@@ -264,7 +268,8 @@ _GITDIR="$(git -C "$REPO" rev-parse --absolute-git-dir)"
 _norm_url() {
   printf '%s\n' "$1" | tr 'A-Z' 'a-z' | sed -E \
     -e 's#^[a-z0-9+.-]+://##' \
-    -e 's#^[^/@]*@##' \
+    -e 's#^/+##' \
+    -e ':a' -e 's#^[^/@]*@##' -e 'ta' \
     -e 's#:443(/|$)#\1#g' \
     -e 's#:22(/|$)#\1#g' \
     -e 's#^([^/]+):(/|$)#\1\2#' \
@@ -286,8 +291,9 @@ if [ "$TEST_MODE" = 1 ]; then
   # (`git remote get-url --push` — the fetch-URL resolution v6 used
   # never saw a pushurl divergence); URL and path operands resolve
   # through insteadOf (`git ls-remote --get-url` — local, no
-  # network). pushInsteadOf on direct URL operands remains a
-  # documented residual (see harness/backups/README.md). The
+  # network). (pushInsteadOf does NOT apply to direct URL/path
+  # operands at push time — executed at G1-iter5-i2 — and remote
+  # NAMES are covered pushurl-aware; no residual there.) The
   # resolved value is NEVER printed (it may embed a credential).
   _tgt="$PUSH_URL"
   if git remote get-url --push "$PUSH_URL" >/dev/null 2>&1; then
@@ -295,12 +301,45 @@ if [ "$TEST_MODE" = 1 ]; then
   else
     _tgt="$(git ls-remote --get-url "$PUSH_URL" 2>/dev/null || printf '%s' "$PUSH_URL")"
   fi
-  if [ -n "${_tgt:-}" ]; then
-    _nt="$(_norm_url "$_tgt")"
+  # fail CLOSED on an unresolvable target (G1-iter5-i2 Architect
+  # minor #1: the v7 block wrapped every target check in
+  # `if [ -n "$_tgt" ]` — an empty resolution silently skipped them
+  # all). The resolved value is NEVER printed (may embed a credential).
+  if [ -z "${_tgt:-}" ]; then
+    echo "!! refusing: the push target could not be resolved — a TEST run" >&2
+    echo "   never pushes to an unverifiable target. Point" >&2
+    echo "   PC_BACKUP_PUSH_REMOTE at a scratch bare repo (see" >&2
+    echo "   harness/backups/README.md)." >&2
+    exit 6
+  fi
+  # RELATIVE push targets are refused outright in TEST mode
+  # (G1-iter5-i2 RT critical #1 / Architect major #1, executed E2E
+  # by both independently): the guard resolves and compares the
+  # target HERE, at the REPO's cwd — but the pushes themselves
+  # execute from the temporary worktree under /tmp, so a relative
+  # operand resolves to a DIFFERENT path at push time than the one
+  # judged (a ../../-chain from the worktree reaches the real
+  # production checkout while the guard compared a dead path from
+  # the repo). Rather than judge the operand at every base it will
+  # ever be used from, refuse the ambiguous form.
+  case "$_tgt" in
+    ./*|../*)
+      echo "!! refusing: PC_BACKUP_PUSH_REMOTE is a RELATIVE path — the push" >&2
+      echo "   executes from a temporary worktree, so a relative target" >&2
+      echo "   resolves somewhere the guard never judged. Use an absolute" >&2
+      echo "   scratch path (see harness/backups/README.md)." >&2
+      exit 6
+      ;;
+  esac
+  _nt="$(_norm_url "$_tgt")"
     # host-suffix denial (G1-iter4-i2 RT critical #1; empty-credential
-    # spellings normalized away at G1-iter5 RT critical #1): match the
-    # HOST (everything before the first '/') against github.com and
-    # ANY *.github.com subdomain — enumeration was the v5 hole
+    # spellings normalized away at G1-iter5 RT critical #1; the
+    # EMPTY-AUTHORITY family — https:///github.com/…, whose leading
+    # slashes used to collapse the host away — at G1-iter5-i2 RT
+    # critical #2; multi-@ ssh userinfo — ssh://user@evil.com@
+    # github.com/… — at G1-iter5-i2 RT major #1): match the HOST
+    # (everything before the first '/') against github.com and ANY
+    # *.github.com subdomain — enumeration was the v5 hole
     _host="${_nt%%/*}"
     case "$_host" in
       github.com|*.github.com)
@@ -331,7 +370,7 @@ if [ "$TEST_MODE" = 1 ]; then
     _ptgt="${_tgt#file://}"
     _ptgt="${_ptgt%/}"
     case "$_ptgt" in
-      /*|./*|../*)
+      /*)
         _cpt="$(cd "$_ptgt" 2>/dev/null && pwd -P || true)"
         while [ "${_cpt:0:2}" = "//" ]; do _cpt="${_cpt#/}"; done
         if [ "$_ptgt" = "$PROD_CHECKOUT" ] || [ "$_cpt" = "$PROD_CHECKOUT" ] \
@@ -344,7 +383,6 @@ if [ "$TEST_MODE" = 1 ]; then
         fi
         ;;
     esac
-  fi
 fi
 
 # -- secret patterns (ERE — grep -E / grep -En everywhere) ------------
