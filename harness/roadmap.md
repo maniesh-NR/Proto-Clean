@@ -95,17 +95,20 @@ its results before the NEXT stage proceeds. Status legend:
   (a TEST run addresses ONLY local absolute filesystem paths,
   physically disjoint from the production checkout; production
   opt-in; nothing exits the machine in TEST mode; the allowlist
-  inversion is EVALUATED, not assumed away); single-source the
-  guarded identity so the one-sided-patch accident class is
+  inversion is MANDATED per decision #20 and its ADOPT evaluation
+  is amended at S8-PG1 — family-by-family disposition: the
+  pushInsteadOf / includeIf-content / symlinked-.git refusals
+  SURVIVE the inversion; loopback QUARTET converts); single-source
+  the guarded identity so the one-sided-patch accident class is
   structurally impossible; fold the glyph-check date-semantics
   residuals (ledger #10) into the port; keep the repo-resident
-  matrices v5–v9 green. **Its own gate before S2's stage gate** (the
-  decision-#18 port schedule, now a stage). **Pre-gate S8-PG1
-  iteration 1 (2026-11-19): NO CONSENSUS — Red Team BLOCK (2
-  criticals) + Devil's Architect BLOCK (3 criticals) + Ship Steward
-  PROCEED-WITH-FINDINGS; converged findings include the
-  retirement over-reach (pushInsteadOf/includeIf not subsumed by
-  the inversion), the fourth loopback consumer (machine-suite
+  matrices v5–v10 green (121 checks). **Its own gate before S2's
+  stage gate** (the decision-#18 port schedule, now a stage).
+  **Pre-gate S8-PG1 iteration 1 (2026-11-19): NO CONSENSUS — Red
+  Team BLOCK (2 criticals) + Devil's Architect BLOCK (3 criticals)
+  + Ship Steward PROCEED-WITH-FINDINGS; converged findings include
+  the retirement over-reach (pushInsteadOf/includeIf not subsumed
+  by the inversion), the fourth loopback consumer (machine-suite
   quartet), and the E11 mischaracterization; remediation cycle on
   the two deliverable documents; iteration 2 re-judges — record:
   `memory/consensus-log/2026-11-19-s8-pre-gate.md`.**

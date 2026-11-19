@@ -59,12 +59,19 @@ recorded as **decision #21**.
   **ADOPT**, consumer inventory re-verified at `5e70fae` — every
   capability-using TEST consumer targets a local absolute filesystem
   path (27 integrity-test invocation sites → tmp_path bares; 33
-  matrix `PC_BACKUP_PUSH_REMOTE` hits, all success lanes → mktemp
-  scratch bares); the one exception class is the loopback-URL
-  observability trio (v6 E11, v5 E3, v9 E28) — recommended to convert
-  at the port with the loopback exemption retiring, and E11's
-  success-surface redaction observability re-homed to a
-  local-filesystem lane.
+  matrix `PC_BACKUP_PUSH_REMOTE` env-setting sites, all success
+  lanes → mktemp scratch bares); the exception class is the
+  loopback-URL observability lanes — CORRECTED AT S8-PG1
+  (2026-11-19, pre-gate iteration 1: RT-C2b/Steward-C1/Arch-M1)
+  from a "trio" (v6 E11, v5 E3, v9 E28) to a QUARTET: the fourth
+  is the machine-suite success-expecting lane
+  (`test_backup_script_mainpush_redaction_and_trace_hygiene` run
+  r2, pushing to `http://user:…@127.0.0.1:…/x.git`, rc 0 asserted —
+  invisible to the target-side grep because the URL flows through a
+  parameter). All four convert at the port; the loopback exemption
+  retires; E11 (a FAILING-push redaction lane over http, not a
+  success-surface lane as first written) re-homes per the amended
+  evaluation.
 - `harness/process/s8-execution-plan.md`: the staged plan (pre-gate →
   port with the property-based exit criterion + identity
   single-sourcing + record sequence field → matrix conversion with
