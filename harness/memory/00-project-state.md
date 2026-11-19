@@ -117,9 +117,12 @@ deliverables. No gate outcome is pre-recorded.**)
   physically disjoint from production; allowlist inversion
   MANDATED per decision #20; identity single-sourced); gated
   before S2's stage gate; ledger #10 rides the port. Pre-gate
-  deliverables in preparation: the allowlist-inversion
+  deliverables LANDED 2026-11-19: the allowlist-inversion
   adopt/reject evaluation + re-verified consumer inventory
-  (decision #20b) and the S8 execution plan.
+  (decision #20b — `backups/allowlist-inversion-evaluation.md`,
+  ADOPT with the loopback trio flagged for conversion) and the S8
+  execution plan (`process/s8-execution-plan.md`); the pre-gate
+  itself has NOT run.
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan
