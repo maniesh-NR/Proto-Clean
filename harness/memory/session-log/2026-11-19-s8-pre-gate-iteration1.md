@@ -120,3 +120,59 @@ Document-level only; every amendment cites its finding in-band:
 
 Iteration 2 re-judges the amended deliverables (three roles,
 parallel, independent, no shared context). No outcome pre-recorded.
+
+## Part 3 — iteration 2 + cap closure + the closing remediation
+
+- **Iteration 2 launched** (three roles, parallel, independent, on
+  `eb459b1`): each given the amended deliverables, the iteration-1
+  record for resolution-fidelity verification, and a fresh
+  mandate (new issues included). Verification executed by the
+  roles: integrity 16 passed (×3); v10 matrix 9/0 (Steward); a
+  read-only static simulation of the post-3a script proving which
+  anchor-demo lanes break (Architect); zero network, zero
+  production contact, no repo file modified, no incident.
+- **Verdicts: RT BLOCK (3C/4M/5m) + Architect BLOCK (2C/6M/6m) +
+  Steward BLOCK (2C/2M/6m) → NO CONSENSUS AT THE CAP.** All three
+  roles confirmed the iteration-1 findings RESOLVED IN SUBSTANCE
+  (each verdict's "resolved?" statement is preserved in the
+  record). The new BLOCKs converged on three criticals of the
+  same boundary-contradiction class: (C-A) the 3a parity oracle
+  unsatisfiable — the five anchor-patching demo lanes (v8 E20,
+  v9 E25/E29, v10 E31/E34) patch the bash source the delegation
+  deletes, vs the plan's "zero edits"/"121 unchanged"/green
+  invariant; (C-B) item-2 realpath-or-refuse red-lines five green
+  resilience lanes (machine alarm, key-scrub run 2, v5 E4 ×2,
+  v6 E12 run 2 — non-existent operands that must PASS) and
+  contradicts the E11 failure-lane re-homing; (C-C) the
+  transport-allowlist backstop undeliverable by the module
+  (pushes stay bash-spawned; env injection blocked by the scrub's
+  own GIT_CONFIG_* drop) and overclaimed (file stays allowed →
+  LOCAL rewrites not subsumed).
+- **Cap closure per the process doc**: the gate closed
+  cap-exhausted and ESCALATED to the project owner with both
+  iterations' records; the record's closure line finalized
+  (`FINAL OUTCOME: NO CONSENSUS — iteration cap reached`), the
+  iteration-1 interim line rewritten to prose per the
+  multi-iteration rule.
+- **Closing remediation** (documents only, landed WITH the record
+  per the G1-iter6-i2 precedent): evaluation (E11 failure lane →
+  the v5-E8 hook-rejection shape; the ancestor-canonicalized
+  containment rule; the honest network-only transport backstop
+  via the bash `_git` wrapper; pattern-parity pinning the live
+  bash scrub/sed; inventory corrections for the
+  non-existent-operand lanes; the v5-E8 citation; the 127.*
+  anchor; residual-list wording) + plan (3a ledgered edit list —
+  identity re-point + de-hardcode + the five demo re-homes AT 3a;
+  3b ledgered edit list incl. the message-token rule and the
+  file://-REPO lane; STAGE 3c merge/alarm/state.json cutover;
+  4 split 4a/4b; matrix retirement to/after STAGE 6; Seq DEFERRED
+  OUT — ledger #10 updated; module contract completed —
+  config_ctx production path, refusal-neutralization test hook,
+  seam protocol fail-closed, full exit-code set, stays-in-bash
+  completed; coverage table derivable; module location decided) +
+  state doc/roadmap/PROJECT_MEMORY refresh + this session log.
+- **Status**: no port work has started (both rounds judged
+  documents only; the suite and matrices are untouched and green
+  — integrity 16 passed at every step). Owner disposition
+  pending: fresh gate on the remediation line (G1→G1-iter3
+  precedent) / further split / descope. Not pre-recorded.

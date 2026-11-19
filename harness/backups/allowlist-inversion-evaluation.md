@@ -41,7 +41,18 @@ typed string alone:
 A TEST run's resolved effective targets must be ONLY local absolute
 filesystem paths, physically disjoint from the production checkout
 (containment, not equality); production is opt-in; nothing exits
-the machine in TEST mode.
+the machine in TEST mode. Physical disjointness for a NON-EXISTENT
+operand is judged by its deepest EXISTING ancestor (realpath): a
+non-existent operand under a scratch ancestor stays LEGAL (the
+unreachable-push resilience lanes keep their semantics — see the
+inventory note below), while an operand whose existing ancestor
+resolves into/under production refuses; the
+later-materialized-alias class is covered at push time by the
+retained symlinked-.git + git-dir containment (corrected at cap
+closure, S8-PG1 iteration 2: RT-C1/Steward-C2 — the earlier
+"realpath-or-refuse for non-existent operands" wording would have
+refused five green resilience lanes and contradicted the E11
+failure-lane re-homing).
 
 ## Consumer inventory (re-verified 2026-11-19, `5e70fae`; quartet
 correction from S8-PG1: RT-C2b / Steward-C1 / Arch-M1)
@@ -62,18 +73,30 @@ correction from S8-PG1: RT-C2b / Steward-C1 / Arch-M1)
    `http://user:$fake@127.0.0.1:$PORT/x.git` (env site L1468, URL
    built L1489), asserts rc 0 + "credentials redacted" + no
    "Server auth using Basic" (L1501–1508), and passes today only
-   via the `127.*` raw-IP exemption (L533–535).
+   via the `127.*` raw-IP exemption (L538–547; the operative case
+   at L539 — anchor corrected at cap closure, Steward-m5).
 2. **Matrices v5–v10** — 34 raw `PC_BACKUP_PUSH_REMOTE` hits across
    the six scripts (33 env-setting sites + 1 patch-anchor string
    mention, v9 L259 — decomposition per S8-PG1 Steward-m1). Every
-   capability-USING success lane (E12, E25, E27, E31, E34, …)
-   targets a mktemp scratch bare (`$S/<lane>/bare.git`, `$d/bare.git`)
-   — local absolute filesystem paths. `relhide*`,
-   `definitely-not-a-remote`, `$d4/nope.git`, `dead.example.com`
-   are refusal lanes. (E10 and E33, listed as success lanes in the
-   original enumeration, are refusal-only lanes — E10: partial
-   overrides exit 2 + production-checkout exit 6; E33: refusals —
-   corrected per S8-PG1 Steward-m2.)
+   capability-USING success lane (E25, E27, E31, E34, …) targets a
+   mktemp scratch bare (`$S/<lane>/bare.git`, `$d/bare.git`) —
+   local absolute filesystem paths. NON-EXISTENT-OPERAND lanes
+   (corrected at cap closure, RT-m3 — the original inventory
+   misclassified them): E12 run 2 targets `$S/nope.git` (rc 0,
+   unreachable-push resilience — the operand PASSES the guard via
+   today's literal-only degradation and stays legal under the
+   corrected ancestor-canonicalized containment); v5 E4's
+   `$d4/nope.git` lanes are SABOTAGE lanes whose operand must PASS
+   the guard so the sabotaged self-test fires (exit 5) — also
+   non-refusal. Actual refusal lanes: `relhide*`,
+   `definitely-not-a-remote`, `dead.example.com`. (E10 and E33,
+   listed as success lanes in the original enumeration, are
+   refusal-only lanes — E10: partial overrides exit 2 +
+   production-checkout exit 6; E33: refusals — corrected per
+   S8-PG1 Steward-m2.) The same non-existent-operand class in the
+   machine suite (the alarm lane's `nope.git`, the key-scrub run's
+   `missing.git`) is likewise legal-and-green under the corrected
+   rule — no lane conversions needed beyond the quartet.
 3. **The loopback-URL QUARTET** — the inventory's one exception
    class (a quartet, not the trio first written — S8-PG1):
    machine-local (loopback never leaves the machine) but
@@ -133,16 +156,28 @@ G1-iter6-i2 RT-C1). The corrected disposition:
 | **symlinked-.git + git-dir containment** | **SURVIVES the inversion** (identity mechanism, not an operand-shape family) | The containment compare is what enforces "physically disjoint" for the git-dir itself — a `.git` symlink can point AT `$PROD/.git` from a disjoint operand path (the E33 shape: a symlink to a NON-production checkout's .git passes production containment and would operate on another checkout's git state). Retirement was never subsumed; the two inconsistent lists in the original document are both superseded by this row. |
 | off-domain redirector URLs | **documented residual** (unchanged) | No client-side spelling check can catch them |
 
-**Defense-in-depth (adopted from S8-PG1 RT-C1 option (b))**: on top
-of the retained config-level refusals, the ported module runs every
-TEST-mode git invocation with all non-file transports denied
+**Defense-in-depth (adopted from S8-PG1 RT-C1 option (b); HONESTLY
+RE-SCOPED at cap closure — RT-C3/Arch-C2: the earlier claim
+"structurally subsumes every push-time rewrite class" was false
+twice over)**: a BASH-SIDE `_git` wrapper (added to the module
+contract's stays-in-bash list — a child module cannot attach `-c`
+flags to parent-spawned processes, and env injection is blocked by
+the scrub's own GIT_CONFIG_* drop) prefixes every TEST-mode git
+invocation it spawns with the non-file transports denied
 (`protocol.http.allow=never`, `protocol.https.allow=never`,
 `protocol.git.allow=never`, `protocol.ssh.allow=never`,
-`protocol.ext.allow=never`, …; `protocol.file.allow` governs the
-local pushes) — verified by the S8-PG1 Red Team scratch probe: a
+`protocol.ext.allow=never`, …; `protocol.file.allow` stays
+permitted — the legitimate TEST pushes are local paths), pinned by
+a wrapper-sabotage lane proving the flags load-bearing. Scope of
+the backstop, stated honestly: it subsumes every NETWORK-transport
+rewrite (verified by the S8-PG1 Red Team scratch probe: a
 pushInsteadOf-rewritten push aborts with "fatal: transport 'http'
-not allowed". This structurally subsumes every push-time rewrite
-class even if a config-level refusal regresses.
+not allowed"). A rewrite to a LOCAL path — the G1-iter6 RT-C3
+incident shape and the E25/E31 demo shapes — is NOT subsumed
+(file must stay allowed); that residual is guarded SOLELY by the
+retained config-level refusals (pushInsteadOf key scan +
+include/includeIf content scan), and this is now the recorded
+residual, not a structural claim.
 
 ## The loopback QUARTET conversion (amended at S8-PG1: RT-C2a /
 Steward-C2 / Steward-M1 / Arch-m2 / Arch-M1)
@@ -152,9 +187,11 @@ Steward-C2 / Steward-M1 / Arch-m2 / Arch-M1)
   the no-leak assertions re-target the refusal surface, which is
   already redaction-covered — E35 + the refusal-redaction lanes).
   v5 E3's resilience aspect ("the run survives a failed push")
-  re-homes to the v8/E8 hook-rejection class, which covers
-  failed-push resilience (per S8-PG1 Arch-m4 — the per-lane audit
-  at plan STAGE 4 records this mapping).
+  re-homes to the v5-E8 hook-rejection class (verify_backup_v5.sh
+  L180–189 — citation corrected at cap closure from the mislabeled
+  "v8/E8", RT-M4: v8 numbers E19–E22), which covers failed-push
+  resilience (per S8-PG1 Arch-m4 — the per-lane audit at plan
+  STAGE 4 records this mapping).
 - (ii) **E11's redaction observability is preserved by TWO
   local-filesystem lanes** (re-specified per RT-C2a / Steward-C2 —
   the original "redaction label on the captured success output" was
@@ -164,23 +201,43 @@ Steward-C2 / Steward-M1 / Arch-m2 / Arch-M1)
     verbose/trace family ON; assert zero credential material and
     zero trace lines in the captured output (the v7-E17 /
     machine-r3 shape);
-  - a FAILURE lane: push to an unreachable LOCAL target; assert the
-    "credentials redacted" label on the captured failing stderr
-    (the label only ever prints on failure — the alarm lane's
-    unreachable-local-target shape already yields it).
-- (iii) **The scrub becomes a pinned unit surface**: the ported
-  module's env-scrub is a pure function with unit tests asserting
-  the sanitized env drops the `GIT_TRACE*` / `GIT_CURL_VERBOSE` /
-  `GIT_CONFIG_*` / `GIT_DIR` families. This is the STRUCTURAL
-  witness for the curl-verbose leak class — correcting the original
+  - a FAILURE lane: push to an EXISTING-but-REJECTING local target
+    — the v5-E8 hook-rejection shape (a scratch bare whose
+    pre-receive hook rejects the ref update; the push executes
+    against a real git endpoint and fails) — and assert the
+    "credentials redacted" label plus zero credential material on
+    the captured failing stderr (the label only ever prints on
+    failure). Re-specified at cap closure (RT-C1/Steward-C2): the
+    earlier "unreachable LOCAL target" wording was the
+    non-existent-operand shape, which the pre-correction exit
+    criterion would have refused up-front (no push executes, no
+    label prints); the hook shape decouples the lane from
+    non-existence semantics entirely and is the stronger failure
+    surface (a real ref-update rejection, not a connection
+    failure).
+- (iii) **The scrub and redaction become pinned unit surfaces +
+  PARITY-PINNED live copies**: the ported module's `sanitize_env`
+  and `redact` are pure functions with unit tests asserting the
+  sanitized env drops the `GIT_TRACE*` / `GIT_CURL_VERBOSE` /
+  `GIT_CONFIG_*` / `GIT_DIR` families — correcting the original
   document's false claim (L88–92 of the pre-amendment text) that
   the v6 pattern scrub + v7 zero-trace lane "structurally
   neutralize" that class: v7 E17 and machine-r3 run LOCAL
   transports where curl never executes and would pass with
   GIT_CURL_VERBOSE deleted from the pattern; the only http-transport
-  witnesses were E11 and machine-r2, both converting. Post-port the
-  unit-pinned pattern is strictly better than the http sink: it
-  catches a scrub regression directly, in CI, on every leg.
+  witnesses were E11 and machine-r2, both converting. AND —
+  extended at cap closure (RT-M1: unit pins alone pin module
+  COPIES, not the live bash artifacts that actually guard the
+  bash-spawned pushes) — PATTERN-PARITY machine lanes pin the live
+  copies to the module: the bash scrub case-list
+  (sandbox_backup.sh L111–117) must equal `sanitize_env`'s
+  drop-list, and the bash push helpers' sed redaction rules
+  (L754/L767) must equal `redact`'s rules — both extracted from
+  the live sources at test time and compared, so a regression in
+  EITHER copy (the G1-iter4-i2 executed-leak class) fails the
+  suite. The module unit tests catch the class directly, in CI,
+  on every leg; the parity lanes keep the live bash artifacts
+  honest for as long as they exist.
 - (iv) **The loopback exemption retires** together with the raw-IP
   refusal family it was carved from.
 
@@ -196,15 +253,19 @@ unit-pin was added).
 ## Residual-list impact (frozen list, backups README; corrected at
 S8-PG1)
 
-At the port, the RETIRE row of the disposition table above
-(insteadOf fetch-side, transports, percent, raw-IP/loopback,
-trailing-dot, multi-@, scp spellings, relative targets, host suffix
-matching) converts to allowlist lanes and leaves the residual list
-by gate finding. The SURVIVES rows (pushInsteadOf, include/includeIf
+At the port, the RETIRE families' refusal lanes (insteadOf
+fetch-side, transports, percent, raw-IP/loopback, trailing-dot,
+multi-@, scp spellings, relative targets, host suffix matching)
+convert to allowlist lanes; what closes on the frozen residual list
+is the third-party-egress clause of residual item 1 (the spelling
+families it enumerated) — wording refined at cap closure
+(Steward-m2: the RETIRE families were never residual-list entries
+themselves). The SURVIVES rows (pushInsteadOf, include/includeIf
 content, symlinked-.git/git-dir containment) remain on the guard —
-they are not residuals of the inversion. Off-domain redirector URLs
-remain a documented residual (no client-side spelling check can
-catch them) — unchanged. **New residual candidate for the frozen
+and the LOCAL-path rewrite residual under the transport backstop
+(cap-closure re-scope above) is recorded beside them. Off-domain
+redirector URLs remain a documented residual (no client-side
+spelling check can catch them) — unchanged. **New residual candidate for the frozen
 list, per S8-PG1 RT-M3: mount-namespace aliasing — unprivileged
 `unshare -rm mount --bind` works in this environment and realpath
 cannot see through it; the port either implements device/inode

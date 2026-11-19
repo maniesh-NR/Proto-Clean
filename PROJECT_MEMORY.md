@@ -36,7 +36,7 @@
 - [◐] **S1 closure gate G1 → iter6-i2: NO CONSENSUS at the 2-iteration cap (2026-11-19), escalated to the project owner.** Closing v10 fix cycle in `7a13645` (both-directions judgment, include-class refusal, symlinked-.git refusal, union-prefers-ours audited, scp redaction, exactly-once PROD derivation; matrices v10 E31–E35; decisions #19/#20; ledger #10→S8 + #11/#12). CI run 44462797163 on `7a13645`: 7/7 legs green, per-leg job-log-verified (`4766ff8`). **Owner disposition RECORDED 2026-11-19 (decision #21): the owner instructed "Continue" — no override; the #19 split is operative. S1-closing gate scheduled 2026-11-20+ (scoped: deliverable closure + split boundary correctness + disposition recording — NOT harness re-judgment; the same-date close-withdrawal tie rule forces the later date). No closing-gate outcome pre-recorded.**
 - [x] **pstack protocol bootstrap**: `PROJECT_MEMORY.md` + `update_memory.py` + post-commit hook + backup push (`89b1d70`).
 - [x] **Owner disposition of the G1-iter6-i2 escalation** — recorded as decision #21 (2026-11-19): split default operative; S1-closing gate scheduled 2026-11-20+; S8 activated.
-- [ ] **NEXT · S8 (ACTIVE) — harness subsystem hardening + Python port**: (1) pre-gate deliverables landed (`82fb63c`) then AMENDED in the remediation cycle (below); (2) **PRE-GATE S8-PG1: iteration 1 on `82fb63c` = NO CONSENSUS (RT BLOCK 2C/4M/4m + Arch BLOCK 3C/6M/4m + Steward PWF 2C/5M/4m; record `f422afe`); remediation cycle landed (evaluation: family-by-family disposition — pushInsteadOf/includeIf-content/symlinked-.git SURVIVE the inversion + transport-allowlist defense-in-depth + loopback QUARTET + E11 re-characterized as failing-push redaction + scrub unit-pin; plan: STAGE 3 split 3a parity+delegation / 3b inversion, module contract, exit-criterion mechanism primitive, Seq-field spec un-bundled, 3.8 floor + import seam + Windows disposition, coverage table, STAGE-6 cap contingency); iteration 2 re-judges the amended documents — no port work before consensus, no outcome pre-recorded**; (3) the port itself (merge/alarm/guard core to a tested Python module, STAGEs 3a→6 per the amended plan). Own gate before S2's stage gate.
+- [ ] **NEXT · S8 (ACTIVE) — harness subsystem hardening + Python port**: (1) pre-gate deliverables landed (`82fb63c`); (2) **PRE-GATE S8-PG1 CLOSED AT THE 2-ITERATION CAP (2026-11-19) — NO CONSENSUS, ESCALATED TO THE OWNER, disposition pending**: iter 1 on `82fb63c` RT BLOCK 2C + Arch BLOCK 3C + Steward PWF 2C → remediation `eb459b1`; iter 2 on `eb459b1` RT BLOCK 3C + Arch BLOCK 2C + Steward BLOCK 2C on NEW boundary-contradiction criticals (3a parity oracle unsatisfiable — anchor-demo lanes break at delegation; realpath-or-refuse red-lines five resilience lanes; transport-allowlist backstop undeliverable as claimed) while ALL THREE confirmed iteration-1 findings resolved in substance; closing remediation landed with the record (3a edit list re-scoped — five demo lanes re-home AT 3a + v6-E10/v7-E15 de-hardcode; item 2 → ancestor-canonicalized containment; item 7 → bash-side `_git` wrapper, honest network-only claim + recorded local-rewrite residual; STAGE 3c merge/alarm/state.json cutover; STAGE 4 split 4a/4b; matrix retirement to/after STAGE 6; Seq field DEFERRED OUT — ledger #10 updated; pattern-parity lanes pin live bash scrub/sed; module location DECIDED scripts/backup_core.py; seam protocol fail-closed exit-6; coverage table derivable). Documents only throughout — NO port code has changed. Record: `harness/memory/consensus-log/2026-11-19-s8-pre-gate.md`; (3) NEXT — owner disposition (fresh gate on the remediation line per G1→G1-iter3 precedent / further split / descope), THEN the port (STAGEs 3a→6 per the cap-closure-amended plan). Own gate before S2's stage gate.
 - [ ] **S2 — release v0.6.3** (Material You + bonding fixes; runbook `harness/memory/03-release-runbook.md`; adversarial pre-gate REQUIRED — none has run): SHA-256 asset checksums in the release body, WCAG ≥ 4.5 contrast property test (~200 seeds) gating the tag, deferred findings #1–#4 + #7.
 - [ ] **S3** bond-server packaging (BLOCKED by S6) · **S4** Android split-tunneling parity · **S5** accessibility pass · **S6** security/threat-model review (helper privileges, DNS surface, blocklist chain, bond-server exposure, account/auth chain) · **S7** legacy-stack sunset decision (Py 3.8 EOL; due by v0.7) — each with its own gate.
 
@@ -62,6 +62,15 @@ Revert = restore those three lines from the upload. The script replaces everythi
 ## Recent Progress & Git Activity
 
 ```diff
+### Commit: eb459b1 - S8-PG1 remediation cycle (documents only, per the record's resolution list): evaluation amended (family-by-family disposition - pushInsteadOf/includeIf-content/symlinked-.git SURVIVE the inversion + transport-allowlist defense-in-depth; loopback QUARTET w/ machine-r2; E11 re-characterized as failing-push redaction + two-lane re-homing + scrub unit-pin; resolved-effective-target semantics; 34-hit decomposition; E10/E33 enumeration; bind-mount residual candidate) + plan amended (STAGE 3 split 3a parity+delegation / 3b inversion; module contract; exit-criterion mechanism primitive; Seq-field spec un-bundled; checklist-(e) amendment at retirement; 3.8 floor/import seam/Windows; coverage-arithmetic table; STAGE-6 cap contingency; per-stage commands; v6-E10/v7-E15 de-hardcode; E3 resilience re-homing) + roadmap stale clauses corrected (MANDATED ADOPT, v5-v10=121) + owner-disposition log trio->quartet; integrity 16 passed (Z User, 2026-11-19)
+ PROJECT_MEMORY.md                                  |  15 +-
+ harness/backups/allowlist-inversion-evaluation.md  | 279 ++++++++++++------
+ .../2026-11-19-owner-disposition-s8-activation.md  |  19 +-
+ .../2026-11-19-s8-pre-gate-iteration1.md           |  49 ++++
+ harness/process/s8-execution-plan.md               | 325 +++++++++++++++++----
+ harness/roadmap.md                                 |  21 +-
+ 6 files changed, 545 insertions(+), 163 deletions(-)
+
 ### Commit: f422afe - S8-PG1 iteration 1: NO CONSENSUS - RT BLOCK (2C: pushInsteadOf/includeIf retirement over-reach reopens executed criticals; loopback conversion loses curl-verbose witness + inventory misses machine-r2, E11 mischaracterized) + Architect BLOCK (3C: same retirement defect; STAGE 3/5 cutover contradiction; no module contract) + Steward PWF (2C: fourth loopback consumer; unimplementable E11 replacement spec) - record + status updates only, remediation next commit per record-before-fix-cycle; matrices v5-v10 re-verified 121/0 during the gate; integrity 16 passed (Z User, 2026-11-19)
  PROJECT_MEMORY.md                                  |  15 +-
  harness/memory/00-project-state.md                 |  31 +-
@@ -77,13 +86,5 @@ Revert = restore those three lines from the upload. The script replaces everythi
  .../2026-11-19-owner-disposition-s8-activation.md  |  39 +++++++-
  harness/process/s8-execution-plan.md               |  79 ++++++++++++++++
  5 files changed, 236 insertions(+), 22 deletions(-)
-
-### Commit: 5e70fae - G1-iter6-i2 owner disposition recorded (decision #21): split default operative - S1 closing gate scheduled 2026-11-20+, S8 activated (Z User, 2026-11-19)
- PROJECT_MEMORY.md                                  | 38 ++++-----------
- harness/memory/00-project-state.md                 | 38 ++++++++++-----
- harness/memory/01-decisions.md                     | 34 +++++++++++++
- .../2026-11-19-owner-disposition-s8-activation.md  | 57 ++++++++++++++++++++++
- harness/roadmap.md                                 | 17 +++++--
- 5 files changed, 137 insertions(+), 47 deletions(-)
 ```
 

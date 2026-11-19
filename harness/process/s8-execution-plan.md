@@ -3,15 +3,22 @@
 Per `harness/process/execution-plan-template.md`. Stage S8 (decision
 #19; activated by the owner disposition, decision #21, 2026-11-19).
 Scheduling per decision #18: the port lands BEFORE S2's stage gate.
-Ledger rows #9/#10 and deferred #12 ride this stage.
-**AMENDED at S8-PG1 iteration 1 (2026-11-19, record
-`memory/consensus-log/2026-11-19-s8-pre-gate.md`): every structural
-change below cites its finding. The headline amendments: STAGE 3
-splits into 3a (parity) / 3b (inversion); the module contract is
-specified; the exit criterion gains its mechanism primitive; the Seq
-field is specified and un-bundled; the Python floor / import seam /
-Windows shape are pinned; coverage arithmetic is tracked; STAGE 6
-gains a cap contingency.**
+Ledger rows #9 and deferred #12 ride this stage (#10 deferred out
+— below). **AMENDED at S8-PG1 iteration 1 and at cap closure
+(2026-11-19, record `memory/consensus-log/2026-11-19-s8-pre-gate.md`):
+every structural change below cites its finding. Iteration-1
+amendments: STAGE 3 split 3a/3b; module contract; exit-criterion
+mechanism primitive; Seq spec; platform constraints; coverage
+arithmetic; cap contingency. Cap-closure amendments (all three
+roles BLOCKed on new criticals): the 3a edit list re-scoped (the
+five anchor-demo lanes re-home AT 3a); exit-criterion item 2
+re-specified as ancestor-canonicalized containment; item 7
+re-scoped to a bash-side `_git` wrapper with an honest
+network-only claim; STAGE 3c added (merge/alarm/state.json
+cutover); STAGE 4 split 4a/4b; matrix retirement moved to/after
+STAGE 6; the Seq field DEFERRED OUT of S8; pattern-parity lanes
+pin the live bash scrub/sed; module location decided; coverage
+table made derivable; the seam protocol fail-closed.**
 
 ```
 PLAN: S8 — harness subsystem hardening + Python port
@@ -23,48 +30,119 @@ STAGE 2: Adversarial consensus PRE-GATE (3 roles judge the
          evaluation + this plan; per process/adversarial-
          consensus.md — 2-iteration cap, owner escalation).
          Iteration 1 (2026-11-19, on 82fb63c): NO CONSENSUS —
-         RT BLOCK + Architect BLOCK + Steward PWF; this amendment
-         is the remediation; iteration 2 re-judges. No port work
-         starts before consensus. No outcome pre-recorded.
+         RT BLOCK + Architect BLOCK + Steward PWF; remediation
+         landed (eb459b1). Iteration 2 (2026-11-19, on eb459b1):
+         NO CONSENSUS AT THE CAP — RT BLOCK (3C) + Architect
+         BLOCK (2C) + Steward BLOCK (2C) on NEW criticals of the
+         same boundary-contradiction class; all three roles
+         confirmed the iteration-1 findings resolved in substance.
+         The gate closed cap-exhausted and ESCALATED to the
+         project owner; the closing remediation (this document's
+         cap-closure amendments) landed with the record. No port
+         work has started (documents only throughout); the next
+         step is the owner's disposition (fresh gate on this line /
+         further split / descope) — not pre-recorded here.
 STAGE 3a: PARITY PORT + DELEGATION (own commit; S8-PG1 Arch-C2/
-         M6, RT-M1/M2):
-         - scripts/backup_core.py implements the merge/alarm/guard
-           core BEHAVIOR-PRESERVING (denylist semantics unchanged).
+         M6, RT-M1/M2; edit list RE-SCOPED at cap closure —
+         RT-C2/Arch-C1/Steward-C1: the earlier "zero edits"
+         oracle was unsatisfiable because the delegation breaks
+         the five anchor-patching mechanism-demo lanes):
+         - scripts/backup_core.py implements the GUARD + IDENTITY
+           core BEHAVIOR-PRESERVING (denylist semantics unchanged;
+           merge/alarm/state.json cut over at STAGE 3c).
          - scripts/sandbox_backup.sh DELEGATES its guard block to
            the module in the SAME commit (the bash PROD_CHECKOUT
            constant is DELETED; the module derives the guarded
            identity — decision #19c holds from this commit, not
            from a later shim).
-         - tests/test_harness_integrity.py `_prod_checkout()` and
-           matrix v9 E30 re-point at the module in the same commit
-           (the exactly-once derivation follows the identity).
-         - The 16 machine tests + 121 matrix checks pin the module
-           TRANSITIVELY (they invoke the unchanged entrypoint).
-           The ONLY expectation edits allowed in this commit are
-           the loopback-QUARTET lanes' identity re-pointing — no
-           semantic expectation changes (parity is the oracle: 137
-           checks green with zero edits = proven equivalence).
+         - LEDGERED 3a EDIT LIST (exhaustive — nothing else
+           changes):
+           (1) `_prod_checkout()` (tests) and matrix v9 E30
+               re-point at the module (the exactly-once derivation
+               follows the identity);
+           (2) v6 E10 and v7 E15 de-hardcode their hand-copied
+               PROD paths to the derived identity (moved here
+               from STAGE 4 — Arch-M6: the identity moves at 3a;
+               leaving hand-copies falsifies the single-identity
+               invariant across the 3a→4 window);
+           (3) the five anchor-patching mechanism-demo lanes
+               (v8 E20, v9 E25, v9 E29, v10 E31, v10 E34) re-home
+               to module-seam stub form IN THIS COMMIT — their
+               bash anchors (the PROD literal + the refusal
+               blocks) are exactly what the delegation deletes;
+               the module contract's injection seams + test hook
+               exist for this (Arch-C1/Steward-C1: deferring them
+               to STAGE 4 leaves a window with ZERO mutation
+               probes); v5 E4 and v7 E18 survive unedited (their
+               anchors stay in bash).
+         - PARITY ORACLE, restated honestly: the SURVIVING checks
+           (everything except the ledgered re-homes above) green
+           with zero expectation edits = the equivalence proof;
+           the re-homed lanes prove the same mechanisms against
+           the module (stubbed seam lying = sabotaged guard). No
+           quartet lane needs a 3a edit (none references the
+           guarded identity — RT-m2/Steward-m6).
 STAGE 3b: INVERSION + LANE CONVERSION (own commit): the allowlist
          inversion lands per the amended evaluation (family-by-
          family; pushInsteadOf + include/includeIf content +
-         symlinked-.git/git-dir containment SURVIVE; transport
-         allowlist `protocol.*.allow=never` on every TEST-mode git
-         invocation as defense-in-depth); the loopback QUARTET
+         symlinked-.git/git-dir containment SURVIVE; the
+         transport-allowlist backstop lands as a BASH-SIDE `_git`
+         wrapper per the cap-closure re-scope — see the module
+         contract + exit-criterion item 7); the loopback QUARTET
          (v5 E3, v6 E11, v9 E28, machine-r2 — NOT a trio) converts
-         per the evaluation's amended §conversion; the scrub
-         unit-pin lands as a module unit test.
-STAGE 4: Matrix conversion + per-lane MECHANISM audit (deferred
+         per the evaluation's amended §conversion; the scrub and
+         redaction unit-pins + the PATTERN-PARITY lanes land.
+         LEDGERED 3b EDIT LIST (exhaustive — RT-M2/Steward-C2:
+         the inversion's semantic-change surface, completed at
+         cap closure): (a) the quartet lanes (URL operands
+         refuse; E3/E28/r2 re-target refusal surfaces; E11's
+         two-lane re-homing per the evaluation); (b) the
+         message-anchored asserts on RETIRING families — tests
+         L989 ("RELATIVE"), L1151 ("fetch"), L1187 ("push"): the
+         module's type-inversion refusal message is REQUIRED to
+         carry the family keyword (message-token preservation by
+         fiat) so the asserts stay green unedited — recorded as a
+         3b pinned behavior, with the alternative (editing the
+         asserts) rejected to keep 3b's diff surface minimal;
+         (c) the file://-REPO behavior change (exit-criterion
+         item 6): the file://+prod lane (tests L1364–1369) keeps
+         its "production checkout" assertion — the file:// refusal
+         message must also carry "production checkout" for
+         prod-under-file:// spellings (same message-token rule);
+         (d) the scrub/redaction parity lanes + unit pins. The
+         non-existent-operand resilience lanes (machine alarm,
+         key-scrub run 2, v5 E4, v6 E12 run 2) need NO edits:
+         the corrected exit-criterion item 2 keeps them green by
+         design (ancestor-canonicalized containment).
+STAGE 3c: MERGE/ALARM/STATE.JSON CUTOVER (own commit; added at
+         cap closure — Arch-M2: "transitively pinned" overstated;
+         the per-function cutover was unnamed): append_manifest,
+         merge_union, alarms_check/alarm_raise, and the
+         state.json serialization move from bash heredocs into
+         the module; the existing machine tests that exercise
+         merge/alarm/manifest behavior (the union-scrubs lanes,
+         the alarm lane, the manifest lanes) pin the module
+         functions from this commit — stated per-function: guard
+         + identity pinned from 3a; merge/alarm/state.json
+         pinned from 3c; the heredocs DELETE in this commit (no
+         dual implementations).
+STAGE 4a: Matrix conversion + per-lane MECHANISM audit (deferred
          #12): every matrix lane maps to a ported test that still
          proves the MECHANISM, not just the outcome; the per-lane
          table records each lane's post-conversion home (v5 E3's
-         failed-push resilience → the v8/E8 hook-rejection class);
-         v6 E10 and v7 E15 hand-copied PROD constants de-hardcode
-         to the derived identity (S8-PG1 RT-M2); decide CI-forcing
-         the ported suite (today ci.yml runs pytest only, so the
-         E4-class stale-lane drift can recur between gates — the
-         ported suite running IN CI closes exactly this). Bash
-         matrices stay re-runnable until parity is proven, then
-         retire with a gate finding.
+         failed-push resilience → the v5-E8 hook-rejection class);
+         the bash matrices STAY RE-RUNNABLE and green through the
+         STAGE 6 closing gate (retirement moved to/after STAGE 6 —
+         Arch-M5: retiring the outside-in oracle before the gate
+         that needs it destroys the gate's independence; "retire
+         with a gate finding" now means BY a finding of the
+         STAGE-6 gate or later).
+STAGE 4b: CI-forcing decision (own commit; split from 4a at cap
+         closure — Arch-m6: STAGE 4 did four jobs): ported-
+         pytest-only vs ported-pytest + bash-matrix CI job until
+         retirement — today ci.yml runs pytest only, so the
+         E4-class stale-lane drift can recur between gates; the
+         ported suite running IN CI closes exactly this.
 STAGE 5: scripts/sandbox_backup.sh becomes a thin shim over the
          module (or retires — open decision 4, blast radius: every
          one of the 16 tests + 6 matrices invokes this entrypoint;
@@ -78,7 +156,9 @@ STAGE 5: scripts/sandbox_backup.sh becomes a thin shim over the
          cycle is checklist-noncompliant against a retired
          artifact).
 STAGE 6: Adversarial consensus gate on the port's RESULTS (S8's
-         closing gate; before S2's stage gate). CAP CONTINGENCY
+         closing gate; before S2's stage gate). The bash matrices
+         retire BY this gate's finding (or later) — never before
+         it. CAP CONTINGENCY
          (S8-PG1 Steward-M5): at a 2-iteration cap-exhaustion,
          S8 escalates to the owner with the port results and named
          options — (a) further split (port vs matrix conversion),
@@ -92,52 +172,83 @@ FINAL STAGE: Sandbox backup (event-driven, always last).
 ## Module contract (S8-PG1 Arch-C3 — a port without a specified API
 is a rewrite with extra steps)
 
-`scripts/backup_core.py` (location per open decision 3, floor and
-import seam below), Python 3.8-compatible, stdlib-only:
+`scripts/backup_core.py` (location DECIDED at cap closure — open
+decision 3 resolved: adjacent to the script it ports, repo-only;
+floor and import seam below), Python 3.8-compatible, stdlib-only:
 
 - **Public functions** (the ported surface):
-  - `judge_target(operand, *, config_ctx) -> Verdict` — the operand
-    guard: both-directions resolution (push view per operand shape:
-    typed spelling for URL/path, `remote get-url --push` for names;
-    fetch view: `ls-remote --get-url` semantics), the allowlist
-    type check, containment, and the retained content-level config
-    scan (pushInsteadOf keys; include/includeIf file content across
-    repo + global + XDG + system).
+  - `judge_target(operand, *, config_ctx=None) -> Verdict` — the
+    operand guard: both-directions resolution (push view per
+    operand shape: typed spelling for URL/path, `remote get-url
+    --push` for names; fetch view: `ls-remote --get-url`
+    semantics), the allowlist type check, containment, and the
+    retained content-level config scan (pushInsteadOf keys;
+    include/includeIf file content across repo + global + XDG +
+    system). **`config_ctx` semantics (pinned at cap closure —
+    RT-M3/Arch-M3): the PRODUCTION path is the module-INTERNAL
+    default reader (git-config-derived, all four scopes) — the
+    bash shim passes ONLY the operand, never config content; a
+    caller-supplied `config_ctx` (paths + an injectable reader,
+    never pre-read content) exists ONLY as the test seam.** A
+    lane pins the production wiring (a config file planted in the
+    four scopes is seen by the default reader).
   - `resolve_prod_checkout() -> Path` — the single-source guarded
-    identity (derived from the module; no hand-copied constant
-    anywhere — #19c).
+    identity, derived from the module's own file location (the
+    E30 derivation pattern generalized; derivation source pinned
+    at cap closure — Arch-m2; no env override in TEST mode).
   - `sanitize_env(env) -> dict` — the env scrub (pure function;
     unit-pinned: drops `GIT_TRACE*` / `GIT_CURL_VERBOSE` /
     `GIT_CONFIG_*` / `GIT_DIR` families).
   - `redact(text) -> str` — the redaction filter (pure function;
-    unit-pinned — the structural witness for the curl-verbose class
-    after the loopback lanes convert).
+    unit-pinned — the structural witness for the curl-verbose
+    class after the loopback lanes convert).
   - `append_manifest(...)`, `merge_union(...)` — the merge core
     (already Python heredocs today: manifest append, divergence
-    union).
+    union; cut over at STAGE 3c).
   - `alarms_check(...) / alarm_raise(...)` — the alarm machinery +
-    failcount.
-- **Stays in bash** (unchanged): worktree/rsync/commit orchestration,
-  the lock (or it moves with the alarm block if the port makes it
-  trivial), CLI/env parsing at the entrypoint, the shim surface.
+    failcount (cut over at STAGE 3c).
+- **Stays in bash** (completed at cap closure — Steward-M2/RT-m1:
+  the original list omitted three load-bearing surfaces):
+  worktree/rsync/commit orchestration; the lock; CLI/env parsing
+  at the entrypoint; the shim surface; **the secret scan +
+  self-test** (v5 E4's sabotage lanes keep patching it there
+  until matrix retirement); **the env-scrub loop** (L111–117 — a
+  child cannot scrub the parent's env; it stays and is
+  PARITY-PINNED to `sanitize_env` by the 3b pattern-parity
+  lane); **the guarded push helpers** (L745–770 — their sed
+  redaction stays and is PARITY-PINNED to `redact`; the label
+  text is pinned by the re-homed failure lane); **the `_git`
+  wrapper** (new at 3b — injects the transport allowlist flags on
+  every TEST-mode git invocation it spawns; sabotage-pinned).
 - **state.json heredoc disposition** (Arch-C3): the third Python
-  heredoc (inventory/state serialization) MOVES into the module —
-  leaving it inline would produce a mixed-paradigm script that
-  shells to Python for merge/alarm/guard while inlining a Python
-  heredoc for inventory, a worse shape than today.
-- **Injection seams for the ported mechanism demos** (Arch-C3):
-  today's mechanism lanes prove refusals load-bearing by patching
-  bash SOURCE text (v5 E4 sed; v7 E18 instrumented copy; v8 E20
-  identity patch; v9 E25/E29; v10 E31/E34 patched-TS). String-
-  patching Python source is the wrong technique; the module takes
-  injectable dependencies — target resolver, config reader, clock —
-  so ported mechanism lanes STUB them instead (a stubbed resolver
-  that lies = the ported equivalent of a sabotaged guard, caught by
-  the same lanes).
-- **Shim invocation**: `python3 scripts/backup_core.py <subcommand>`
-  with JSON lines on stdout for the bash side's consumption; the
-  bash script keeps the exit-code contract (0/2/6 semantics
-  unchanged).
+  heredoc (inventory/state serialization) MOVES into the module
+  at STAGE 3c — leaving it inline would produce a
+  mixed-paradigm script that shells to Python for
+  merge/alarm/guard while inlining a Python heredoc for
+  inventory, a worse shape than today.
+- **Injection seams for the ported mechanism demos** (Arch-C3,
+  extended at cap closure — Arch-M3): today's mechanism lanes
+  prove refusals load-bearing by patching bash SOURCE text. The
+  module takes injectable dependencies — target resolver,
+  config reader, clock — AND an explicit **refusal-neutralization
+  test hook** (a loud `--test-neutralize=<check>` flag, refused
+  outside TEST mode, whose use is printed loudly in output): the
+  ported E25/E29/E31/E34-class lanes neutralize ONE retained
+  check through the hook and assert the incident reproduces —
+  the exact ported equivalent of deleting a refusal block, with
+  no source string-patching.
+- **Shim invocation + seam protocol** (pinned at cap closure —
+  Arch-M1): `python3 scripts/backup_core.py <subcommand>` with a
+  FIXED-SCHEMA line protocol on stdout (one `key=value` pair per
+  line — no jq dependency on the legacy legs; bash reads lines
+  directly). **Fail-closed taxonomy: ANY seam anomaly — module
+  crash (non-zero python exit), python3 missing (127),
+  malformed/truncated output — maps to the refusal exit 6 with a
+  loud seam-anomaly label.** The exit-code contract is the FULL
+  documented set 0/2/3/4/5/6/7/8 (+1/128 pass-through, README
+  L264–280) — not just 0/2/6; exit 7 is lane-asserted (v5 L188,
+  tests L1313). A seam-anomaly lane pins the fail-closed
+  behavior (a stubbed module that emits garbage → exit 6).
 
 ## Exit criterion — the mechanism primitive (S8-PG1 RT-M3/M4 /
 Arch-M2; wording per decision #20 + the amended evaluation)
@@ -148,11 +259,24 @@ physically disjoint from the production checkout — enforced by:
 1. **Judgment subject**: the RESOLVED EFFECTIVE targets of both
    directions (never the raw operand alone; clean remote names stay
    legal — their resolved targets must pass).
-2. **Canonicalization, both sides**: the operand AND the guarded
-   identity canonicalize (`realpath`); a non-existent operand
-   REFUSES rather than silently degrading to literal-only judgment
-   (the current `|| true` degradation is a weakening the port does
-   not inherit).
+2. **Canonicalization, both sides — with
+   ancestor-canonicalization for non-existent operands**
+   (RE-SPECIFIED at cap closure — RT-C1/Steward-C2: the earlier
+   "realpath-or-refuse for non-existent operands" red-lined five
+   green resilience lanes): the operand AND the guarded identity
+   canonicalize (`realpath`); for a NON-EXISTENT operand, the
+   deepest EXISTING ancestor canonicalizes and the operand is
+   judged against that ancestor's containment — a non-existent
+   operand under a scratch ancestor stays LEGAL (the alarm /
+   key-scrub / E4 / E12-run-2 resilience lanes keep their
+   semantics); an operand whose existing ancestor resolves
+   into/under production REFUSES; an ancestor that cannot be
+   canonicalized at all REFUSES (no silent literal-only
+   degradation — the current `|| true` weakening is not
+   inherited); the later-materialized-alias class (a symlink
+   planted at the non-existent suffix after judgment) is covered
+   at push time by the retained symlinked-.git + git-dir
+   containment.
 3. **Containment**: equality-or-descendant-with-separator against
    the canonicalized identity; for the git-dir, the symlinked-.git
    refusal + git-dir containment check (retained per the
@@ -160,43 +284,49 @@ physically disjoint from the production checkout — enforced by:
 4. **Bind-mount reality** (RT-M3, demonstrated): realpath cannot
    see through `unshare -rm mount --bind`. The port either
    implements device/inode-identity containment (bind mounts
-   preserve st_dev/st_ino — comparing the operand's
-   device/inode-identity chain against the identity's catches the
-   aliasing) or mount-namespace aliasing joins the frozen residual
-   list by gate finding. Decided at STAGE 3b, recorded in the
-   evaluation + README.
+   preserve st_dev/st_ino — comparing the operand's canonical
+   ancestor chain's (st_dev, st_ino) against the identity's,
+   `lstat` for the symlink check and `stat` for components —
+   mechanics pinned when the 3b lane is written, Arch-m5) or
+   mount-namespace aliasing joins the frozen residual list by
+   gate finding. Decided at STAGE 3b, recorded in the evaluation
+   + README.
 5. **Operand scope**: the same rule governs PC_BACKUP_PUSH_REMOTE,
    PC_BACKUP_REPO, and PC_SANDBOX_HOME.
 6. **`file://` refused** — a behavior change for the REPO operand
    (today `file:///*` is accepted); stated here so the port's
    expectation edits are explicit, not silent.
-7. **Transport allowlist**: every TEST-mode git invocation runs
-   with non-file transports denied (`protocol.*.allow=never`) —
-   the structural backstop for every push-time rewrite class.
+7. **Transport allowlist** (RE-SCOPED at cap closure —
+   RT-C3/Arch-C2): a BASH-SIDE `_git` wrapper prefixes every
+   TEST-mode git invocation it spawns with the non-file
+   transports denied (`protocol.*.allow=never`; `file` stays
+   permitted — the legitimate TEST pushes are local paths),
+   pinned by a wrapper-sabotage lane. Scope, stated honestly: a
+   NETWORK-transport-rewrite backstop only; a rewrite to a LOCAL
+   path is NOT subsumed (file must stay allowed) and rests solely
+   on the retained config-level refusals — the recorded residual
+   (see the evaluation's defense-in-depth paragraph).
 8. **Exit criterion is LANE-CHECKED, not generator-based** (S8-PG1
    Arch-m1): decision #20's own wording — "feed a non-local
    operand, expect refusal — a matrix lane, not a prose argument".
    No hypothesis dependency (the legacy CI legs install no extras).
 
-## Record sequence field (deferred #10; spec per S8-PG1 RT-m1 /
-Arch-M3 — and UN-BUNDLED from the port stages)
+## Record sequence field (deferred #10; DEFERRED OUT OF S8 at cap
+closure — Arch-M4: the spec as drafted was incoherent with its own
+purpose)
 
-- `Seq:` orders records; **dates keep backing authority** — a Seq
-  header never backs a glyph or withdraws a close by itself.
-- Seq-less records (all existing ones) sort by date BEFORE all
-  Seq-ful records; a Seq-less non-consensus record keeps its
-  date-semantics withdrawal behavior unchanged.
-- Duplicate Seq = malformation (like multiple Date: headers);
-  missing Seq after adoption = malformation for records dated after
-  adoption (the GATE_RULE_ADOPTION pattern, tests L36–37).
-- The forgery-suite extension (synthetic Seq classes: forged high
-  Seq, duplicate Seq, Seq-less post-adoption) lands in the SAME
-  commit as the field.
-- **Sequencing (Arch-M3)**: the Seq field lands as an ISOLATED
-  commit AFTER the port stages (or is deferred out of S8 by gate
-  finding) — bundling a record-format change into a port stage
-  repeats the bundling pattern that created S8 (decision #19's own
-  diagnosis).
+The cap-closure finding: "dates keep backing authority" contradicted
+"Seq-less records sort before all Seq-ful" (the sort changes which
+record is 'latest' under the withdrawal logic); the withdrawal
+predicate for Seq-ful records was unspecified; and #10's motivating
+defect (a future-dated filename shielding a ☑) remained unsolved.
+Rather than rush a record-format change inside a port stage (the
+bundling pattern that created S8), the Seq field is **deferred out
+of S8 entirely**: ledger row #10 stays deferred to "the next record
+format change", with the cap-closure analysis recorded there as the
+starting spec (ordering-only + never touching the withdrawal
+predicate + exact sort key TBD + forgery-suite classes TBD). S8
+ships without it; nothing in the port depends on it.
 
 ## Platform + packaging constraints (S8-PG1 Steward-M4 / Arch-M5)
 
@@ -225,23 +355,28 @@ Arch-M3 — and UN-BUNDLED from the port stages)
 ## Coverage arithmetic (S8-PG1 Steward-M3 — tracked so checklist
 item (e) always has a stable expected number)
 
-| Surface | Today | Expected after STAGE 3b | Expected after STAGE 4/5 |
-|---|---|---|---|
-| Matrix checks (bash) | v5 20 · v6 22 · v7 25 · v8 19 · v9 26 · v10 9 = 121 | 121 unchanged (bash lanes unedited; quartet expectations edited only where they face the guard — recount at commit) | retired per-lane as ported equivalents land; final count = gate finding |
-| Integrity suite | 16 tests (728+9 local; 737×4 POSIX; 605+132 Windows) | 16 + new module unit tests (count recorded at commit; POSIX legs +N; Windows +M unit-runnable) | matrix lanes absorbed; final counts recorded at the retirement gate |
-| The quartet | E3, E11, E28 rc-0/exemption lanes; machine-r2 rc-0 | refusal lanes (E3/E28/r2 guard-facing) + local-filesystem success lane + local-filesystem failure lane + scrub unit-pin | ported per-lane equivalents |
+| Surface | Today | After 3a (expected) | After 3b (expected) | After 3c/4/5 |
+|---|---|---|---|---|
+| Matrix checks (bash) | v5 20 · v6 22 · v7 25 · v8 19 · v9 26 · v10 9 = 121 | 121 total preserved; the five re-homed demo lanes (v8 E20, v9 E25/E29, v10 E31/E34) re-point at module seams, still 121 | 121 preserved: quartet lanes re-shaped in place (E3/E28/r2 → refusal expectations), E11 → the two-lane re-homing stays INSIDE v6 (22 checks, re-shaped), message-token rule keeps L989/L1151/L1187 green unedited | unchanged 121 through the STAGE-6 gate; retirement BY that gate's finding (or later), with the per-lane table as the count map |
+| Integrity suite | 16 tests (728+9 local; 737×4 POSIX; 605+132 Windows) | 16 + module unit tests + the seam-anomaly lane + the five demo re-homes' pytest twins (count recorded at the 3a commit) | + scrub/redaction unit pins + pattern-parity lanes + the `_git`-wrapper sabotage lane (count recorded at the 3b commit) | 3c: unchanged count (heredoc cutover is behavior-preserving); Windows: +M unit-runnable (pure functions) per the platform section |
+| The quartet | E3, E11, E28 rc-0/exemption lanes; machine-r2 rc-0 | unchanged (no 3a edits — no quartet lane references the identity) | E3/E28/r2 → refusal lanes; E11 → v6 two-lane re-homing (success + hook-rejection failure); scrub unit-pin + parity lanes | ported per-lane equivalents at 4a |
 
-Every stage commit records its actual numbers in this table; a
-number that drifts without a lane map is the E4 class.
+Every stage commit records its ACTUAL numbers beside these expected
+numbers; a number that drifts without a lane map is the E4 class
+(the expected cells are derivable from the ledgered 3a/3b edit
+lists — corrected at cap closure, Steward-M1).
 
 ## Invariants held throughout
 
 - The suite stays green at every stage (baseline 728 passed + 9
   skipped local / 737×4 POSIX, 605+132 Windows, wheel + Android
   CI); new coverage extends tests in place per the house rule.
-- STAGE 3a is parity-only: the 137 existing checks green with zero
-  semantic expectation edits (identity re-pointing aside) is the
-  equivalence proof; STAGE 3b changes semantics in its own commit.
+- STAGE 3a is parity-only: the SURVIVING checks (everything
+  outside the ledgered 3a edit list — identity re-pointing,
+  de-hardcoding, the five demo-lane re-homes) green with zero
+  semantic expectation edits is the equivalence proof; STAGE 3b
+  changes semantics in its own commit, against its own ledgered
+  edit list.
 - Mutation probes patch BOTH SIDES (the guarded identity AND every
   real-path lane) or run only where the production path does not
   exist; probe batteries snapshot the WORKING TREE
@@ -259,7 +394,7 @@ number that drifts without a lane map is the E4 class.
 
 ## Per-stage verification commands (S8-PG1 Steward-m4)
 
-- STAGE 3a/3b/4/5 boundaries: `python -m pytest -q -p no:asyncio`
+- STAGE 3a/3b/3c/4a/4b/5 boundaries: `python -m pytest -q -p no:asyncio`
   (full suite) + `bash harness/backups/matrices/verify_backup_
   v5.sh` … `v10.sh` (all six) + the module unit tests; STAGE 3b
   additionally: the quartet lanes' new expectations + the scrub
@@ -275,18 +410,20 @@ number that drifts without a lane map is the E4 class.
   harness/backups/matrices/); fix at STAGE 3a.
 - Module Windows skip policy per the platform section above.
 
-## Open decisions (updated at S8-PG1)
+## Open decisions (updated at cap closure)
 
 1. ~~The loopback-trio conversion~~ — DECIDED at S8-PG1: the QUARTET
    converts per the amended evaluation (all three roles converged;
    disagreement would have escalated).
-2. CI-forcing choice for the matrices (STAGE 4): ported-pytest-only
+2. CI-forcing choice for the matrices (STAGE 4b): ported-pytest-only
    vs ported-pytest + bash-matrix CI job until retirement — still
-   open; decided at STAGE 4.
-3. Module location (`scripts/backup_core.py` proposed — adjacent to
-   the script it ports; alternative `harness/backup_core.py`) —
-   still open, now with the floor/import/packaging/Windows context
-   above attached.
+   open; decided at STAGE 4b.
+3. ~~Module location~~ — DECIDED at cap closure (RT-m5: the platform
+   section already reasons from it; deciding before 3a):
+   `scripts/backup_core.py` — adjacent to the script it ports,
+   repo-only (not in the wheel), imported via tests/conftest.py;
+   `harness/` rejected because the module is the ported
+   implementation, not governance process documentation.
 4. Shim vs retire for the bash entrypoint at STAGE 5 — still open,
    with the blast radius stated (all 137 checks invoke the
    entrypoint; retirement deletes the last documented bash surface).
