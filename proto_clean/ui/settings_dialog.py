@@ -781,7 +781,10 @@ class SettingsDialog(QDialog):
         seed_row = QHBoxLayout()
         seed_row.addWidget(QLabel("Custom seed: "))
         self.accent_seed_edit = QLineEdit(s.accent_color)
-        self.accent_seed_edit.setPlaceholderText("#2f6d3f")
+        # the placeholder shows the BRAND seed, single-sourced from md3
+        # (G1-iter6 Architect minor #3)
+        from .md3 import PROTO_BRAND_SEED
+        self.accent_seed_edit.setPlaceholderText(PROTO_BRAND_SEED)
         self.accent_seed_edit.setMaximumWidth(120)
         seed_row.addWidget(self.accent_seed_edit)
         seed_row.addWidget(QLabel("hex color, e.g. #b3261e or #0a84ff"))

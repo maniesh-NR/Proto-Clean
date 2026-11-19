@@ -175,8 +175,10 @@ THEMES = ("system", "light", "dark")
 #   "custom" - a user-chosen hex seed (accent_color)
 ACCENT_SOURCES = ("brand", "system", "custom")
 
-# The Proto Clean brand seed (must match ui/md3.py's _PROTO_SEED).
-_BRAND_SEED = "#2f6d3f"
+# The Proto Clean brand seed — SINGLE-SOURCED from ui/md3.py
+# (G1-iter6 Architect minor #3: five hand-copied hex constants drift
+# independently; the md3 module owns the value)
+from .ui.md3 import PROTO_BRAND_SEED as _BRAND_SEED
 
 
 def normalize_hex_color(value: object) -> str:
@@ -484,7 +486,7 @@ class Settings:
     #              AccentColor, macOS AppleHighlightColor) - Material You
     #   "custom" - the user's own hex seed (accent_color below)
     accent_source: str = "brand"           # "brand" | "system" | "custom"
-    accent_color: str = "#2f6d3f"          # hex seed used when source == "custom"
+    accent_color: str = _BRAND_SEED           # hex seed used when source == "custom"
     prefer_dark_theme: bool = True         # legacy (superseded by `theme`)
     window_geometry: Optional[List[int]] = None
     # Refresh interval for server loads (seconds)

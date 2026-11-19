@@ -15,107 +15,31 @@ its results before the NEXT stage proceeds. Status legend:
 ## In gate (outcome pending — no pre-recording)
 
 - ◐ **S1. Material You across all OSes + agent harness + event-driven
-  backups** — gate history: G1 iter-1 BLOCK → iter-2 cap → owner-ordered
-  fresh gate **G1-iter3** (cap 2): iter-1 BLOCK (canary/scan gaps) →
-  fix cycle `7e54aa1` → CI broke 5/7 → three environment fix extensions
-  (`140d9dc` identity fallback, `3d51da9` push-stderr capture + container
-  rsync, `67df974` shallow-checkout fetch-depth; CI 7/7 green,
-  728/leg POSIX · 604+124 windows) → **iter-2 (2026-11-14): Red Team
-  BLOCK** (scan coverage gap on the harness/ refresh surface — proven
-  exfiltration to the pushed branch — plus guard/alarm/GIT_TRACE
-  majors) + Architect/Steward PROCEED-WITH-FINDINGS → **iteration cap
-  reached, NO CONSENSUS — escalated to the project owner.** All
-  iteration-2 findings remediated in the commit carrying the iter-2
-  record (scan covers all of harness/, any-target production refusal,
-  branch-push streak alarm + `prev_branch_push` manifest field,
-  GIT_TRACE unset + stderr redaction, per-field identity fallback,
-  shaped-filename tree exclusion, FINAL-OUTCOME-backed integrity
-  check); each fix execution-verified in scratch. **S1 stays open: a
-  fresh gate (G1-iter4) must re-judge the remediation commit before
-  closure — per process, that re-gate is the owner's call.**
-  **G1-iter4 (owner-ordered 2026-11-15): iteration 1 — Red Team BLOCK
-  (production-as-default + guard-spelling bypass + unreachable-alarm
-  + unscanned divergence merge + GIT_TRACE2) and Devil's Architect
-  BLOCK (the FINAL-OUTCOME machine check defeated by its own
-  documentation) vs Ship Steward PROCEED-WITH-FINDINGS; every finding
-  remediated and execution-verified (backup v5, hardened +
-  self-falsified integrity check, +4 machine tests, 20/20 scratch
-  matrix) — iteration 2 re-judged the fix commit (record:
-  `2026-11-15-S1-material-you-gate-iter4.md`).
-  Iteration 2 (2026-11-16): Red Team BLOCK** (2 criticals: the
-  github-SUBDOMAIN guard bypass — `www.github.com` verified a live
-  anonymous git endpoint for the production repo, a gist target ran
-  end-to-end past the guard; the FINAL-OUTCOME ☑ check still
-  forgeable four ways — undated/cross-stage/substring/fenced) **+ 2
-  majors (GIT_CURL_VERBOSE raw-credential leak through the
-  then-inline main push; partial-override test runs polluting the
-  production checkout) vs Architect + Steward
-  PROCEED-WITH-FINDINGS → iteration cap reached, NO CONSENSUS —
-  escalated to the project owner.** All findings from both
-  iterations remediated and machine-covered in the remediation
-  commit carrying the closed record (backup v6: pattern-matched
-  trace/config env scrub, all-or-none overrides +
-  production-checkout refusal, host-suffix github denial, guarded
-  main push, union key-scrub, manifest-note normalization;
-  declaration-bound gate-record authority — Stage: lines,
-  last-line closure, fence-stripping; +4 machine tests, 727+9
-  local). **A fresh gate (G1-iter5) on the remediation commit is
-  the owner's call.**
-  **G1-iter5 (owner-ordered 2026-11-19, on the G1-iter4-i2
-  remediation line `bf0c74e`→`c00f647`→`a02db67`): iteration 1 —
-  Red Team BLOCK** (2 criticals: empty-credential apex spellings
-  — `https://@github.com/…`, `github.com:/…`, scp
-  `git@github.com:/…` — parsed past the v6 normalization, executed
-  end-to-end past the guard incl. a real receive-pack attempt
-  against git@github.com; symlink and `//` spellings defeated the
-  production-checkout compare — logical pwd, not `pwd -P`; 1 major:
-  `url.*.insteadOf` config-file rewrites + the unscrubbed
-  `GIT_CONFIG_GLOBAL` evaded the raw-operand guard) **and Devil's
-  Architect BLOCK** (the push TARGET was never compared against the
-  production path — the v6 guard checked only the REPO operand,
-  falsifying the script header; the trace-scrub machine test was
-  not mutation-covering — reverting the entire env scrub left CI
-  green) vs Ship Steward PROCEED-WITH-FINDINGS (3 doc-currency
-  minors; per-leg CI counts exact from job logs, claim/code map
-  clean, audit trail faithful). **No consensus — iteration 1 of 2.**
-  The v7 fix cycle (empty-credential normalization, physical
-  path compares on repo AND push target incl. `.git`,
-  insteadOf/pushurl-aware target resolution,
-  `GIT_CONFIG_GLOBAL`/`SYSTEM` scrub, post-add INDEX re-scan,
-  zero-trace-lines mutation-covering lane, stale-consensus
-  withdrawal + id-less-☑ rules; 16 machine tests, matrices
-  v5 20/20 + v6 22/22 + v7 25/25; decision #18 adopts the bash
-  capability freeze + Python port before S2's stage gate + the
-  frozen residual-threat list) lands in the commit carrying the
-  iteration-1 record
-  (`2026-11-19-S1-material-you-gate-iter5.md`); **iteration 2
-  re-judges that commit — no outcome pre-recorded.**
-  **Iteration 2 (2026-11-19): Red Team BLOCK** (2 criticals:
-  RELATIVE push targets bypass the physical compare — the guard
-  judges at the repo's cwd while the push executes from the
-  temporary worktree, executed E2E against a patched decoy AND with
-  real constants via a logging shim; the empty-AUTHORITY family
-  `https:///github.com/…` reached github through v7's `//`-collapse
-  — executed via a proxy, CONNECT github.com:443; 1 major:
-  double-`@` ssh spellings, handoff executed, socket hop modeled)
-  **and Devil's Architect BLOCK** (the same relative-base defect,
-  found and executed E2E INDEPENDENTLY with patched constants —
-  convergent with RT-C1; the pushurl-aware resolution not
-  mutation-covered — reverting `--push` left CI green) vs Ship
-  Steward PROCEED-WITH-FINDINGS (15/15 claim map clean, CI exact,
-  audit trail faithful, incident handling verified; 2 doc minors).
-  **NO CONSENSUS at the 2-iteration cap — G1-iter5 closed,
-  escalated to the project owner.** Every finding from both
-  iterations remediated and machine/matrix-covered in the closing
-  commit (backup v8: relative-target refusal + fail-closed
-  unresolvable targets, leading-slash normalization, multi-@
-  userinfo loop; pushurl-divergent machine lane; Shipped-signature
-  + fenced-mention glyph rules; corrected two-directional residual
-  list; ledger #10; 16 tests — 728+9 local, expectation 737×4 /
-  605+132; mutation probes A-E all caught; matrices v8 19/19 + v7
-  25/25 + v6 22/22 + v5 20/20). **A fresh gate (G1-iter6) on the
-  remediation commit is the owner's call — the G1 → G1-iter3 →
-  G1-iter4 → G1-iter5 precedent.**
+  backups** — the DELIVERABLE (desktop + Android dynamic color, seed
+  persistence, OS accent detection) shipped green in the first gate
+  and has stayed green since; all five cap-exhaustions of this gate
+  were decided by backup/harness-subsystem findings (full narratives:
+  `memory/consensus-log/2026-11-13-S1-material-you-gate.md` and its
+  iter2/iter3/iter4/iter5 successors). G1-iter6 (owner-ordered
+  2026-11-19, on the G1-iter5 closing line `a1607ce` +
+  `32d822f`): iteration 1 — Red Team BLOCK (git-dir identity
+  redirects, remote-carried relative targets, pushInsteadOf on direct
+  operands — falsifying a frozen-residual claim — percent-encoded
+  hosts, `ext::` transports, six new glyph-forgery classes; all
+  executed E2E) + Devil's Architect PROCEED-WITH-FINDINGS (identity
+  coupling, port exit-criterion shape, gate convergence) + Ship
+  Steward PROCEED-WITH-FINDINGS (claim map clean, CI exact, one
+  stale-log major) → **NO CONSENSUS — iteration 1 of 2.** The fix
+  cycle (backup v9: git-dir identity check + env-family scrub,
+  every-relative refusal, pushInsteadOf/transport/percent/raw-IP
+  refusals, first-colon + post-@ host cut, containment compares;
+  glyph rules: backing adoption date, multi-Date, multi-id,
+  lookalike glyphs, id-less ◐, post-closure fences; lanes derive the
+  guarded identity; matrices repo-resident v5–v9 = 112 checks;
+  residual list corrected per findings; the harness subsystem SPLIT
+  into S8, decision #19) lands in the commit carrying the iter6
+  record; **iteration 2 (final) re-judges the fix commit — no
+  outcome pre-recorded.**
   - Desktop: dynamic-color seed (brand / system accent / custom hex),
     OS accent detection (GNOME 47 accent-color, Windows DWM
     AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,
@@ -126,6 +50,19 @@ its results before the NEXT stage proceeds. Status legend:
 
 ## Near term
 
+- ☐ **S8. Harness subsystem hardening + Python port** (decision #19,
+  split out of S1 at G1-iter6 after five subsystem-concentrated
+  cap-exhaustions) — port the backup merge/alarm/guard core to a
+  tested Python module against the PROPERTY-based exit criterion
+  (a TEST run addresses ONLY local absolute filesystem paths,
+  physically disjoint from the production checkout; production
+  opt-in; nothing exits the machine in TEST mode; the allowlist
+  inversion is EVALUATED, not assumed away); single-source the
+  guarded identity so the one-sided-patch accident class is
+  structurally impossible; fold the glyph-check date-semantics
+  residuals (ledger #10) into the port; keep the repo-resident
+  matrices v5–v9 green. **Its own gate before S2's stage gate** (the
+  decision-#18 port schedule, now a stage).
 - ☐ **S2. Release v0.6.3** — ship Material You + bonding fixes
   (runbook: `memory/03-release-runbook.md`; **adversarial pre-gate
   required before work starts — none has run yet**). Scope (folded in
@@ -152,7 +89,11 @@ its results before the NEXT stage proceeds. Status legend:
 - ☐ **S6. Security/threat-model review** — helper privileges, DNS
   server surface, blocklist download chain, **bond server exposure
   (must gate or accompany S3's packaging work — do not promote the
-  attack surface before reviewing it)**; also decide whether to port
+  attack surface before reviewing it)**, **the account/auth chain
+  (G1-iter6 Architect minor #5): credential storage at rest (keyring
+  + the chmod-0600 JSON fallback), TOTP secret storage, session
+  persistence, the browser-scrape login relay, API TLS
+  verification**; also decide whether to port
   the backup merge/alarm/guard core from bash to a tested Python
   module — now ledger row #9, with the port + a frozen verification
   matrix as the harness subsystem's bounded exit criterion

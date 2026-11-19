@@ -9,6 +9,7 @@ from proto_clean.qtcompat import QPoint, QRectF, Qt
 from proto_clean.qtcompat import QBrush, QColor, QIcon, QPainter, QPainterPath, QPixmap, QPen
 
 from .theme import is_dark
+from .md3 import PROTO_BRAND_SEED
 
 
 def _pixmap(size: int = 64) -> QPixmap:
@@ -17,7 +18,7 @@ def _pixmap(size: int = 64) -> QPixmap:
     return pm
 
 
-def shield_icon(color: str = "#2f6d3f", size: int = 64) -> QIcon:
+def shield_icon(color: str = PROTO_BRAND_SEED, size: int = 64) -> QIcon:
     pm = _pixmap(size)
     p = QPainter(pm)
     p.setRenderHint(QPainter.Antialiasing)
@@ -1178,7 +1179,7 @@ def app_icon(size: int = 64) -> QIcon:
     pm = QPixmap()
     pm.loadFromData(base64.b64decode(_APP_ICON_PNG), "PNG")
     if pm.isNull():            # fallback: flat green shield
-        return shield_icon("#2f6d3f", size)
+        return shield_icon(PROTO_BRAND_SEED, size)
     if size:
         pm = pm.scaled(size, size, Qt.KeepAspectRatio,
                        Qt.SmoothTransformation)

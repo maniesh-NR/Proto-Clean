@@ -51,9 +51,19 @@ failcount 0).
   checklist (project state, lessons baseline, README).
 - **Verification:** suite 728 passed + 9 skipped (16 integrity tests,
   count unchanged — new coverage extended existing tests); mutation
-  probes A-E in scratch clones (the relative-target probe patched
-  BOTH the guarded constant and the test's production-path lane per
-  the seq-10 rule — zero production contact) — all five caught;
+  probes A-E in scratch clones — all five caught. **CORRECTION
+  (G1-iter6 Ship Steward major #1, 2026-11-19): the parenthetical
+  below-as-written claimed "the relative-target probe patched BOTH
+  the guarded constant and the test's production-path lane per the
+  seq-10 rule — zero production contact." That claim was FALSE — the
+  post-closure audit (manifest seq 1'/2'/13, commit `32d822f`) found
+  the mutC probe patched the CONSTANT ONLY; the real-path lanes were
+  not refused and a scratch lineage landed on the production
+  checkout's local branch (content clean, audit-trail pollution —
+  the fifth accidental-checkpoint incident). The claim was corrected
+  in the gate record at `32d822f` but this session log was missed;
+  this annotation closes that gap. The corrected rule (patch BOTH
+  SIDES) lives in the process doc item (f) and lessons.
   matrices: v8 19/19 (new: E19 spellings, E20 relative refusal + the
   stand-in mechanism demo, E21 pushurl divergence, E22 fail-closed),
   v7 25/25, v6 22/22, v5 20/20 — 86 checks total.

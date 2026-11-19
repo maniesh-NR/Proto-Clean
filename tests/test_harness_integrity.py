@@ -40,14 +40,20 @@ STAGE_DECLARATION_ADOPTION = (2026, 11, 16)  # Stage: header requirement
 def _record_date(name, text):
     """A record's effective date: the LATER of its filename date and
     its 'Date:' header (G1-iter4: a back-dated filename must not
-    escape the rules)."""
+    escape the rules). G1-iter6 RT critical #6b: multiple 'Date:'
+    headers are a MALFORMATION, not a date — first-match parsing let
+    a pre-adoption first header shield a future second one; the
+    caller flags the record instead of trusting either date."""
     dates = []
     m = re.match(r"(\d{4})-(\d{2})-(\d{2})-", name)
     if m:
         dates.append((int(m.group(1)), int(m.group(2)), int(m.group(3))))
-    h = re.search(r"(?m)^Date: (\d{4})-(\d{2})-(\d{2})", text)
-    if h:
-        dates.append((int(h.group(1)), int(h.group(2)), int(h.group(3))))
+    headers = re.findall(r"(?m)^Date: (\d{4})-(\d{2})-(\d{2})", text)
+    if len(headers) > 1:
+        return None  # malformed — _gate_record_violations flags it
+    if headers:
+        y, mo, d = (int(x) for x in headers[0])
+        dates.append((y, mo, d))
     return max(dates) if dates else None
 
 
@@ -100,6 +106,13 @@ def _gate_record_violations(per_record, roadmap):
     declared, backs_consensus, rec_date = {}, {}, {}
     for name, text in per_record.items():
         body = _strip_fences(text)
+        # G1-iter6 RT critical #6b: multiple Date: headers are a
+        # malformation — first-match parsing let a forged record pick
+        # which date the rules see
+        if len(re.findall(r"(?m)^Date: ", text)) > 1:
+            violations.append(
+                f"{name} carries multiple 'Date:' headers — exactly one is "
+                f"required (first-match date parsing is forgeable)")
         d = _record_date(name, text)
         rec_date[name] = d
         declared[name] = _declared_stages(body)
@@ -119,6 +132,17 @@ def _gate_record_violations(per_record, roadmap):
                     f"{name}: the FINAL OUTCOME line must be the LAST "
                     f"non-empty line of the record (mid-record closure "
                     f"lines and fenced examples do not count)")
+            else:
+                # G1-iter6 RT critical #6f: the closure line must also
+                # be the last NON-BLANK line of the RAW text — fence
+                # stripping let a fenced addendum after the closure
+                # hide a human-visible retraction from the machine
+                raw_last = _last_line(text)
+                if outcome_lines[0] != raw_last:
+                    violations.append(
+                        f"{name}: non-blank content (a fenced addendum?) "
+                        f"follows the FINAL OUTCOME line — post-closure "
+                        f"fences are auditable forgeries, not formatting")
         if (d is not None and d >= STAGE_DECLARATION_ADOPTION
                 and not declared[name]):
             violations.append(
@@ -126,8 +150,14 @@ def _gate_record_violations(per_record, roadmap):
                 f"'Stage: S<n>' line — a record must name the stage(s) it "
                 f"gates (prose mentions do not back closure)")
         m = CONSENSUS_REACHED_LINE.search(body)
+        # G1-iter6 RT critical #6a: BACKING requires the declaration-
+        # bound authority's adoption date — a backdated record (pre-
+        # 2026-11-16 filename or Date: header) carrying a Stage: line
+        # and a terminal closure used to machine-back a ☑ although the
+        # declaration rules it exploits did not exist yet
         backs_consensus[name] = (
-            d is not None and m is not None
+            d is not None and d >= STAGE_DECLARATION_ADOPTION
+            and m is not None
             and m.group(0).rstrip() == _last_line(body).rstrip())
     records = "\n".join(name + "\n" + text
                         for name, text in per_record.items())
@@ -136,67 +166,101 @@ def _gate_record_violations(per_record, roadmap):
         if line.startswith("## "):
             section = line[3:].strip().lower()
             continue
+        # G1-iter6 RT critical #6d: done-claims made with LOOKALIKE
+        # glyphs (✅ ✔ ✓) are invisible to every ☑ rule — the legend
+        # defines exactly ☐ ◐ ☑, and no roadmap line legitimately
+        # carries the substitutes
+        if re.search(r"[\u2705\u2714\u2713]", line):
+            violations.append(
+                f"roadmap line carries a done-claim lookalike glyph "
+                f"(\u2705/\u2714/\u2713) — the status legend defines exactly "
+                f"\u2610/\u25d0/\u2611: {line.strip()!r}")
         if ("☑" in line or "◐" in line):
-            m = re.search(r"\bS(\d+)\b", line)
-            if not m:
+            # G1-iter6 RT critical #6c: EVERY stage id on the line is
+            # checked — v8 verified only the first, so a
+            # '☑ S310 (subsumes S311 and S312)' line rode two free
+            # done-claims
+            ids = re.findall(r"\bS(\d+)\b", line)
+            if not ids:
                 # G1-iter5 RT minor #2: only the retro-assessed
                 # "Shipped" section may carry id-less done lines —
                 # anywhere else a ☑ bullet without a stage id skipped
                 # the check entirely (an unbacked done-claim lane).
-                # Non-bullet lines (the status legend) never count.
-                if ("☑" in line and line.lstrip().startswith("- ")
+                # G1-iter6 RT critical #6e extends the rule to ◐: an
+                # id-less in-gate claim is equally unauditable.
+                # Non-bullet lines (the status legend, wrapped prose)
+                # never count.
+                if (line.lstrip().startswith("- ")
                         and not (section.startswith("shipped")
                                  and "retrospectively assessed" in section)):
                     violations.append(
-                        f"roadmap marks work done (☑) with no stage id "
-                        f"outside the 'Shipped' section: {line.strip()!r}")
+                        f"roadmap marks work done/active (glyph) with no "
+                        f"stage id outside the 'Shipped' section: "
+                        f"{line.strip()!r}")
                 continue  # shipped-line items without a stage id
-            sid = "S" + m.group(1)
-            mentioned = any(re.search(rf"\b{re.escape(sid)}\b",
-                                      _strip_fences(t))
-                            for t in per_record.values())
-            if not mentioned:
-                violations.append(
-                    f"roadmap marks {sid} as done/active but no "
-                    f"consensus-log record mentions it")
-            if "☑" in line:
-                backing = [n for n in per_record
-                           if sid in declared[n] and backs_consensus[n]]
-                if not backing:
+            for sid_num in ids:
+                sid = "S" + sid_num
+                mentioned = any(re.search(rf"\b{re.escape(sid)}\b",
+                                          _strip_fences(t))
+                                for t in per_record.values())
+                if not mentioned:
                     violations.append(
-                        f"roadmap marks {sid} done (☑) but no record both "
-                        f"DECLARES it (a 'Stage: {sid}' line) and closes "
-                        f"with a line-anchored 'FINAL OUTCOME: CONSENSUS "
-                        f"REACHED' as its last line — prose mentions, "
-                        f"fenced examples, substring stage ids and undated "
-                        f"records do not back closure")
-                else:
-                    # G1-iter5 RT minor #1 (stale consensus): a NEWER
-                    # record declaring the stage that does not close
-                    # with CONSENSUS REACHED withdraws the backing —
-                    # a failed re-gate must retract a ☑ machine-green
-                    # (proven by synthetic execution at G1-iter5; same-
-                    # date ties withdraw on any non-consensus record —
-                    # fail-safe under ambiguous ordering)
-                    recs = sorted(
-                        ((rec_date[n], n) for n in per_record
-                         if sid in declared[n] and rec_date[n] is not None),
-                        key=lambda t: (t[0], t[1]))
-                    if recs:
-                        latest_date = recs[-1][0]
-                        withdrawn = [n for d, n in recs
-                                     if d == latest_date
-                                     and not backs_consensus[n]]
-                        if withdrawn:
-                            violations.append(
-                                f"roadmap marks {sid} done (☑), but the "
-                                f"latest record(s) declaring it "
-                                f"({', '.join(sorted(withdrawn))}) do not "
-                                f"close with 'FINAL OUTCOME: CONSENSUS "
-                                f"REACHED' — a newer non-consensus record "
-                                f"withdraws the backing (a failed re-gate "
-                                f"retracts the glyph)")
+                        f"roadmap marks {sid} as done/active but no "
+                        f"consensus-log record mentions it")
+                if "☑" in line:
+                    backing = [n for n in per_record
+                               if sid in declared[n] and backs_consensus[n]]
+                    if not backing:
+                        violations.append(
+                            f"roadmap marks {sid} done (☑) but no record both "
+                            f"DECLARES it (a 'Stage: {sid}' line) and closes "
+                            f"with a line-anchored 'FINAL OUTCOME: CONSENSUS "
+                            f"REACHED' as its last line — prose mentions, "
+                            f"fenced examples, substring stage ids and undated "
+                            f"records do not back closure")
+                    else:
+                        # G1-iter5 RT minor #1 (stale consensus): a NEWER
+                        # record declaring the stage that does not close
+                        # with CONSENSUS REACHED withdraws the backing —
+                        # a failed re-gate must retract a ☑ machine-green
+                        # (proven by synthetic execution at G1-iter5; same-
+                        # date ties withdraw on any non-consensus record —
+                        # fail-safe under ambiguous ordering)
+                        recs = sorted(
+                            ((rec_date[n], n) for n in per_record
+                             if sid in declared[n] and rec_date[n] is not None),
+                            key=lambda t: (t[0], t[1]))
+                        if recs:
+                            latest_date = recs[-1][0]
+                            withdrawn = [n for d, n in recs
+                                         if d == latest_date
+                                         and not backs_consensus[n]]
+                            if withdrawn:
+                                violations.append(
+                                    f"roadmap marks {sid} done (☑), but the "
+                                    f"latest record(s) declaring it "
+                                    f"({', '.join(sorted(withdrawn))}) do not "
+                                    f"close with 'FINAL OUTCOME: CONSENSUS "
+                                    f"REACHED' — a newer non-consensus record "
+                                    f"withdraws the backing (a failed re-gate "
+                                    f"retracts the glyph)")
     return violations
+
+
+def _prod_checkout():
+    """G1-iter6 Architect major #1: lanes DERIVE the guarded identity
+    from the script under test instead of hand-copying it. The seq-10
+    and seq-1'/2'/13 incidents both fired because test lanes
+    referenced the real production path independently of the guard's
+    PROD_CHECKOUT constant — a mutation probe that patches the
+    constant then repoints the lanes automatically (a one-sided
+    patch neutralized the guard for every unpatched real-path lane).
+    """
+    src = (ROOT / "scripts" / "sandbox_backup.sh").read_text(
+        encoding="utf-8")
+    m = re.search(r'(?m)^PROD_CHECKOUT="(.+)"$', src)
+    assert m, "PROD_CHECKOUT constant not found in the backup script"
+    return m.group(1)
 
 
 def test_roadmap_glyphs_backed_by_gate_records():
@@ -394,6 +458,63 @@ def test_final_outcome_check_cannot_be_forged():
         {"2099-01-01-S113-forged.md": fenced_mention},
         roadmap_line("S114", "\u25d0"))
     assert any("mentions it" in m for m in v), v
+    # G1-iter6 RT critical #6a: a BACKDATED record (pre-2026-11-16
+    # filename or Date: header) carrying a Stage: line and a terminal
+    # closure used to machine-back a ☑ — backing now requires the
+    # declaration-bound authority's adoption date
+    backdated_backing = ("# forged record\nDate: 2026-11-13\nStage: S115\n\n"
+                         "FINAL OUTCOME: CONSENSUS REACHED\n")
+    v = _gate_record_violations(
+        {"2026-11-13-S115-forged.md": backdated_backing},
+        roadmap_line("S115", "\u2611"))
+    assert any("S115" in m and "DECLARES" in m for m in v), v
+    # G1-iter6 RT critical #6b: multiple Date: headers — first-match
+    # parsing let a forged record pick which date the rules see
+    multi_date = ("# forged record\nDate: 2026-11-13\nDate: 2099-01-01\n"
+                  "Stage: S116a\n\nFINAL OUTCOME: CONSENSUS REACHED\n")
+    v = _gate_record_violations(
+        {"2099-01-01-S116a-forged.md": multi_date},
+        roadmap_line("S116a", "\u25d0"))
+    assert any("multiple 'Date:' headers" in m for m in v), v
+    # G1-iter6 RT critical #6c: EVERY stage id on a glyph line is
+    # checked — '☑ S116 (subsumes S117)' used to ride a free done-claim
+    # for S117 on the first-id-only check
+    subsuming = ("# record\nDate: 2026-11-20\nStage: S116\n\n"
+                 "verdicts returned PROCEED.\n\n"
+                 "FINAL OUTCOME: CONSENSUS REACHED\n")
+    v = _gate_record_violations(
+        {"2099-01-01-S116-forged.md": subsuming},
+        "- \u2611 **S116.** shipped (subsumes S117 and S118)")
+    assert any("S117" in m for m in v), v
+    assert any("S118" in m for m in v), v
+    # ...but the same record still legitimately backs its own id
+    v2 = _gate_record_violations(
+        {"2099-01-01-S116-forged.md": subsuming},
+        roadmap_line("S116", "\u2611"))
+    assert v2 == [], v2
+    # G1-iter6 RT critical #6d: done-claims made with LOOKALIKE glyphs
+    # (✅ ✔ ✓) were invisible to every ☑ rule
+    v = _gate_record_violations({}, "- \u2705 **S119.** done, honest\n")
+    assert any("lookalike glyph" in m for m in v), v
+    v = _gate_record_violations({}, "- \u2714 **S119.** done, honest\n")
+    assert any("lookalike glyph" in m for m in v), v
+    # G1-iter6 RT critical #6e: an id-less ◐ bullet outside Shipped is
+    # as unauditable as an id-less ☑
+    v = _gate_record_violations(
+        {}, "## Near term\n\n- \u25d0 actively in gate, trust us\n")
+    assert any("outside the 'Shipped' section" in m for m in v), v
+    # G1-iter6 RT critical #6f: a fenced addendum AFTER the closure
+    # line hid a human-visible retraction from the machine while the
+    # ☑ stayed backed — the closure must be the last non-blank line of
+    # the RAW text too
+    fenced_addendum = ("# forged record\nDate: 2026-11-20\nStage: S120\n\n"
+                       "FINAL OUTCOME: CONSENSUS REACHED\n\n"
+                       "```\nADDENDUM: this gate actually FAILED —\n"
+                       "the consensus above was forged\n```\n")
+    v = _gate_record_violations(
+        {"2099-01-01-S120-forged.md": fenced_addendum},
+        roadmap_line("S120", "\u2611"))
+    assert any("follows the FINAL OUTCOME" in m for m in v), v
 
 
 def test_deferred_findings_reference_real_targets():
@@ -433,6 +554,39 @@ def test_harness_doc_references_resolve():
                       else HARNESS / ref)
             assert target.exists(), (
                 f"{p.relative_to(ROOT)} references missing {ref}")
+
+    # G1-iter6 Architect minor #2: the canonical CURRENT-baseline
+    # statements (fix-cycle checklist items a/b/c) must AGREE — the
+    # numbers drifted three gates running because four docs carry them
+    # and only manual refreshing kept them current. Historical as-of
+    # mentions (release-history tables, gate narratives, records) are
+    # exempt; only the canonical statements are compared.
+    canonical = [
+        ("process doc (baseline parenthetical)",
+         HARNESS / "process" / "adversarial-consensus.md",
+         "current test baseline"),
+        ("project state (Test baseline bullet)",
+         HARNESS / "memory" / "00-project-state.md",
+         "Test baseline"),
+        ("lessons (Baseline line)",
+         HARNESS / "memory" / "02-lessons.md",
+         "- Baseline ("),
+    ]
+    pairs = {}
+    for doc, path, marker in canonical:
+        text = path.read_text(encoding="utf-8")
+        i = text.find(marker)
+        assert i >= 0, f"{doc}: canonical baseline marker missing"
+        window = text[i:i + 250]
+        m = (re.search(r"(\d+)\s*passed\s*\+\s*(\d+)\s*skipped", window)
+             or re.search(r"(\d+)\s*\+\s*(\d+)\s*local", window))
+        assert m, f"{doc}: no baseline pair near the canonical marker"
+        pairs.setdefault((int(m.group(1)), int(m.group(2))),
+                         []).append(doc)
+    assert len(pairs) == 1, (
+        f"the local test baseline disagrees across the living docs — "
+        f"the fix-cycle checklist refreshes them in the SAME commit: "
+        f"{pairs}")
 
 
 @pytest.mark.skipif(os.name != "posix",
@@ -702,6 +856,32 @@ def test_backup_script_guard_refuses_github_spellings(tmp_path):
         # binary on the runners)
         "ssh://user@evil.com@github.com/maniesh-NR/Proto-Clean",
         "user@evil.com@github.com:maniesh-NR/Proto-Clean.git",
+        # G1-iter6 RT critical #4: PERCENT-ENCODED hosts — curl decodes
+        # the host before connecting (%67ithub.com and github%2ecom both
+        # emitted CONNECT github.com:443 at a local sink) while the
+        # normalizer compares the raw spelling
+        "https://%67ithub.com/maniesh-NR/Proto-Clean.git",
+        "https://github%2ecom/maniesh-NR/Proto-Clean.git",
+        # G1-iter6 RT critical #5: helper TRANSPORTS — ext::/fd::
+        # execute an arbitrary command as the push itself (a remote
+        # named ext::git-receive-pack <path> landed a checkpoint by
+        # running it)
+        "ext::git-receive-pack /tmp/nowhere.git",
+        "fd::17,/tmp/nowhere.git",
+        # G1-iter6 RT major #1: the scp double-colon PORT spelling —
+        # the greedy host cut read git@github.com:22:repo as host
+        # github.com:22 (suffix-matches nothing) while the ssh handoff
+        # reached github.com
+        "git@github.com:22:maniesh-NR/Proto-Clean.git",
+        # G1-iter6 RT minor #1: multi-trailing-dot hosts — only one
+        # trailing dot used to be collapsed
+        "github.com..",
+        "https://gist.github.com../aa11bb22cc33dd44ee55ff6677aabbcc.git",
+        # G1-iter6 RT minor #3: raw-IP hosts — the suffix denylist is a
+        # NAME check; github's own IP spelled directly never matched
+        # (loopback is exempt by design — the redaction lane's local
+        # http sink)
+        "https://140.82.121.4/maniesh-NR/Proto-Clean.git",
     ]
     subprocess.run(["git", "-C", str(repo), "remote", "add", "prodscp",
                     "git@github.com:maniesh-NR/Proto-Clean.git"], check=True)
@@ -711,8 +891,26 @@ def test_backup_script_guard_refuses_github_spellings(tmp_path):
                     "git@github.com:/maniesh-NR/Proto-Clean.git"], check=True)
     subprocess.run(["git", "-C", str(repo), "remote", "add", "doublescp",
                     "user@evil.com@github.com:maniesh-NR/Proto-Clean.git"], check=True)
+    # G1-iter6 RT major #1 (remote-name side): the :22: scp spelling
+    # via a configured remote — the direct form is caught by the
+    # not-a-remote layer, the remote-carried form reached github
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "scp22",
+                    "git@github.com:22:maniesh-NR/Proto-Clean.git"], check=True)
+    # G1-iter6 RT critical #5 (remote-name side): the ext:: transport
+    # via a configured remote (protocol.ext.allow defaults to never —
+    # the guard must refuse on the SPELLING, before any transport
+    # could run)
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "extrans",
+                    "ext::git-receive-pack /tmp/nowhere.git"], check=True)
+    # G1-iter6 RT critical #2 (remote-name side): a remote whose URL
+    # is RELATIVE with an interior .. — no ./ or ../ prefix, so v8's
+    # prefix-shaped refusal and the absolute-only path compare both
+    # skipped it; the push resolved at the temporary worktree base
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "relhide",
+                    "harness/../../nowhere.git"], check=True)
     for target in list(variants) + ["prodscp", "gistscp", "prodscpempty",
-                                    "doublescp"]:
+                                    "doublescp", "scp22", "extrans",
+                                    "relhide"]:
         e = dict(os.environ)
         empty_home = tmp_path / "home-env"
         empty_home.mkdir(exist_ok=True)
@@ -743,7 +941,7 @@ def test_backup_script_guard_refuses_github_spellings(tmp_path):
     # github (executed end-to-end in scratch). Literal spellings
     # refuse on any machine; filesystem-dependent spellings (symlink,
     # //) need the checkout to exist and run where it does.
-    prod = "/home/z/my-project/cleanroom"
+    prod = _prod_checkout()
     prod_spellings = [prod, "file://" + prod, prod + "/", prod + "/.git"]
     if Path(prod).exists():
         tlink = tmp_path / "prod-target-link"
@@ -769,7 +967,7 @@ def test_backup_script_guard_refuses_github_spellings(tmp_path):
     # independently: a ../../-chain from the worktree delivered a
     # test checkpoint onto a "production" stand-in's local branch)
     for target in ("../bare.git", "./bare.git",
-                   "../../home/z/my-project/cleanroom"):
+                   "../../" + _prod_checkout()):
         e = dict(os.environ)
         e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
                   "PC_BACKUP_PUSH_REMOTE": target,
@@ -839,6 +1037,86 @@ def test_backup_script_guard_refuses_github_spellings(tmp_path):
     assert "push failed" not in out, (
         "the env-injected insteadOf was not inert — the push did not "
         "go to the local bare it was addressed to")
+
+    # G1-iter6 RT critical #3: url.*.pushInsteadOf rewrites DIRECT
+    # push operands at push time (executed E2E: the typed operand
+    # …/innocent.git landed the checkpoint in a reconfigured bare) —
+    # the guard resolves fetch-side, so ANY pushInsteadOf key in
+    # visible config refuses the run outright (fail-closed)
+    other_bare = tmp_path / "rewrite-target.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(other_bare)],
+                   check=True)
+    subprocess.run(["git", "-C", str(repo), "config",
+                    "url." + str(other_bare) + ".pushInsteadOf",
+                    str(bare)], check=True)
+    e = dict(os.environ)
+    e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+              "PC_BACKUP_PUSH_REMOTE": str(bare),
+              "HOME": str(empty_home)})
+    r = subprocess.run(["bash", str(script), "pushInsteadOf probe"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=120)
+    out = r.stdout + r.stderr
+    assert r.returncode == 6, (r.returncode, out)
+    assert "pushInsteadOf" in out, out
+    assert "refs/heads/sandbox/backups" not in subprocess.run(
+        ["git", "--git-dir", str(other_bare), "for-each-ref",
+         "refs/heads/sandbox/backups"],
+        capture_output=True, text=True).stdout, (
+        "the pushInsteadOf probe reached the rewrite target")
+    subprocess.run(["git", "-C", str(repo), "config", "--unset",
+                    "url." + str(other_bare) + ".pushInsteadOf"],
+                   check=True)
+
+    # G1-iter6 RT critical #1: the git-dir IDENTITY — a subdirectory
+    # or a linked worktree of ANOTHER checkout shares that checkout's
+    # .git (git discovery walks UP / the common dir points elsewhere),
+    # so the REPO path compares pass while every git operation runs on
+    # the other checkout's git state (executed E2E on a stand-in: a
+    # full test checkpoint + self-heal merge landed inside it). Both
+    # shapes refuse on ANY machine (scratch stand-ins, no production
+    # dependency).
+    sub_repo = tmp_path / "standin"          # a scratch "other" checkout
+    subprocess.run(["git", "clone", "-q", str(ROOT), str(sub_repo)],
+                   check=True, timeout=120)
+    subprocess.run(["git", "-C", str(sub_repo), "remote", "set-url",
+                    "origin", str(bare)], check=True)
+    for operand, label in [
+            (sub_repo / "harness", "subdirectory (discovery walks up)"),
+            (tmp_path / "standin-wt", "linked worktree (shared .git)")]:
+        if "worktree" in label:
+            subprocess.run(["git", "-C", str(sub_repo), "worktree", "add",
+                            "--quiet", "--detach",
+                            str(operand)], check=True, timeout=120)
+        e = dict(os.environ)
+        e.update({"PC_BACKUP_REPO": str(operand),
+                  "PC_SANDBOX_HOME": str(home),
+                  "PC_BACKUP_PUSH_REMOTE": str(bare),
+                  "HOME": str(empty_home)})
+        r = subprocess.run(["bash", str(script), "identity probe"],
+                           cwd=str(sub_repo), env=e,
+                           capture_output=True, text=True, timeout=120)
+        out = r.stdout + r.stderr
+        assert r.returncode == 6, (label, r.returncode, out)
+        assert "git dir is not its own" in out, (label, out)
+
+    # ...and the GIT_DIR env redirection is scrubbed with its family:
+    # with GIT_DIR exported at another checkout, the run must behave
+    # EXACTLY as if it were unset (the intended repo's own git state)
+    e = dict(os.environ)
+    e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+              "PC_BACKUP_PUSH_REMOTE": str(bare),
+              "HOME": str(empty_home),
+              "GIT_DIR": str(sub_repo) + "/.git"})
+    r = subprocess.run(["bash", str(script), "gitdir-scrub probe"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=240)
+    assert r.returncode == 0, (r.returncode, r.stdout + r.stderr)
+    assert "refs/heads/sandbox/backups" not in subprocess.run(
+        ["git", "--git-dir", str(sub_repo) + "/.git", "for-each-ref",
+         "refs/heads/sandbox/backups"],
+        capture_output=True, text=True).stdout, (
+        "the GIT_DIR export redirected the run into the stand-in")
 
 
 @pytest.mark.skipif(os.name != "posix", reason="backup script is POSIX")
@@ -923,7 +1201,7 @@ def test_backup_script_overrides_all_or_none(tmp_path):
     # any machine; the PHYSICAL canonicalized compare (cd + pwd -P)
     # additionally catches relative/symlink spellings where the path
     # exists)
-    prod = "/home/z/my-project/cleanroom"
+    prod = _prod_checkout()
     for spelling in (prod, "file://" + prod, prod + "/"):
         r = run(PC_BACKUP_REPO=spelling, PC_SANDBOX_HOME=str(tmp_path),
                 PC_BACKUP_PUSH_REMOTE=str(tmp_path))
@@ -1100,7 +1378,7 @@ def test_backup_script_index_rescan_positions():
     races by the G1-iter5 Red Team all missed the window); the
     behavioral surfaces are the planted-secret lanes (exit 4, both
     scans exercised) and the widened-window probe in
-    scripts/verify_backup_v7.sh (sandbox matrix, E18)."""
+    harness/backups/matrices/verify_backup_v7.sh (E18)."""
     src = (ROOT / "scripts" / "sandbox_backup.sh").read_text(encoding="utf-8")
     lines = src.splitlines()
     # normal path: add → index scan → commit

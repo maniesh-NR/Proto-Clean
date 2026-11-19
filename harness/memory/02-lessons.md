@@ -52,7 +52,7 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   close a loop that `is_running()` (macOS CI caught this, `bdefec5`).
 - Full suite runtime ≈ 80-90 s locally; `python -m pytest tests/ -q
   -p no:asyncio`.
-- Baseline (after the G1-iter5-i2 fix cycle): local 728 passed +
+- Baseline (after the G1-iter6 fix cycle): local 728 passed +
   9 skipped; CI 737 per POSIX leg (windows 605 passed + 132
   platform skips). A changed skip count on a leg means a test
   silently changed behavior — check before/after when adding tests.
@@ -60,7 +60,7 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   showed 736+1 — the bond-desktop loopback-alias skip, runner
   instance variance, not drift.)
 
-## Harness / adversarial process (gates G1 → G1-iter5)
+## Harness / adversarial process (gates G1 → G1-iter6)
 
 - Enumeration is how defenses die. v5's unset list enumerated trace
   variables and missed the legacy alias `GIT_CURL_VERBOSE` (raw
@@ -165,6 +165,100 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   (executed at G1-iter5-i2; the phantom was corrected per the list's
   own gate-finding rule). A residual list is only as good as its
   executed facts.
+
+- **Judge the git dir, not the path spelling** (G1-iter6 RT C1,
+  executed E2E): every REPO compare judged the operand's spelling
+  while git's DISCOVERY can land elsewhere — GIT_DIR env, a
+  subdirectory (discovery walks UP into the parent .git), a linked
+  worktree (git-common-dir points at the main checkout). A full test
+  run landed a checkpoint + self-heal merge inside a stand-in
+  production with all guards green. Fix: scrub the discovery-redirection
+  env family AND verify `git rev-parse --git-common-dir` physically
+  equals the operand's own `.git`; make the protected-path compares
+  CONTAINMENT checks (the checkout AND everything under it).
+- **Fetch-side resolution is not push-time resolution** (G1-iter6 RT
+  C3): `git ls-remote --get-url` applies `insteadOf` but never
+  `pushInsteadOf` — and git 2.47.3 DOES rewrite direct path push
+  operands at push time (executed: the typed operand landed the
+  checkpoint in the reconfigured bare). Fix: refuse the CLASS (any
+  pushInsteadOf key in visible config), don't chase the rewrites.
+- **META: one spelling's non-exploitability never certifies a
+  family** (G1-iter6, the pushInsteadOf case): the G1-iter5-i2
+  "verified non-residual, executed" finding was probed via `file://`
+  — the ONE form git does not rewrite. When verifying a
+  transport-mechanism claim, enumerate the spellings the mechanism
+  has (plain path, file://, ssh, scp, remote-name) or verify the
+  mechanism at the git source level; a single-lane probe that passes
+  proves only that lane.
+- **The transport decodes what the guard compares raw**
+  (G1-iter6 RT C4): curl percent-decodes the HOST before connecting
+  (`%67ithub.com` → CONNECT github.com:443, observed at a local
+  sink) — any spelling-based denylist must refuse encodings it
+  cannot canonicalize (v9 refuses any `%` in the authority).
+- **Helper transports hide the destination inside the operand**
+  (G1-iter6 RT C5): `ext::git-receive-pack <path>` EXECUTES as the
+  push — URL normalization cannot see the target at all. Refuse the
+  transport prefix class (`::`), not the parsed destination.
+- **Greedy parsing artifacts are bypasses** (G1-iter6 RT M1/m2): the
+  host cut took everything up to the LAST colon-before-slash, so
+  `git@github.com:22:repo` read host `github.com:22` (no suffix
+  match) while ssh handed off to github.com. Cut at the FIRST colon
+  after the last `@`; collapse trailing dots; refuse raw-IP hosts
+  (the suffix denylist is a NAME check).
+- **Glyph-check rules need adoption dates on their TEETH too**
+  (G1-iter6 RT C6): a backdated record carrying a Stage line + a
+  terminal closure machine-backed a ☑; multiple Date: headers
+  parsed first-match; multi-id glyph lines verified only the first
+  id; lookalike glyphs (✅/✔/✓) were invisible; an id-less ◐ skipped;
+  a fenced addendum after the closure line hid a retraction. Every
+  rule the checker enforces needs: the date semantics, the
+  multi-instance case, the lookalike class, and the RAW-text
+  terminal position (fence-stripping is for CONTENT rules, never for
+  position rules).
+- **Derive guarded constants in the lanes, never hand-copy them**
+  (G1-iter6 Architect M1, the seq-10 / seq-1'/2'/13 root cause):
+  test lanes that hardcode the production path independently of the
+  script's constant are exactly the one-sided-patch accident. The
+  integrity lanes now parse PROD_CHECKOUT out of the script under
+  test — a mutation probe that patches the constant repoints the
+  lanes automatically.
+- **An exit criterion measured by an artifact nobody must run is not
+  a criterion** (G1-iter6 Architect M2): the verification matrices
+  lived only in the sandbox home, referenced by repo docs through
+  paths that did not resolve in-repo, and went stale twice (v5 E4;
+  v8 E20's patch anchor drifted silently). They are repo-resident
+  (`harness/backups/matrices/`) and the checklist re-runs all of
+  them; the port's exit criterion is now PROPERTY-based, not
+  behavior-preserving (decision #19).
+- **Probe from the tree that contains the fix — cloning a probe repo
+  from HEAD while the fix is uncommitted re-creates the one-sided
+  patch structurally** (G1-iter6, sixth incident, fourth variant,
+  executed TWICE): the mutation-probe battery cloned from HEAD, got
+  the v8 test file with hand-copied production paths, patched the
+  script constant — and the stale lanes pushed two junk clusters
+  onto production's local branch. The v9 fix (lanes DERIVE the
+  constant) was exactly the part the stale clone lacked. Probe
+  batteries snapshot the WORKING TREE over a history clone
+  (`git clone` + `rsync --delete` overlay), never bare HEAD; anchors
+  verify LOUDLY (a missing anchor is an inconclusive probe, never a
+  silent skip); and a debug re-run of a failing production-touching
+  probe is itself production-touching — re-check containment before
+  re-running (the second cluster came from exactly such a debug
+  re-run).
+- **A local branch polluted by test runs that never reached the
+  remote resets to origin — no annotation theater** (G1-iter6): the
+  append-only discipline protects the PUSHED audit trail; junk that
+  exists only in a local ref (reflog-verified) is removed by reset
+  with the incident disclosed in the anomaly log. Annotating would
+  PUSH the junk to the remote — the opposite of containment.
+
+- **A control with no terminal state is an escalation ladder**
+  (G1-iter6 Architect M3): five consecutive cap-exhaustions, each
+  followed by an owner-ordered fresh gate of the same scope, with
+  the findings concentrated in one subsystem while the deliverable
+  stayed green. The owner-side rule now DEFAULTS to splitting the
+  subsystem out (S8) after two consecutive subsystem-concentrated
+  caps (process doc, decision #19).
 
 ## CI / GitHub
 

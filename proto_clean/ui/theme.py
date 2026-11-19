@@ -55,8 +55,9 @@ THEME_LABELS = {
     "dark": "Dark mode",
 }
 
-# Material You: the brand seed mirrors md3._PROTO_SEED / settings' default.
-_BRAND_SEED = "#2f6d3f"
+# Material You: the brand seed is SINGLE-SOURCED from md3
+# (G1-iter6 Architect minor #3).
+from .md3 import PROTO_BRAND_SEED as _BRAND_SEED
 
 # module state: what was requested / what is actually painted
 _requested: str = "dark"

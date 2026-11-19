@@ -459,6 +459,11 @@ def scheme_from_seed(seed_rgb_hex: str, is_dark: bool) -> MaterialScheme:
 # Theme convenience
 # ---------------------------------------------------------------------------
 _PROTO_SEED: str = "#2f6d3f"   # proto-clean green
+# G1-iter6 Architect minor #3: the brand seed is SINGLE-SOURCED here —
+# settings/theme/resources/settings_dialog import this constant instead
+# of hand-copying the hex (resources.py's painter copy was a live
+# instance of the deferred-#7 raw-hex-in-painter class)
+PROTO_BRAND_SEED: str = _PROTO_SEED
 
 
 def md3_scheme_for(theme: str) -> Tuple[MaterialScheme, str]:

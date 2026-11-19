@@ -166,10 +166,39 @@ Format: **decision** — context — date. Newest last.
     (a) the bash script's capability set is FROZEN — only
     refusal-class fixes and port prep until the port; (b) the
     merge/alarm/guard core ports to a tested Python module BEFORE
-    S2's stage gate (the 16 machine tests + the 67 matrix checks
-    across v5/v6/v7 pin the behavior to port better than it will
-    ever be pinned again); (c) a FROZEN residual-threat list
+    S2's stage gate (the 16 machine tests + the 112 matrix checks
+    across v5–v9 — repo-resident since G1-iter6 — pin the behavior
+    to port better than it will ever be pinned again); (c) a FROZEN residual-threat list
     (backups README) bounds what future gates judge against — each
     gate no longer re-derives the attack surface from scratch, and
     adding to the list requires a gate finding. (2026-11-19,
     G1-iter5)
+
+19. **Harness subsystem split + the port's PROPERTY-based exit
+    criterion (G1-iter6, 2026-11-19).** Five consecutive S1 gates
+    closed at their caps, every closing finding concentrated in the
+    backup/harness subsystem while the stage's deliverable (Material
+    You) stayed green and fully ledgered — the monolithic stage let a
+    subsystem hold the deliverable hostage (G1-iter6 Devil's
+    Architect major #3, remediated same cycle). (a) **S1 closes on
+    its deliverable** (Material You verified green across five gates;
+    residual items ledgered to S2/S5); the harness subsystem — the
+    backup script port, its property re-specification, the matrix
+    upkeep — becomes its own roadmap stage (**S8**), gated before
+    S2's stage gate (the decision-#18 port schedule, now with its own
+    gate). (b) **The port's exit criterion is PROPERTY-based, not
+    behavior-preserving** (Architect major #2): a TEST run addresses
+    ONLY local absolute filesystem paths, physically disjoint from
+    the production checkout (containment, not equality); production
+    is opt-in; nothing exits the machine in TEST mode. The port must
+    EVALUATE the allowlist inversion (v9's denylist+refusal families
+    exist because TEST mode retains any-host capability that no
+    consumer uses — every legitimate TEST lane pushes to a local
+    scratch bare); the frozen residual list then shrinks by gate
+    finding. (c) **Identity single-sourcing is part of the exit**:
+    the guarded identity derives from the script under test
+    (machine lanes already do, G1-iter6; the port's config must make
+    the one-sided-patch accident structurally impossible — Architect
+    major #1). (d) The owner-side escalation default (split after two
+    consecutive subsystem-concentrated cap-exhaustions) is recorded
+    in `process/adversarial-consensus.md`. (2026-11-19, G1-iter6)

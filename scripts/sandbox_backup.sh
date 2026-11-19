@@ -23,26 +23,46 @@
 #     (G1-iter3 criticals #1+#2) — and covers the sandbox scripts dir,
 #     the checkpoint message, and the exact backup tree
 #   * test isolation (G1-iter3 major #1, hardened G1-iter4-i2, then
-#     G1-iter5 and G1-iter5-i2): overrides are ALL-THREE or NONE (a
-#     partial set — the exact accident shape of the seq-3/seq-5
-#     incidents — refuses exit 2); a TEST run refuses ANY github host
-#     (github.com, ssh.github.com and EVERY subdomain — gist./www./
-#     api./… — matched by host SUFFIX, not enumeration; empty-
-#     credential spellings — https://@github.com/…, github.com:/… —
-#     normalize away; the EMPTY-AUTHORITY family — https:///
+#     G1-iter5 and G1-iter5-i2, then G1-iter6): overrides are
+#     ALL-THREE or NONE (a partial set — the exact accident shape of
+#     the seq-3/seq-5 incidents — refuses exit 2); a TEST run refuses
+#     ANY github host (github.com, ssh.github.com and EVERY subdomain
+#     — gist./www./api./… — matched by host SUFFIX, not enumeration;
+#     empty-credential spellings — https://@github.com/…, github.com:/…
+#     — normalize away; the EMPTY-AUTHORITY family — https:///
 #     github.com/… — no longer collapses the host away; multi-@
 #     ssh userinfo — ssh://user@evil.com@github.com/… — strips every
-#     @-segment) AND the production checkout itself (exit 6) — as
-#     the push TARGET as well as the repo, the target RESOLVED the
-#     way git resolves it (remote pushurl via `git remote get-url
-#     --push`; url.*.insteadOf rewrites via `git ls-remote
-#     --get-url`), RELATIVE targets refused outright (the guard
-#     judges at the repo's cwd while the push executes from the
-#     temporary worktree — a relative operand resolves somewhere the
-#     guard never judged), the path compare PHYSICAL (pwd -P), and
-#     an unresolvable target refused fail-closed — so test traffic
-#     can touch neither github nor the production repo, not even via
-#     a clone's origin
+#     @-segment; G1-iter6 adds: PERCENT-ENCODED hosts — %67ithub.com
+#     — are refused (curl decodes the host before connecting; the
+#     v8 normalizer did not — executed at a local CONNECT sink),
+#     scp PORT spellings — git@github.com:22:repo — cut at the FIRST
+#     colon (v8's greedy cut read the host as github.com:22, which
+#     suffix-matches nothing), helper TRANSPORTS — ext::/fd::/vendor::/
+#     anything:: — refused (a remote named ext::git-receive-pack …
+#     executed an arbitrary command as the push target, invisible to
+#     URL normalization), raw-IP and IPv6-literal hosts refused, and
+#     trailing-dot hosts collapsed) AND the production checkout itself
+#     (exit 6) — as the push TARGET as well as the repo, the target
+#     RESOLVED the way git resolves it (remote pushurl via `git remote
+#     get-url --push`; url.*.insteadOf rewrites via `git ls-remote
+#     --get-url`), ANY url.*.pushInsteadOf key in visible config
+#     refused outright (G1-iter6 RT critical #3, executed E2E: git
+#     2.47.3 DOES rewrite direct path push operands at push time —
+#     the typed operand /tmp/…/innocent.git landed the checkpoint in
+#     the reconfigured /tmp/…/B4.git while the guard had judged only
+#     innocent.git; the G1-iter5-i2 "phantom" finding was a file://
+#     probe, the one spelling git does not rewrite), EVERY relative
+#     target refused — ./x, ../x and remote-carried interior-..
+#     spellings alike (harness/../../… resolved at the push worktree
+#     base and landed a checkpoint on an unjudged sink, G1-iter6 RT
+#     critical #2) — the path compare PHYSICAL (pwd -P) and a
+#     CONTAINMENT compare (the production checkout AND anything under
+#     it), the git-dir IDENTITY verified (the v8 compares judged the
+#     REPO path spelling while git's discovery followed a subdirectory
+#     or a linked worktree into the production .git — G1-iter6 RT
+#     critical #1, executed E2E on a stand-in), and an unresolvable
+#     target refused fail-closed — so test traffic can touch neither
+#     github nor the production repo, not even via a clone's origin
 #   * trace/config env is neutralized by PATTERN over the live
 #     environment (G1-iter4-i2 RT major #1: v5's enumerated unset list
 #     missed the legacy alias GIT_CURL_VERBOSE, which printed the raw
@@ -79,11 +99,21 @@ set -euo pipefail
 # re-enable http.verbose or inject any config) all die here.
 while IFS='=' read -r _tv _; do
   case "$_tv" in
-    GIT_TRACE*|GIT_CURL_VERBOSE|GIT_CONFIG_KEY*|GIT_CONFIG_VALUE*|GIT_CONFIG_COUNT|GIT_CONFIG_PARAMETERS|GIT_CONFIG_GLOBAL|GIT_CONFIG_SYSTEM)
+    GIT_TRACE*|GIT_CURL_VERBOSE|GIT_CONFIG_KEY*|GIT_CONFIG_VALUE*|GIT_CONFIG_COUNT|GIT_CONFIG_PARAMETERS|GIT_CONFIG_GLOBAL|GIT_CONFIG_SYSTEM|GIT_DIR|GIT_WORK_TREE|GIT_COMMON_DIR|GIT_INDEX_FILE|GIT_OBJECT_DIRECTORY|GIT_ALTERNATE_OBJECT_DIRECTORIES|GIT_CEILING_DIRECTORIES)
       unset "$_tv" || true
       ;;
   esac
 done < <(env)
+# G1-iter6 RT critical #1 added the discovery-redirection family
+# (GIT_DIR/GIT_WORK_TREE/…): with GIT_DIR exported, every git
+# operation the script runs — including the branch creation and the
+# divergence fetch — operated on a DIFFERENT git dir than the REPO
+# path the guard had compared (executed E2E on a stand-in: a full
+# test checkpoint landed inside the stand-in production's .git and
+# its main worktree HEAD was switched to sandbox/backups). Scrubbing
+# the family removes the env redirection; the git-dir IDENTITY check
+# below catches the remaining discovery shapes (subdirectory walk-up,
+# linked worktrees).
 
 REPO="${PC_BACKUP_REPO:-/home/z/my-project/cleanroom}"
 REPO="${REPO#file://}"          # accept file:// URLs (G1-iter3 major #1)
@@ -163,12 +193,28 @@ if [ "$TEST_MODE" = 1 ]; then
   # carries (POSIX lets implementations keep a leading //).
   _crepo="$(cd "$REPO" 2>/dev/null && pwd -P || true)"
   while [ "${_crepo:0:2}" = "//" ]; do _crepo="${_crepo#/}"; done
-  if [ "$_nrepo" = "$PROD_CHECKOUT" ] || [ "$_crepo" = "$PROD_CHECKOUT" ]; then
-    echo "!! refusing: env overrides mark this as a TEST run, but PC_BACKUP_REPO" >&2
-    echo "   is the production checkout — test traffic never touches it (clone" >&2
-    echo "   to scratch first; see harness/backups/README.md)." >&2
-    exit 6
-  fi
+  # CONTAINMENT, not just equality (G1-iter6 RT critical #1): a
+  # SUBDIRECTORY of the production checkout — PC_BACKUP_REPO=…/
+  # cleanroom/harness — matched neither compare (…/cleanroom/harness
+  # ≠ …/cleanroom) while git's discovery walked UP into the
+  # production .git and wrote refs/remotes/pcbk/* and a scratch
+  # sandbox/backups lineage into it (executed E2E on a stand-in).
+  case "$_nrepo" in
+    "$PROD_CHECKOUT"|"$PROD_CHECKOUT"/*)
+      echo "!! refusing: env overrides mark this as a TEST run, but PC_BACKUP_REPO" >&2
+      echo "   is the production checkout (or inside it) — test traffic never" >&2
+      echo "   touches it (clone to scratch first; see harness/backups/README.md)." >&2
+      exit 6
+      ;;
+  esac
+  case "$_crepo" in
+    "$PROD_CHECKOUT"|"$PROD_CHECKOUT"/*)
+      echo "!! refusing: env overrides mark this as a TEST run, but PC_BACKUP_REPO" >&2
+      echo "   resolves to the production checkout (or inside it) — test traffic" >&2
+      echo "   never touches it (clone to scratch first; see harness/backups/README.md)." >&2
+      exit 6
+      ;;
+  esac
 fi
 
 cd "$REPO"
@@ -183,6 +229,33 @@ fi
 if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
   echo "!! the backup repo has no HEAD commit (unborn branch?) — clone a real checkout first" >&2
   exit 2
+fi
+
+# -- git-dir IDENTITY check (G1-iter6 RT critical #1, executed E2E on
+#    a stand-in): the REPO compares above judge the path SPELLING;
+#    git's repo discovery can still land on a git dir that is not the
+#    operand's own — a SUBDIRECTORY of another checkout (discovery
+#    walks UP into the parent .git) or a LINKED WORKTREE (git-common-
+#    dir points at the main checkout's .git; a full test run created
+#    sandbox/backups and ran the divergence self-heal INSIDE the
+#    stand-in production's git state, all guards green). With the
+#    GIT_DIR family scrubbed above, the remaining redirection shapes
+#    are structural — so verify the discovered common dir IS the
+#    operand's own .git, PHYSICALLY. Production mode is exempt (the
+#    production checkout IS the repo being backed up).
+if [ "$TEST_MODE" = 1 ]; then
+  _cgd="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+  [ -n "$_cgd" ] || _cgd=".git"
+  case "$_cgd" in /*) ;; *) _cgd="$REPO/$_cgd" ;; esac
+  _ccgd="$(cd "$_cgd" 2>/dev/null && pwd -P || true)"
+  _cown="$(cd "$REPO/.git" 2>/dev/null && pwd -P || true)"
+  if [ -z "$_ccgd" ] || [ -z "$_cown" ] || [ "$_ccgd" != "$_cown" ]; then
+    echo "!! refusing: PC_BACKUP_REPO's git dir is not its own — a subdirectory" >&2
+    echo "   or a linked worktree of ANOTHER checkout shares that checkout's .git," >&2
+    echo "   and test traffic would operate on it. Clone a full scratch checkout" >&2
+    echo "   (see harness/backups/README.md)." >&2
+    exit 6
+  fi
 fi
 
 # -- git identity self-sufficiency (G1-iter3 fix-cycle extension,
@@ -291,10 +364,8 @@ if [ "$TEST_MODE" = 1 ]; then
   # (`git remote get-url --push` — the fetch-URL resolution v6 used
   # never saw a pushurl divergence); URL and path operands resolve
   # through insteadOf (`git ls-remote --get-url` — local, no
-  # network). (pushInsteadOf does NOT apply to direct URL/path
-  # operands at push time — executed at G1-iter5-i2 — and remote
-  # NAMES are covered pushurl-aware; no residual there.) The
-  # resolved value is NEVER printed (it may embed a credential).
+  # network). The resolved value is NEVER printed (it may embed a
+  # credential).
   _tgt="$PUSH_URL"
   if git remote get-url --push "$PUSH_URL" >/dev/null 2>&1; then
     _tgt="$(git remote get-url --push "$PUSH_URL")"
@@ -312,22 +383,77 @@ if [ "$TEST_MODE" = 1 ]; then
     echo "   harness/backups/README.md)." >&2
     exit 6
   fi
-  # RELATIVE push targets are refused outright in TEST mode
-  # (G1-iter5-i2 RT critical #1 / Architect major #1, executed E2E
-  # by both independently): the guard resolves and compares the
-  # target HERE, at the REPO's cwd — but the pushes themselves
-  # execute from the temporary worktree under /tmp, so a relative
-  # operand resolves to a DIFFERENT path at push time than the one
-  # judged (a ../../-chain from the worktree reaches the real
-  # production checkout while the guard compared a dead path from
-  # the repo). Rather than judge the operand at every base it will
-  # ever be used from, refuse the ambiguous form.
+  # url.*.pushInsteadOf refusal (G1-iter6 RT critical #3, executed
+  # E2E): git 2.47.3 DOES rewrite DIRECT URL/path push operands at
+  # push time — the typed operand …/innocent.git landed the checkpoint
+  # in a reconfigured …/B4.git while this guard had judged only
+  # innocent.git (the G1-iter5-i2 "phantom" finding was probed via the
+  # file:// spelling, the ONE form git does not rewrite — the residual
+  # list's "verified non-residual" entry was wrong and is corrected).
+  # The guard resolves fetch-side (ls-remote --get-url applies
+  # insteadOf, never pushInsteadOf), so rather than chase the
+  # push-side rewrites, ANY pushInsteadOf key in visible config
+  # refuses the run fail-closed — no scratch setup needs one.
+  if git config --get-regexp '^url\..+\.pushinsteadof$' >/dev/null 2>&1; then
+    echo "!! refusing: a url.*.pushInsteadOf key exists in visible git config —" >&2
+    echo "   push-time rewrites are invisible to fetch-side resolution, so a" >&2
+    echo "   TEST run refuses outright. Remove the key or use a clean scratch" >&2
+    echo "   repo (see harness/backups/README.md)." >&2
+    exit 6
+  fi
+  # helper-TRANSPORT refusal (G1-iter6 RT critical #5, executed E2E):
+  # a remote named ext::git-receive-pack <path> pushed the checkpoint
+  # by EXECUTING that command against the path — the destination lives
+  # inside the operand, invisible to URL normalization (fd::/vendor::/
+  # any future remote helper is the same shape). IPv6-literal hosts
+  # ([::1]) also carry :: and are refused with it — raw-IP targets are
+  # refused as a class below. No scratch target contains a double
+  # colon.
   case "$_tgt" in
-    ./*|../*)
-      echo "!! refusing: PC_BACKUP_PUSH_REMOTE is a RELATIVE path — the push" >&2
-      echo "   executes from a temporary worktree, so a relative target" >&2
-      echo "   resolves somewhere the guard never judged. Use an absolute" >&2
-      echo "   scratch path (see harness/backups/README.md)." >&2
+    *::*)
+      echo "!! refusing: the push target carries a helper-transport (::) spelling" >&2
+      echo "   — ext::/fd::/vendor::/… execute an arbitrary command as the push" >&2
+      echo "   itself. Point PC_BACKUP_PUSH_REMOTE at a scratch bare repo (see" >&2
+      echo "   harness/backups/README.md)." >&2
+      exit 6
+      ;;
+  esac
+  # PERCENT-ENCODED host refusal (G1-iter6 RT critical #4, executed at
+  # a local CONNECT sink): curl percent-decodes the host BEFORE
+  # connecting — %67ithub.com and github%2ecom both emitted
+  # CONNECT github.com:443 — while the normalizer compares the raw
+  # spelling, so the suffix match saw neither. No scratch target needs
+  # percent-encoding; refuse any % in the authority.
+  _pct="${_tgt#*://}"
+  _pct="${_pct%%/*}"
+  case "$_pct" in
+    *%*)
+      echo "!! refusing: the push target carries percent-encoding — the transport" >&2
+      echo "   decodes it before connecting, so the guard cannot judge what it" >&2
+      echo "   reaches. Point PC_BACKUP_PUSH_REMOTE at a scratch bare repo (see" >&2
+      echo "   harness/backups/README.md)." >&2
+      exit 6
+      ;;
+  esac
+  # EVERY relative target refused (G1-iter5-i2 RT critical #1 for the
+  # ./ ../ forms; G1-iter6 RT critical #2 for the rest, executed E2E):
+  # the guard resolves and compares the target HERE, at the REPO's
+  # cwd — but the pushes themselves execute from the temporary
+  # worktree under /tmp, so ANY relative form resolves to a DIFFERENT
+  # path at push time than the one judged. v8 refused only the ./ and
+  # ../ prefixes; a remote-carrying harness/../../… (interior .., no
+  # prefix) resolved at the worktree base and landed the checkpoint on
+  # an unjudged sink. Refuse every operand that is neither a URL nor
+  # an absolute path.
+  case "$_tgt" in
+    *://*) : ;;   # a URL — judged by the host rules below
+    /*)    : ;;   # an absolute path — canonicalized + compared below
+    *)
+      echo "!! refusing: PC_BACKUP_PUSH_REMOTE resolves to a RELATIVE target" >&2
+      echo "   (however carried — direct operand or a remote's URL) — the push" >&2
+      echo "   executes from a temporary worktree, so a relative target resolves" >&2
+      echo "   somewhere the guard never judged. Use an absolute scratch path" >&2
+      echo "   (see harness/backups/README.md)." >&2
       exit 6
       ;;
   esac
@@ -337,10 +463,35 @@ if [ "$TEST_MODE" = 1 ]; then
     # EMPTY-AUTHORITY family — https:///github.com/…, whose leading
     # slashes used to collapse the host away — at G1-iter5-i2 RT
     # critical #2; multi-@ ssh userinfo — ssh://user@evil.com@
-    # github.com/… — at G1-iter5-i2 RT major #1): match the HOST
-    # (everything before the first '/') against github.com and ANY
-    # *.github.com subdomain — enumeration was the v5 hole
+    # github.com/… — at G1-iter5-i2 RT major #1). The HOST is cut from
+    # the normalized authority at the FIRST colon (G1-iter6 RT major
+    # #1: the greedy cut read git@github.com:22:repo as host
+    # github.com:22, which suffix-matches nothing, and the ssh handoff
+    # reached github.com — executed via a shim), AFTER the last @
+    # (G1-iter6 RT minor #2: an @ inside ssh userinfo —
+    # ssh://user/name@github.com/…, or its %2f-encoded form — left the
+    # host reading the userinfo prefix), with trailing dots collapsed
+    # (G1-iter6 RT minor #1: github.com.. suffix-matches nothing).
     _host="${_nt%%/*}"
+    case "$_host" in *@*) _host="${_host##*@}" ;; esac
+    _host="${_host%%:*}"
+    while [ "${_host:0-1}" = "." ] && [ -n "$_host" ]; do _host="${_host%.}"; done
+    # raw-IP refusal (G1-iter6 RT minor #3): a digits-and-dots host is
+    # an IPv4 literal (github's own IP spelled directly) — the suffix
+    # denylist is a NAME check and never matches it. LOOPBACK is
+    # exempt: the guarded-push redaction lane pushes to a local
+    # http://127.0.0.1 sink by design. An empty host is refused with
+    # it (nothing legitimate normalizes to one).
+    case "$_host" in
+      127.*) : ;;
+      *[!0-9.]*) : ;;
+      *)
+        echo "!! refusing: the push target is a raw-IP (or empty) host — test" >&2
+        echo "   traffic never targets IP literals; name a scratch path instead" >&2
+        echo "   (see harness/backups/README.md)." >&2
+        exit 6
+        ;;
+    esac
     case "$_host" in
       github.com|*.github.com)
         echo "!! refusing: env overrides mark this as a TEST run, but the push" >&2
@@ -351,38 +502,61 @@ if [ "$TEST_MODE" = 1 ]; then
         exit 6
         ;;
     esac
-    if [ "$_nt" = "$(_norm_url 'https://github.com/maniesh-NR/Proto-Clean.git')" ]; then
-      echo "!! refusing: env overrides mark this as a TEST run, but the push target" >&2
-      echo "   resolves to the PRODUCTION repo (however spelled). Point" >&2
-      echo "   PC_BACKUP_PUSH_REMOTE at a scratch bare repo (see harness/backups/README.md)." >&2
-      exit 6
-    fi
     # production-PATH refusal (G1-iter5 Architect major #1, sibling
-    # of RT critical #2): a TEST run never pushes INTO the production
-    # checkout either. v6 checked only the REPO operand — a
-    # PC_BACKUP_PUSH_REMOTE pointing at the production path (plain,
-    # file://, via a symlink, or the checkout's .git) wrote a test
-    # checkpoint onto its local sandbox/backups, which the next
-    # production run then propagated to github (executed end-to-end
-    # in scratch). The compare is PHYSICAL (pwd -P + leading-//
-    # collapse — a logical-pwd compare let symlinked and // spellings
-    # through, G1-iter5 RT critical #2).
-    _ptgt="${_tgt#file://}"
-    _ptgt="${_ptgt%/}"
-    case "$_ptgt" in
-      /*)
-        _cpt="$(cd "$_ptgt" 2>/dev/null && pwd -P || true)"
-        while [ "${_cpt:0:2}" = "//" ]; do _cpt="${_cpt#/}"; done
-        if [ "$_ptgt" = "$PROD_CHECKOUT" ] || [ "$_cpt" = "$PROD_CHECKOUT" ] \
-           || [ "$_ptgt" = "$PROD_CHECKOUT/.git" ] || [ "$_cpt" = "$PROD_CHECKOUT/.git" ]; then
-          echo "!! refusing: env overrides mark this as a TEST run, but the push" >&2
-          echo "   target is the production checkout (or its .git) — test traffic" >&2
-          echo "   never touches it. Point PC_BACKUP_PUSH_REMOTE at a scratch bare" >&2
-          echo "   repo (see harness/backups/README.md)." >&2
-          exit 6
-        fi
+    # of RT critical #2; CONTAINMENT added at G1-iter6): a TEST run
+    # never pushes INTO the production checkout — or anything under
+    # it — either. v6 checked only the REPO operand; v8 compared the
+    # target only for equality; the compare is PHYSICAL (pwd -P +
+    # leading-// collapse — a logical-pwd compare let symlinked and //
+    # spellings through, G1-iter5 RT critical #2). file:// targets
+    # must be absolute (file://host/… or file://relative refuse — the
+    # push resolves them differently than any compare could). Network
+    # URLs were judged by the host rules above and carry no path to
+    # compare. (The v8 literal production-URL compare — unreachable
+    # for every github spelling because the host denial exits first —
+    # was removed at G1-iter6 as dead code that hardcoded the repo
+    # identity; the Python port re-derives it from the live remote.)
+    case "$_tgt" in
+      file:///*)
+        _ptgt="${_tgt#file://}"
+        _ptgt="${_ptgt%/}"
+        ;;
+      file://*)
+        echo "!! refusing: a file:// push target that is not an absolute path —" >&2
+        echo "   the transport resolves it relative to a base the guard never" >&2
+        echo "   judged. Use a plain absolute scratch path (see" >&2
+        echo "   harness/backups/README.md)." >&2
+        exit 6
+        ;;
+      *://*)
+        _ptgt=""
+        ;;
+      *)
+        _ptgt="${_tgt%/}"
         ;;
     esac
+    if [ -n "$_ptgt" ]; then
+      _cpt="$(cd "$_ptgt" 2>/dev/null && pwd -P || true)"
+      while [ "${_cpt:0:2}" = "//" ]; do _cpt="${_cpt#/}"; done
+      case "$_ptgt" in
+        "$PROD_CHECKOUT"|"$PROD_CHECKOUT"/*|"$PROD_CHECKOUT/.git"|"$PROD_CHECKOUT/.git"/*)
+          echo "!! refusing: env overrides mark this as a TEST run, but the push" >&2
+          echo "   target is the production checkout (or inside it / its .git) —" >&2
+          echo "   test traffic never touches it. Point PC_BACKUP_PUSH_REMOTE at a" >&2
+          echo "   scratch bare repo (see harness/backups/README.md)." >&2
+          exit 6
+          ;;
+      esac
+      case "$_cpt" in
+        "$PROD_CHECKOUT"|"$PROD_CHECKOUT"/*|"$PROD_CHECKOUT/.git"|"$PROD_CHECKOUT/.git"/*)
+          echo "!! refusing: env overrides mark this as a TEST run, but the push" >&2
+          echo "   target resolves to the production checkout (or inside it / its" >&2
+          echo "   .git) — test traffic never touches it. Point PC_BACKUP_PUSH_REMOTE" >&2
+          echo "   at a scratch bare repo (see harness/backups/README.md)." >&2
+          exit 6
+          ;;
+      esac
+    fi
 fi
 
 # -- secret patterns (ERE — grep -E / grep -En everywhere) ------------
