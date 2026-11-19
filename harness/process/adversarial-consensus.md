@@ -41,6 +41,17 @@ MINOR:     [list or none]   — fix-or-file
   iteration, the stage halts and the decision escalates to the
   project owner (with both iterations' records). Re-runs happen only
   after fixes; every re-run counts against the cap and is recorded.
+- **Owner-side escalation rule (adopted G1-iter6, Architect major
+  #3):** when TWO consecutive cap-exhaustions on the same stage are
+  concentrated in one subsystem (five of five S1 gates were decided
+  by backup/harness findings while the stage's deliverable stayed
+  green), the owner's escalation options DEFAULT to SPLITTING that
+  subsystem into its own stage with its own gate (closing the parent
+  stage on its deliverable once that deliverable's own findings are
+  fixed) rather than another same-scope re-gate — the re-gate ladder
+  is how S1 accumulated five cap-exhaustions. The split is recorded
+  as a roadmap edit + a decision-log entry; a fresh gate may still be
+  ordered, but it must be justified against the split default.
 - **No pre-recording gate outcomes.** A gate's result is written only
   after the independent verdicts return — a session log or roadmap
   line that asserts a consensus before it exists is an audit-trail
@@ -60,9 +71,12 @@ MINOR:     [list or none]   — fix-or-file
   CI confirmations (replace "to be confirmed" hedges once CI ran),
   (c) `02-lessons.md` baseline lines, (d) the backups-README table
   labels (script version, manifest key wording), (e) re-runs ALL
-  sandbox matrices (v5/v6/v7…), not just the new one — the v5 E4
-  lanes sat stale through an entire gate because nobody re-ran the
-  old matrix after v6 changed the behavior it probes, (f) mutation
+  the verification matrices (harness/backups/matrices/verify_backup_
+  v5/v6/v7/v8/v9… — repo-resident since G1-iter6), not just the new
+  one — the v5 E4 lanes sat stale through an entire gate because
+  nobody re-ran the old matrix after v6 changed the behavior it
+  probes, and the v8 E20 demo's patch anchor drifted silently through
+  the v9 rework until the re-run caught it, (f) mutation
   probes of PATH-GUARD lanes patch BOTH SIDES — the guarded constant
   (PROD_CHECKOUT / default REPO / SANDBOX_HOME) AND every test lane
   that references the real protected path — or run only where the

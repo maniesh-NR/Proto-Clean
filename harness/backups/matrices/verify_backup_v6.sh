@@ -22,7 +22,8 @@
 # All fake tokens are built at runtime (no literals). Everything stays
 # under /tmp/pc-v6-verify; production is never contacted.
 set -u
-ROOT=/home/z/my-project/cleanroom
+# G1-iter6 (Architect major #2): matrices are REPO-RESIDENT (CI-visible) — ROOT derives from this file's location so the matrix runs against ANY checkout (the sandbox-home copies are retired)
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIPT="$ROOT/scripts/sandbox_backup.sh"
 S=/tmp/pc-v6-verify
 rm -rf "$S"; mkdir -p "$S"

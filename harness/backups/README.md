@@ -15,13 +15,15 @@ fixed time interval. (Project owner directive, 2026-11-13.)
 The `sandbox/backups` branch intentionally does not trigger CI
 (`ci.yml` runs on `main` only) so frequent backups don't burn runner
 minutes. **What the branch carries:** a product-tree snapshot frozen
-at branch birth, `harness/` memory/process docs **refreshed from the
-live checkout on every run** (so the branch is self-contained as of
-each checkpoint), and the sandbox state. If a run records
+at branch birth (superseded once by the G1-iter5 post-closure mutC
+merge — see the anomaly log below; history preserves the original),
+`harness/` memory/process docs **refreshed from the live checkout on
+every run** (so the branch is self-contained as of each checkpoint),
+and the sandbox state. If a run records
 `main_push: failed`, product code is NOT on the remote that checkpoint
 — two consecutive failures raise a loud exit-7 alarm.
 
-## v5/v6/v7/v8 design (hardened by gates G1-iter2 → G1-iter4-i2 → G1-iter5 → G1-iter5-i2, 2026-11-13/16/19)
+## v5–v9 design (hardened by gates G1-iter2 → G1-iter4-i2 → G1-iter5 → G1-iter5-i2 → G1-iter6, 2026-11-13/16/19)
 
 The v1 design leaked credentials into a would-be push and could brick
 itself; v2 could never complete (`git add` collided with the ignore
@@ -93,6 +95,30 @@ execution order:
   family (`https:///github.com/…`) and multi-@ ssh userinfo
   (`ssh://user@evil.com@github.com/…`) all normalize away too
   (G1-iter5 RT critical #1, G1-iter5-i2 RT critical #2 + major #1).
+  G1-iter6 added four more refusal classes (all executed E2E by the
+  Red Team against v8, all machine/matrix-covered): PERCENT-ENCODED
+  hosts (`https://%67ithub.com/…` — curl decodes before connecting;
+  observed CONNECT github.com:443 at a local sink), helper TRANSPORTS
+  (`ext::`/`fd::`/anything`::` — the destination lives inside the
+  operand; `ext::git-receive-pack <prod>/.git` is an arbitrary-command
+  channel; IPv6 literals refuse with them), `url.*.pushInsteadOf`
+  keys in ANY visible config (git rewrites DIRECT push operands at
+  push time — fetch-side resolution never sees it), and raw-IP hosts
+  (github's IP spelled directly; loopback exempt for the redaction
+  lane's local sink). The host is cut from the authority at the FIRST
+  colon and AFTER the last `@` (the greedy cut read
+  `git@github.com:22:repo` as host `github.com:22` — no suffix
+  match — while the ssh handoff reached github.com), trailing dots
+  collapse, EVERY relative target refuses (not just `./`/`../`
+  prefixes — a remote-carrying `harness/../../…` resolved at the push
+  worktree base and landed on an unjudged sink), and the git-dir
+  IDENTITY is verified (the compares judge the path SPELLING; git's
+  discovery follows a subdirectory or a linked worktree into another
+  checkout's .git — the env-redirection family GIT_DIR/GIT_WORK_TREE/
+  … is scrubbed, and `git rev-parse --git-common-dir` must physically
+  equal the operand's own `.git`; the REPO and target compares are
+  CONTAINMENT checks — the production checkout and anything under
+  it).
   Off-domain redirector URLs are a documented residual (see the
   frozen residual list below) — no client-side spelling check can
   catch them.
@@ -231,7 +257,8 @@ An exit-8 abort runs the alarm checks first, so a pending alarm banner
 is never masked by the abort.
 
 ## Frozen residual-threat list (adopted G1-iter5, decision #18;
-corrected G1-iter5-i2 per gate findings)
+corrected G1-iter5-i2 per gate findings; corrected again G1-iter6
+per gate findings — the two-directional freeze working as designed)
 
 These are the KNOWN residuals future gates judge against — a fixed
 list, so each gate no longer re-derives the attack surface from
@@ -239,16 +266,26 @@ scratch (the Architect's bounded-exit recommendation). **Adding to
 or removing from this list requires a gate finding, not prose**
 (two-directional since G1-iter5-i2):
 
-1. **Off-domain redirectors** — a push target on a non-github domain
-   that 301-redirects to github. No client-side spelling check can
-   catch it; the credential never enters a TEST push and production
-   pushes are opt-in, so the residual is reachability, not leakage.
-2. **pushInsteadOf — VERIFIED NON-RESIDUAL for direct operands**
-   (corrected at G1-iter5-i2, RT minor #1, executed): git does NOT
-   apply `url.<base>.pushInsteadOf` to command-line URL/path
-   operands at push time; remote NAMES are resolved pushurl-aware
-   (`get-url --push`) and refused. Kept on the list (marked
-   non-residual) so no future gate re-derives it from the docs.
+1. **Off-domain redirectors and transport-layer indirection** — a
+   push target on a non-github domain that 301-redirects to github
+   (URL-level), or a proxy/transport redirect — `http.proxy` /
+   `http.<url>.proxy` config, `core.sshCommand` / `GIT_SSH_COMMAND`,
+   ssh `ProxyCommand` — routing a benign-host push to github
+   (transport-level; G1-iter6 RT minor #4, modeled). No client-side
+   spelling check can catch either; the credential never enters a
+   TEST push and production pushes are opt-in, so the residual is
+   reachability, not leakage.
+2. **pushInsteadOf on direct operands — FIXED at v9** (corrected at
+   G1-iter6, RT critical #3, executed E2E): the G1-iter5-i2
+   "verified non-residual" claim was probed via the `file://`
+   spelling — the ONE form git 2.47.3 does not rewrite — while the
+   plain-path form DOES rewrite direct push operands at push time
+   (the typed operand landed the checkpoint in the reconfigured
+   bare while the guard had judged only the typed one). v9 refuses
+   ANY `url.*.pushInsteadOf` key in visible config (fail-closed,
+   machine-covered). Kept on the list (marked fixed at v9) so no
+   future gate re-derives it — and so the meta-lesson stands: one
+   spelling's non-exploitability never certifies a family.
 3. **Resolution/use TOCTOU** (G1-iter5-i2 Architect minor #2) — the
    guard resolves the target once, pre-action; the pushes re-resolve
    at push time, so a config rewrite (insteadOf/pushurl/remote url)
@@ -266,10 +303,14 @@ or removing from this list requires a gate finding, not prose**
    the declaration-bound model raises the cost to a multi-artifact
    forgery visible in a pushed diff, anchored by git history,
    independent agents, and CI on main. That is the design's ceiling.
-6. **Config-level indirection beyond env** — repo/global config FILES
-   in the scratch clone are visible to the guard's own resolution
-   (that is the fix), but a hostile non-git wrapper around the script
-   is outside the threat model entirely.
+6. **Config-level indirection beyond env — CORRECTED at v9** (the
+   G1-iter5-i2 claim that config FILES are "visible to the guard's
+   own resolution" was falsified twice, both executed E2E:
+   pushInsteadOf rewrite — item 2 — and `ext::`/`fd::` helper
+   transports, whose destination lives INSIDE the operand and is
+   invisible to any URL resolution; both are now REFUSED outright).
+   The residual that remains: a hostile non-git wrapper around the
+   script is outside the threat model entirely.
 
 ## Running
 
@@ -284,12 +325,20 @@ PC_BACKUP_PUSH_REMOTE=/path/to/bare.git scripts/sandbox_backup.sh "msg"
 The hermetic cycle (fresh-create → append → planted-secret abort) is
 also machine-checked in `tests/test_harness_integrity.py` on every
 push to main (POSIX legs), and the sandbox matrices
-(`scripts/verify_backup_v8.sh`, extending the still-valid v5/v6/v7
-matrices — **re-run ALL of them after any script change**, see
-lessons) cover the v8 surfaces end-to-end: E19 empty-authority +
+(`harness/backups/matrices/verify_backup_v9.sh` + the still-valid
+v5/v6/v7/v8 matrices — REPO-RESIDENT since G1-iter6 (Architect major
+#2: an exit criterion measured by an artifact nobody is forced to run
+is not a criterion — the sandbox-home copies are retired) — **re-run
+ALL of them after any script change**, see lessons) cover the v8+v9
+surfaces end-to-end: E19 empty-authority +
 multi-@ spellings, E20 relative-target refusal (+ the stand-in
 mechanism demo), E21 pushurl divergence, E22 fail-closed
-unresolvable targets.
+unresolvable targets; the v9 matrix adds E23 percent-encoded hosts,
+E24 helper transports, E25 pushInsteadOf (refusal + rewrite
+mechanism demo), E26 scp `:22:` port spellings, E27 git-dir identity
++ GIT_DIR scrub, E28 raw-IP/trailing-dot hosts (loopback exempt),
+E29 remote-carried relative URLs (+ mechanism demo), E30 push-target
+containment.
 
 ## Restore
 
@@ -300,6 +349,38 @@ unresolvable targets.
   `git log` (commit SHAs are recorded by git itself, not the manifest).
 
 ## Known audit-trail anomalies
+
+- LOCAL-ONLY, cleaned by reset (`310555e`/`b43e3fa`/`0c41aff` and
+  `580fbb3`/`f87a8b3`/`dd4bf0e`, reflog 2026-11-19T03:34-03:35Z —
+  the SIXTH accidental-checkpoint incident, FOURTH variant): during
+  the G1-iter6 fix cycle the orchestrator's mutation-probe battery
+  cloned its probe repos from HEAD while the v9 fix (which makes the
+  integrity lanes DERIVE `PROD_CHECKOUT` from the script under test)
+  was still UNCOMMITTED — the probe clone therefore carried the v8
+  test file with its HAND-COPIED production paths, and probe L
+  (which patches the script constant to a stand-in) became a
+  one-sided patch: the guard test's push-target lanes ran full
+  backups against the production checkout and pushed two junk
+  clusters onto its LOCAL `sandbox/backups` branch (a "guard clean
+  lane" checkpoint rode each time: the prod-lane run based on the
+  clone's local branch, which carried the clean-lane commit, then
+  self-heal-merged the fetched production branch and pushed). The
+  second cluster came from the orchestrator's DEBUG re-run of the
+  failing probe — a debug re-run of a production-touching probe is
+  itself production-touching. Origin was NEVER touched (the reflog
+  shows only local ref updates; no push to the remote left the
+  machine) — the local branch was reset to `origin/sandbox/backups`
+  (`0a48be5`) and verified identical. Content clean (test-shaped
+  scratch homes; all scans ran). **Corrected rule (extends the
+  both-sides rule and the seq-7 test-from-HEAD rule): probe from the
+  tree that CONTAINS the guard fix being exercised — a probe clone
+  taken from HEAD while the fix sits uncommitted in the working tree
+  re-creates the one-sided patch structurally, and the fix that
+  saves you (derived lanes) is exactly the part the stale clone
+  lacks. Mutation-probe batteries snapshot the WORKING TREE (clone
+  for history + rsync the tree over it), never bare HEAD; and never
+  re-run a failing production-touching probe to 'see what happens'
+  without re-checking its containment first.**
 
 - `5516e36`/`00c2ba9`/`2277469` (manifest seq 1' "guard clean lane",
   seq 2' "push-target probe", seq 13 "override probe" — the

@@ -22,10 +22,16 @@
 #
 # All fake tokens are built at runtime. Everything stays under
 # /tmp/pc-v8-verify; production is never contacted or written (the
-# one identity-patched probe patches PROD_CHECKOUT to a stand-in per
-# the seq-10 process rule).
+# one identity-patched probe patches PROD_CHECKOUT to a stand-in —
+# per the CORRECTED G1-iter6 both-sides rule (process doc item (f)),
+# which supersedes the seq-10 rule it originally cited: patch the
+# guarded constant AND every lane that references the real protected
+# path, or run only where the production path does not exist — the
+# E20 demo satisfies it because every mutated-copy lane references
+# only scratch stand-in paths).
 set -u
-ROOT=/home/z/my-project/cleanroom
+# G1-iter6 (Architect major #2): matrices are REPO-RESIDENT (CI-visible) — ROOT derives from this file's location so the matrix runs against ANY checkout (the sandbox-home copies are retired)
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIPT="$ROOT/scripts/sandbox_backup.sh"
 S=/tmp/pc-v8-verify
 rm -rf "$S"; mkdir -p "$S"
@@ -108,28 +114,36 @@ src = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
 src = src.replace('PROD_CHECKOUT="/home/z/my-project/cleanroom"',
                   'PROD_CHECKOUT="/tmp/pc-v8-verify/standin-prod/checkout"')
 # ... and REMOVE the relative refusal (restore the v7 behavior)
-old = """  case "$_tgt" in
-    ./*|../*)
-      echo "!! refusing: PC_BACKUP_PUSH_REMOTE is a RELATIVE path — the push" >&2
-      echo "   executes from a temporary worktree, so a relative target" >&2
-      echo "   resolves somewhere the guard never judged. Use an absolute" >&2
-      echo "   scratch path (see harness/backups/README.md)." >&2
-      exit 6
-      ;;
-  esac
-"""
-assert old in src, "relative-refusal anchor not found"
-src = src.replace(old, "")
+# G1-iter6: the v9 script replaced the ./ ../-prefix case with the
+# EVERY-relative refusal — the demo removes the CURRENT block (tracked
+# across script versions; a missing anchor must FAIL LOUD, never
+# silently demo an empty file)
+import re as _re
+new_block, n = _re.subn(
+    r'  case "\$_tgt" in\n    \*://\*\) : ;;.*?\n  esac\n',
+    "", src, count=1, flags=_re.S)
+assert n == 1 and "RELATIVE target" in src, "relative-refusal anchor not found"
+src = new_block
 pathlib.Path("/tmp/pc-v8-verify/patched.sh").write_text(src, encoding="utf-8")
 PY
+[ -s "$S/patched.sh" ] && grep -q "PROD_CHECKOUT" "$S/patched.sh" \
+  || { bad "E20 patched copy is empty/trivial (patch anchor drifted)"; exit 1; }
 bash -n "$S/patched.sh" || { bad "E20 patched copy does not parse"; exit 1; }
 # the stand-in "production checkout": a real working clone whose local
-# sandbox/backups the v7-state push would land on
+# sandbox/backups the v7-state push would land on. G1-iter6: the demo
+# carries the relative operand via a REMOTE NAME (harness/../../…) —
+# the direct ../../ spelling is now ALSO refused by v9's empty-host
+# rule (host normalizes to .. -> empty), a second independent layer;
+# the remote-carried shape isolates the relative-refusal layer so the
+# demo still proves exactly one thing: without the refusal, the push
+# resolves at the WORKTREE base, somewhere the guard never judged
 mkdir -p "$S/standin-prod"
 git clone -q "$ROOT" "$S/standin-prod/checkout" 2>/dev/null
 d="$S/e20"
+git -C "$d/clone" remote add relhide20 \
+  "harness/../../pc-v8-verify/standin-prod/checkout"
 env PC_BACKUP_REPO="$d/clone" PC_SANDBOX_HOME="$d/home" \
-  PC_BACKUP_PUSH_REMOTE="../../tmp/pc-v8-verify/standin-prod/checkout" \
+  PC_BACKUP_PUSH_REMOTE="relhide20" \
   bash "$S/patched.sh" "e20 mechanism demo" >"$d/out-demo" 2>&1
 rc=$?
 # from the REPO cwd the operand dead-ends (no refusal, v7 state); the
@@ -144,7 +158,7 @@ else
   bad "E20 mechanism demo did not reproduce the base mismatch (rc=$rc): $(tail -2 "$d/out-demo")"
 fi
 # and the REAL v8 script refuses the same operand outright
-rc=$(run_bk e20 "e20 probe" "../../tmp/pc-v8-verify/standin-prod/checkout")
+rc=$(run_bk e20 "e20 probe" "relhide20")
 [ "$rc" = 6 ] && ok "E20 the real v8 script refuses the same operand" \
   || bad "E20 real-script relative-to-standin rc=$rc"
 

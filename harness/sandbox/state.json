@@ -1,6 +1,6 @@
 {
   "git_branch": "main",
-  "git_head": "32d822f",
+  "git_head": "0c4b8f9",
   "main_push": "ok",
   "sandbox": {
     "download": [
@@ -62,6 +62,7 @@
       "dtls_repro.py",
       "ed25519_verify",
       "extract_wg_section.py",
+      "g1i6_mutation_probes.sh",
       "hy2_debug.py",
       "inspect_page.py",
       "inspect_page2.py",
@@ -77,12 +78,7 @@
       "rename_proto_clean.py",
       "rename_proton_clean.py",
       "socks_min.py",
-      "tnacl_mirror.py",
-      "verify_backup_v4.sh",
-      "verify_backup_v5.sh",
-      "verify_backup_v6.sh",
-      "verify_backup_v7.sh",
-      "verify_backup_v8.sh"
+      "tnacl_mirror.py"
     ],
     "scripts_skipped_shaped_count": 0,
     "skills": [
@@ -116,5 +112,5 @@
       "xlsx"
     ]
   },
-  "timestamp": "2026-11-18T18:34:21Z"
+  "timestamp": "2026-11-19T04:27:28Z"
 }
