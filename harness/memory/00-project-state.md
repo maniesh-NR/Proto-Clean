@@ -18,9 +18,14 @@ redaction, exactly-once PROD derivation, matrices v10 E31–E35 +
 v9 loud anchors/derived E30/loud skips (121 checks v5–v10), decision
 #20, ledger #10→S8 + rows #11/#12, process item (f) extension +
 record-before-fix-cycle rule — landed in the commit carrying the
-iter6 record. **The owner's decision is pending; per the
-owner-side escalation default the decision-#19 split is already
-recorded — no outcome pre-recorded here.**)
+iter6 record. **OWNER DISPOSITION RECORDED (2026-11-19, decision
+#21): the owner instructed "Continue" — no override; the
+decision-#19 split is operative. S1 closes on its deliverable via
+a scoped closing gate (fresh-gate precedent, remediation line
+`7a13645`+), scheduled 2026-11-20+ because the iter6-i2 record
+(same date, NO CONSENSUS, declares S1) withdraws a same-date close
+per the fail-safe tie rule; S8 is activated for its named pre-gate
+deliverables. No gate outcome is pre-recorded.**)
 
 ## Identity
 
@@ -90,8 +95,8 @@ recorded — no outcome pre-recorded here.**)
 
 ## Known open threads
 
-- **S1 gate: G1-iter6 CLOSED at the cap (both iterations), owner
-  decision PENDING** — iteration 1 (`a1607ce`+`32d822f`): RT BLOCK /
+- **S1 gate: G1-iter6 CLOSED at the cap (both iterations); owner
+  disposition RECORDED 2026-11-19 (decision #21)** — iteration 1 (`a1607ce`+`32d822f`): RT BLOCK /
   Architect PWF / Steward PWF; the v9 fix cycle landed at
   `0c4b8f9`. Iteration 2 (`0c4b8f9`): RT BLOCK (includeIf-conditional
   pushInsteadOf + the fetch side of a named remote, both executed
@@ -100,14 +105,21 @@ recorded — no outcome pre-recorded here.**)
   the cap; the v10 closing fix cycle landed with the record. Per
   the owner-side escalation default the decision-#19 split is
   already recorded: S1 may close on its deliverable with the
-  harness findings owned by S8 — the owner decides. History: G1 →
-  G1-iter6, six cap-exhaustions, all decided by backup/harness
-  findings (records in `memory/consensus-log/`).
-- **S8 (new, decision #19): harness subsystem hardening + Python
-  port** — property-based exit criterion (TEST runs address only
-  local scratch paths physically disjoint from production; allowlist
-  inversion MANDATED per decision #20; identity single-sourced); gated before S2's
-  stage gate; ledger #10 rides the port.
+  harness findings owned by S8 — DECIDED 2026-11-19 (decision
+  #21): the owner instructed "Continue"; the S1-closing gate is
+  scheduled 2026-11-20+ (the same-date close-withdrawal tie
+  constraint). History: G1 → G1-iter6, six cap-exhaustions, all
+  decided by backup/harness findings (records in
+  `memory/consensus-log/`).
+- **S8 (decision #19; ACTIVATED 2026-11-19 per decision #21):
+  harness subsystem hardening + Python port** — property-based
+  exit criterion (TEST runs address only local scratch paths
+  physically disjoint from production; allowlist inversion
+  MANDATED per decision #20; identity single-sourced); gated
+  before S2's stage gate; ledger #10 rides the port. Pre-gate
+  deliverables in preparation: the allowlist-inversion
+  adopt/reject evaluation + re-verified consumer inventory
+  (decision #20b) and the S8 execution plan.
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan

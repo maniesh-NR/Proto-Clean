@@ -66,11 +66,18 @@ its results before the NEXT stage proceeds. Status legend:
   derived-exactly-once PROD; matrix v10 E31–E35 + v9 hardening
   (loud anchors, derived E30, loud skips); decision #20; ledger
   #10→S8 + rows #11/#12; process-doc item (f) extension +
-  record-before-fix-cycle rule) — **the owner's decision is pending:
-  per the G1-iter6 owner-side escalation default the split (decision
-  #19) is already recorded — S1 may close on its deliverable with
-  the harness findings owned by S8, unless the owner orders another
-  gate; no outcome pre-recorded here.**
+  record-before-fix-cycle rule) — **OWNER DISPOSITION RECORDED
+  (2026-11-19, decision #21): the owner instructed "Continue" — no
+  override, so the decision-#19 split is operative. S1 closes on
+  its deliverable via a scoped closing gate (fresh-gate precedent
+  G1→G1-iter3, on the remediation line `7a13645`+; scope = the
+  deliverable's closure + the split's boundary correctness + the
+  disposition's recording — NOT a re-judgment of the harness
+  findings, which S8's own gate owns). The done-glyph flip + title
+  narrowing (deferred #11) land with that gate's backing record,
+  scheduled 2026-11-20+ — the iter6-i2 record (2026-11-19, NO
+  CONSENSUS, declares S1) withdraws a same-date close under the
+  fail-safe tie rule. No closing-gate outcome is pre-recorded.**
   - Desktop: dynamic-color seed (brand / system accent / custom hex),
     OS accent detection (GNOME 47 accent-color, Windows DWM
     AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,
