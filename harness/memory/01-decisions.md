@@ -229,3 +229,37 @@ Format: **decision** — context — date. Newest last.
     judgment and the residual list's third-party-egress entry
     (backups README item 1, added by the same gate finding) document
     exactly what the inversion closes. (2026-11-19, G1-iter6-i2)
+
+21. **Owner disposition of the G1-iter6-i2 escalation — the split
+    default takes effect; S1 closes on its deliverable via a scoped
+    closing gate; S8 activates for its pre-gate deliverables
+    (2026-11-19).** Presented with the escalation at the pstack
+    handoff (commit `89b1d70`), the owner instructed "Continue" —
+    no override of the split default was ordered, so per the
+    owner-side escalation rule (process doc, adopted G1-iter6) the
+    decision-#19 split is OPERATIVE: S1 closes on its deliverable
+    (Material You green through six gates, zero deliverable
+    findings; residuals ledgered to S2/S5), and the harness findings
+    are owned by S8's own gate. (a) **Mechanics of the S1 close:**
+    the done-glyph flip requires a backing record declaring S1 that
+    closes CONSENSUS REACHED (decisions #15/#17/#18,
+    machine-enforced), and that record must be dated STRICTLY AFTER
+    2026-11-19 — the iter6-i2 record (same date, NO CONSENSUS,
+    declares S1) withdraws a same-date close under the fail-safe tie
+    rule (G1-iter5 RT minor #1). The S1-closing gate is therefore
+    scheduled for 2026-11-20+ on the remediation line (`7a13645` and
+    later), per the G1→G1-iter3 fresh-gate precedent, SCOPED to the
+    split: S1's deliverable closure, the split's boundary
+    correctness, and this disposition's recording — NOT a
+    re-judgment of the harness findings (S8 owns those; the narrowed
+    scope is the fresh gate's justification against the split
+    default). The roadmap title narrows to the deliverable at the
+    flip, same commit (deferred #11). (b) **S8 activates now** for
+    its named pre-gate deliverables (decision #20b): the written
+    allowlist-inversion adopt/reject evaluation carrying the
+    re-verified consumer inventory, and the S8 execution plan (port
+    design; property-based exit criterion; identity single-sourcing;
+    per-lane mechanism audit + CI-forcing decision per deferred #12;
+    record sequence field per deferred #10). No gate outcome is
+    pre-recorded. (2026-11-19, owner disposition on the G1-iter6-i2
+    escalation)

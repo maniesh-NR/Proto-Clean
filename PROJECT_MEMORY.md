@@ -33,10 +33,10 @@
 
 - [x] v0.6.0–v0.6.2 released line + desktop link bonding (retrospectively assessed at G1, zero findings).
 - [x] **S1 deliverable — Material You across all OSes** (desktop + Android dynamic color, seed persistence, OS accent detection): shipped green in the first gate iteration and stayed green through all six cap-exhaustions — every exhaustion was decided by backup/harness-subsystem findings, never the deliverable.
-- [◐] **S1 closure gate G1 → iter6-i2: NO CONSENSUS at the 2-iteration cap (2026-11-19), escalated to the project owner.** Closing v10 fix cycle in `7a13645` (both-directions judgment, include-class refusal, symlinked-.git refusal, union-prefers-ours audited, scp redaction, exactly-once PROD derivation; matrices v10 E31–E35; decisions #19/#20; ledger #10→S8 + #11/#12). CI run 44462797163 on `7a13645`: 7/7 legs green, per-leg job-log-verified (`4766ff8`). **Owner disposition PENDING — default per decision #19: S1 closes on its deliverable with the harness findings owned by S8, unless the owner orders another gate. No outcome pre-recorded.**
-- [x] **pstack protocol bootstrap** (this change): `PROJECT_MEMORY.md` + `update_memory.py` + post-commit hook + backup push.
-- [ ] **Owner disposition of the G1-iter6-i2 escalation** (decisions #19/#20) — gates S1 closure and S8 sequencing.
-- [ ] **S8 — harness subsystem hardening + Python port**: port the backup merge/alarm/guard core from bash to a tested Python module; property-based exit criterion (TEST runs address only local scratch paths physically disjoint from production; allowlist inversion MANDATED per decision #20; identity single-sourced); ledger rows #9/#10 ride the port. Own gate before S2's stage gate.
+- [◐] **S1 closure gate G1 → iter6-i2: NO CONSENSUS at the 2-iteration cap (2026-11-19), escalated to the project owner.** Closing v10 fix cycle in `7a13645` (both-directions judgment, include-class refusal, symlinked-.git refusal, union-prefers-ours audited, scp redaction, exactly-once PROD derivation; matrices v10 E31–E35; decisions #19/#20; ledger #10→S8 + #11/#12). CI run 44462797163 on `7a13645`: 7/7 legs green, per-leg job-log-verified (`4766ff8`). **Owner disposition RECORDED 2026-11-19 (decision #21): the owner instructed "Continue" — no override; the #19 split is operative. S1-closing gate scheduled 2026-11-20+ (scoped: deliverable closure + split boundary correctness + disposition recording — NOT harness re-judgment; the same-date close-withdrawal tie rule forces the later date). No closing-gate outcome pre-recorded.**
+- [x] **pstack protocol bootstrap**: `PROJECT_MEMORY.md` + `update_memory.py` + post-commit hook + backup push (`89b1d70`).
+- [x] **Owner disposition of the G1-iter6-i2 escalation** — recorded as decision #21 (2026-11-19): split default operative; S1-closing gate scheduled 2026-11-20+; S8 activated.
+- [ ] **NEXT · S8 (ACTIVE) — harness subsystem hardening + Python port**: (1) pre-gate deliverables per decision #20b — the allowlist-inversion adopt/reject evaluation + re-verified consumer inventory, and the S8 execution plan; (2) the S8 pre-gate (3 roles, consensus); (3) the port itself — merge/alarm/guard core to a tested Python module, property-based exit criterion (TEST runs address ONLY local absolute filesystem paths physically disjoint from production; allowlist inversion MANDATED per decision #20; identity single-sourced); per-lane mechanism audit + CI-forcing decision (deferred #12); record sequence field (deferred #10); ledger rows #9/#10 ride the port. Own gate before S2's stage gate.
 - [ ] **S2 — release v0.6.3** (Material You + bonding fixes; runbook `harness/memory/03-release-runbook.md`; adversarial pre-gate REQUIRED — none has run): SHA-256 asset checksums in the release body, WCAG ≥ 4.5 contrast property test (~200 seeds) gating the tag, deferred findings #1–#4 + #7.
 - [ ] **S3** bond-server packaging (BLOCKED by S6) · **S4** Android split-tunneling parity · **S5** accessibility pass · **S6** security/threat-model review (helper privileges, DNS surface, blocklist chain, bond-server exposure, account/auth chain) · **S7** legacy-stack sunset decision (Py 3.8 EOL; due by v0.7) — each with its own gate.
 
@@ -62,6 +62,11 @@ Revert = restore those three lines from the upload. The script replaces everythi
 ## Recent Progress & Git Activity
 
 ```diff
+### Commit: 89b1d70 - pstack bootstrap: PROJECT_MEMORY.md root state memory + update_memory.py activity sync (Z User, 2026-11-19)
+ PROJECT_MEMORY.md | 111 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ update_memory.py  |  68 +++++++++++++++++++++++++++++++++
+ 2 files changed, 179 insertions(+)
+
 ### Commit: 4766ff8 - G1-iter6-i2 CI confirmation on the closing commit 7a13645: run 44462797163, all 7 legs success, per-leg job-log-verified - 737x4 POSIX, 605+132 windows, wheel + Android green, exact expectation met (state doc + gate record hedges replaced per the fix-cycle checklist item (b)) (Z User, 2026-11-19)
  harness/memory/00-project-state.md                                 | 7 ++++---
  .../memory/consensus-log/2026-11-19-S1-material-you-gate-iter6.md  | 7 ++++---
@@ -82,30 +87,5 @@ Revert = restore those three lines from the upload. The script replaces everythi
  scripts/sandbox_backup.sh                          | 188 +++++++++++----
  tests/test_harness_integrity.py                    | 165 ++++++++++++-
  13 files changed, 1054 insertions(+), 104 deletions(-)
-
-### Commit: 0c4b8f9 - G1-iter6 iteration 1: NO CONSENSUS (Red Team BLOCK on six executed E2E criticals - git-dir identity redirects, remote-carried relative targets, pushInsteadOf on direct operands falsifying the G1-iter5-i2 frozen-residual claim, percent-encoded hosts, ext:: transports, six glyph-forgery classes; Architect PWF - identity coupling, exit-criterion shape, gate convergence; Steward PWF - the stale closure-log claim) - v9 fix cycle: git-dir identity verification (git-common-dir physical compare) + discovery-redirection env scrub, every-relative + pushInsteadOf-class + transport + percent + raw-IP/trailing-dot refusals, first-colon/post-@ host cut, containment compares on repo AND push target; glyph teeth (backing adoption dates, single-Date, multi-id, lookalike glyphs, id-less in-progress, post-closure fences); integrity lanes DERIVE PROD_CHECKOUT from the script under test (one-sided-patch class structurally impossible); matrices REPO-RESIDENT v5-v9 = 112 checks, all re-run 0 failed; residual list corrected per findings (items 1/2/6); S8 split + decision #19 (property-based port exit criterion) + owner-side escalation rule in process doc; brand seed single-sourced (PROTO_BRAND_SEED); S6 scope + account/auth chain; sixth accidental-checkpoint incident disclosed (stale-clone probe battery, local-only, reset to origin, verified identical) with the probe-from-the-fixed-tree rule; provenance disclosure for the lost iteration-1 verdict texts (context loss mid-cycle; record reconstructed from fix-cycle annotations); suite 728+9 local exact; iteration 2 (final) re-judges this commit - no outcome pre-recorded (Z User, 2026-11-19)
- harness/backups/README.md                          | 127 +++++--
- harness/backups/matrices/verify_backup_v5.sh       | 194 ++++++++++
- harness/backups/matrices/verify_backup_v6.sh       | 200 +++++++++++
- harness/backups/matrices/verify_backup_v7.sh       | 228 ++++++++++++
- harness/backups/matrices/verify_backup_v8.sh       | 196 ++++++++++
- harness/backups/matrices/verify_backup_v9.sh       | 306 ++++++++++++++++
- harness/memory/00-project-state.md                 |  62 ++--
- harness/memory/01-decisions.md                     |  35 +-
- harness/memory/02-lessons.md                       |  98 ++++-
- .../2026-11-19-S1-material-you-gate-iter6.md       | 222 ++++++++++++
- .../session-log/2026-11-19-g1-iter5-closure.md     |  16 +-
- .../2026-11-19-g1-iter6-iteration1-fixcycle.md     |  60 ++++
- .../2026-11-19-g1-iter6-sixth-incident.md          |  69 ++++
- harness/process/adversarial-consensus.md           |  20 +-
- harness/roadmap.md                                 | 145 +++-----
- proto_clean/settings.py                            |   8 +-
- proto_clean/ui/md3.py                              |   5 +
- proto_clean/ui/resources.py                        |   5 +-
- proto_clean/ui/settings_dialog.py                  |   5 +-
- proto_clean/ui/theme.py                            |   5 +-
- scripts/sandbox_backup.sh                          | 326 +++++++++++++----
- tests/test_harness_integrity.py                    | 398 +++++++++++++++++----
- 22 files changed, 2418 insertions(+), 312 deletions(-)
 ```
 
