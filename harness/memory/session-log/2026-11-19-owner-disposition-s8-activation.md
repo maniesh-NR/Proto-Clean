@@ -53,5 +53,40 @@ recorded as **decision #21**.
 - Pushed to `main`; event backup run (production, opt-in) per the
   event-driven backup policy.
 
-No gate outcome is pre-recorded anywhere in this commit — the
-S1-closing gate and the S8 pre-gate have not run.
+## S8 pre-gate deliverables (landed this session)
+
+- `harness/backups/allowlist-inversion-evaluation.md` (decision #20b):
+  **ADOPT**, consumer inventory re-verified at `5e70fae` — every
+  capability-using TEST consumer targets a local absolute filesystem
+  path (27 integrity-test invocation sites → tmp_path bares; 33
+  matrix `PC_BACKUP_PUSH_REMOTE` hits, all success lanes → mktemp
+  scratch bares); the one exception class is the loopback-URL
+  observability trio (v6 E11, v5 E3, v9 E28) — recommended to convert
+  at the port with the loopback exemption retiring, and E11's
+  success-surface redaction observability re-homed to a
+  local-filesystem lane.
+- `harness/process/s8-execution-plan.md`: the staged plan (pre-gate →
+  port with the property-based exit criterion + identity
+  single-sourcing + record sequence field → matrix conversion with
+  per-lane mechanism audit + the CI-forcing decision → shim/retire →
+  closing gate → event backup), the held invariants, and four open
+  decisions surfaced to the pre-gate (loopback conversion,
+  CI-forcing choice, module location, shim-vs-retire).
+
+## Post-backup hardening (disclosure)
+
+The event backup (manifest entry #19) surfaced an interaction: the
+backup script's branch commit in its temp worktree fired the repo's
+post-commit hook, which failed with a python3 file-not-found —
+`update_memory.py` is absent from the backup branch's frozen product
+tree. Harmless to the backup (both pushes ok; the hook failure cannot
+affect a completed commit), but noisy on every future run: the hook
+is now fail-soft (`[ -f update_memory.py ] || exit 0`) — a no-op in
+worktrees without the script.
+
+## Next (explicitly not pre-recorded outcomes)
+
+The S8 pre-gate (3 roles judging the evaluation + the plan) and the
+S1-closing gate (scheduled 2026-11-20+ per decision #21) have NOT
+run — no gate outcome is pre-recorded anywhere in this commit.
+

@@ -36,7 +36,7 @@
 - [◐] **S1 closure gate G1 → iter6-i2: NO CONSENSUS at the 2-iteration cap (2026-11-19), escalated to the project owner.** Closing v10 fix cycle in `7a13645` (both-directions judgment, include-class refusal, symlinked-.git refusal, union-prefers-ours audited, scp redaction, exactly-once PROD derivation; matrices v10 E31–E35; decisions #19/#20; ledger #10→S8 + #11/#12). CI run 44462797163 on `7a13645`: 7/7 legs green, per-leg job-log-verified (`4766ff8`). **Owner disposition RECORDED 2026-11-19 (decision #21): the owner instructed "Continue" — no override; the #19 split is operative. S1-closing gate scheduled 2026-11-20+ (scoped: deliverable closure + split boundary correctness + disposition recording — NOT harness re-judgment; the same-date close-withdrawal tie rule forces the later date). No closing-gate outcome pre-recorded.**
 - [x] **pstack protocol bootstrap**: `PROJECT_MEMORY.md` + `update_memory.py` + post-commit hook + backup push (`89b1d70`).
 - [x] **Owner disposition of the G1-iter6-i2 escalation** — recorded as decision #21 (2026-11-19): split default operative; S1-closing gate scheduled 2026-11-20+; S8 activated.
-- [ ] **NEXT · S8 (ACTIVE) — harness subsystem hardening + Python port**: (1) pre-gate deliverables per decision #20b — the allowlist-inversion adopt/reject evaluation + re-verified consumer inventory, and the S8 execution plan; (2) the S8 pre-gate (3 roles, consensus); (3) the port itself — merge/alarm/guard core to a tested Python module, property-based exit criterion (TEST runs address ONLY local absolute filesystem paths physically disjoint from production; allowlist inversion MANDATED per decision #20; identity single-sourced); per-lane mechanism audit + CI-forcing decision (deferred #12); record sequence field (deferred #10); ledger rows #9/#10 ride the port. Own gate before S2's stage gate.
+- [ ] **NEXT · S8 (ACTIVE) — harness subsystem hardening + Python port**: (1) DONE — pre-gate deliverables landed: `harness/backups/allowlist-inversion-evaluation.md` (decision #20b: ADOPT + re-verified consumer inventory; loopback trio E11/E3/E28 flagged for conversion) and `harness/process/s8-execution-plan.md`; (2) NEXT — the S8 pre-gate (3 roles judging the evaluation + plan; NOT yet run, no outcome pre-recorded); (3) the port itself — merge/alarm/guard core to a tested Python module, property-based exit criterion (TEST runs address ONLY local absolute filesystem paths physically disjoint from production; allowlist inversion MANDATED per decision #20; identity single-sourced); per-lane mechanism audit + CI-forcing decision (deferred #12); record sequence field (deferred #10); ledger rows #9/#10 ride the port. Own gate before S2's stage gate.
 - [ ] **S2 — release v0.6.3** (Material You + bonding fixes; runbook `harness/memory/03-release-runbook.md`; adversarial pre-gate REQUIRED — none has run): SHA-256 asset checksums in the release body, WCAG ≥ 4.5 contrast property test (~200 seeds) gating the tag, deferred findings #1–#4 + #7.
 - [ ] **S3** bond-server packaging (BLOCKED by S6) · **S4** Android split-tunneling parity · **S5** accessibility pass · **S6** security/threat-model review (helper privileges, DNS surface, blocklist chain, bond-server exposure, account/auth chain) · **S7** legacy-stack sunset decision (Py 3.8 EOL; due by v0.7) — each with its own gate.
 
@@ -57,11 +57,19 @@ Owner-uploaded 2026-11-19 (verbatim original preserved in the session upload sto
 2. `MEMORY_FILE` anchored to the script's directory — safe from any CWD and inside hooks.
 3. Success message reads "commit summaries (stat)" instead of "commit diffs".
 
-Revert = restore those three lines from the upload. The script replaces everything between the auto section's fixed header (see end of file) and end-of-file on every run; the post-commit hook refresh leaves a one-commit lag by design (the refresh rides with the next commit).
+Revert = restore those three lines from the upload. The script replaces everything between the auto section's fixed header (see end of file) and end-of-file on every run; the post-commit hook refresh leaves a one-commit lag by design (the refresh rides with the next commit). The hook is fail-soft since 2026-11-19 (post-backup hardening): it no-ops in worktrees where the script is absent — the backup script's temp worktree (`sandbox/backups` branch commit, manifest entry #19) fired the hook and printed a python3 file-not-found before the guard; harmless to the backup, both pushes ok.
 
 ## Recent Progress & Git Activity
 
 ```diff
+### Commit: 5e70fae - G1-iter6-i2 owner disposition recorded (decision #21): split default operative - S1 closing gate scheduled 2026-11-20+, S8 activated (Z User, 2026-11-19)
+ PROJECT_MEMORY.md                                  | 38 ++++-----------
+ harness/memory/00-project-state.md                 | 38 ++++++++++-----
+ harness/memory/01-decisions.md                     | 34 +++++++++++++
+ .../2026-11-19-owner-disposition-s8-activation.md  | 57 ++++++++++++++++++++++
+ harness/roadmap.md                                 | 17 +++++--
+ 5 files changed, 137 insertions(+), 47 deletions(-)
+
 ### Commit: 89b1d70 - pstack bootstrap: PROJECT_MEMORY.md root state memory + update_memory.py activity sync (Z User, 2026-11-19)
  PROJECT_MEMORY.md | 111 ++++++++++++++++++++++++++++++++++++++++++++++++++++++
  update_memory.py  |  68 +++++++++++++++++++++++++++++++++
@@ -71,21 +79,5 @@ Revert = restore those three lines from the upload. The script replaces everythi
  harness/memory/00-project-state.md                                 | 7 ++++---
  .../memory/consensus-log/2026-11-19-S1-material-you-gate-iter6.md  | 7 ++++---
  2 files changed, 8 insertions(+), 6 deletions(-)
-
-### Commit: 7a13645 - G1-iter6-i2 (iteration 2, final): NO CONSENSUS at the 2-iteration cap - Red Team BLOCK on two executed E2E criticals (includeIf-conditional pushInsteadOf: the key is invisible to the guard's context on main and materializes at push time in the sandbox/backups worktree, the full TEST checkpoint landed in the unjudged rewrite target rc 0 zero refusals; the fetch side of a named remote never judged: url=<github-spelled> + pushurl=<local bare> fetched from github in TEST mode, 3x CONNECT github.com:443 at a local sink) + symlinked .git major (both identity-compare sides resolve through it) + 3 minors (union prefers the remote same-triple entry, PROD derivation first-match vs bash last-assignment, scp password echo); Architect PWF (the allowlist hedge -> decision #20 mandates the inversion, evaluation as a named S8 pre-gate deliverable; identity derivation unfinished -> exactly-once assertion + derived E30 + loud anchors; the split left stale ledger #10/S6 docs -> corrected; 5 minors incl. the record-before-fix-cycle rule adopted + residual third-party-egress entry added); Steward PWF (CI confirmed exact on 0c4b8f9 run 44458438836 - 737x4 POSIX, 605+132 windows, wheel+Android green; claim map clean; 2 doc minors fixed) - v10 closing fix cycle: BOTH-DIRECTIONS target judgment via _judge_target (push view + fetch view resolved and judged per operand shape - closing RT-C2 AND the URL-operand insteadOf sibling found by orchestrator analysis during the fix and disclosed in the record), include/includeIf class refusal by FILE CONTENT (repo+global+XDG+system), symlinked-.git refusal + git-dir containment, union-prefers-ours with merge_triple_conflicts audited, scp-syntax redaction on all three refusal surfaces, exactly-once PROD derivation; matrix v10 E31-E35 (includeIf refusal + mechanism demo, fetch divergence + clean control, symlink, union patched-TS demo, redaction) + v9 hardening (loud PROD anchors in E25/E29, E30 derives PROD from the script, E30 skip counted loudly); 16 integrity tests extended in place (fetch-divergence + bothclean control, insteadOf push-view, includeIf + include + clean control, symlink, scp redaction, exactly-once derivation); suite 728+9 exact; matrices v5-v10 = 121 checks 0 failed all re-run; mutation probes from WORKING-TREE snapshots (the sixth-incident rule) 5/5 caught, zero production contact, no incident this cycle; escalated to the project owner - per the owner-side default the decision-#19 split is already recorded (S1 may close on its deliverable, the harness findings owned by S8's own gate); no outcome pre-recorded (Z User, 2026-11-19)
- harness/backups/README.md                          |  51 ++++-
- harness/backups/matrices/verify_backup_v10.sh      | 255 +++++++++++++++++++++
- harness/backups/matrices/verify_backup_v9.sh       |  34 ++-
- harness/memory/00-project-state.md                 |  65 ++++--
- harness/memory/01-decisions.md                     |  27 +++
- harness/memory/02-lessons.md                       |  47 +++-
- .../2026-11-19-S1-material-you-gate-iter6.md       | 212 ++++++++++++++++-
- harness/memory/deferred-findings.md                |   6 +-
- .../2026-11-19-g1-iter6-iteration1-fixcycle.md     |  43 ++++
- harness/process/adversarial-consensus.md           |  19 +-
- harness/roadmap.md                                 |  46 +++-
- scripts/sandbox_backup.sh                          | 188 +++++++++++----
- tests/test_harness_integrity.py                    | 165 ++++++++++++-
- 13 files changed, 1054 insertions(+), 104 deletions(-)
 ```
 
