@@ -202,3 +202,30 @@ Format: **decision** — context — date. Newest last.
     major #1). (d) The owner-side escalation default (split after two
     consecutive subsystem-concentrated cap-exhaustions) is recorded
     in `process/adversarial-consensus.md`. (2026-11-19, G1-iter6)
+
+20. **The port ADOPTS the allowlist inversion — the evaluation
+    becomes a named S8 pre-gate deliverable, not a clause
+    (G1-iter6-i2, 2026-11-19).** Decision #19b's "EVALUATE the
+    allowlist inversion" was a hedge (G1-iter6-i2 Devil's Architect
+    major #1): the criterion's first clause — a TEST run addresses
+    ONLY local absolute filesystem paths — already IS the inversion,
+    semantically; "nothing exits the machine in TEST mode" is
+    mechanically testable only under it (feed a non-local operand,
+    expect refusal — a matrix lane, not a prose argument); and every
+    denylist-family bypass across six gates (percent-encoded hosts,
+    `ext::` transports, `:22:` spellings, raw-IP, trailing dots,
+    multi-@ userinfo, pushInsteadOf, includeIf-conditional config,
+    the fetch side of named remotes) was a spelling chase the
+    inversion makes structurally impossible. (a) S8's exit criterion
+    now MANDATES: TEST mode addresses ONLY local absolute filesystem
+    paths, physically disjoint from the production checkout;
+    production is opt-in; the denylist refusal families retire as
+    their matrix lanes convert to allowlist lanes. (b) The evaluation
+    survives as a NAMED S8 pre-gate deliverable: a written
+    adopt/reject decision carrying the consumer inventory (the
+    "every legitimate TEST lane pushes to a local scratch bare"
+    claim, re-verified at the port) — a REJECTION requires an owner
+    decision at S8's gate, not prose. (c) The v10 both-directions
+    judgment and the residual list's third-party-egress entry
+    (backups README item 1, added by the same gate finding) document
+    exactly what the inversion closes. (2026-11-19, G1-iter6-i2)

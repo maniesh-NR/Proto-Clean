@@ -9,7 +9,7 @@ fixed time interval. (Project owner directive, 2026-11-13.)
 | Layer | Where it lives | Mechanism |
 |---|---|---|
 | Product code + docs + `harness/` memory | `main` branch | normal commits (already part of every plan) |
-| Sandbox-only state (`/home/z/my-project/scripts/`, sandbox inventory) | `sandbox/backups` branch, under `harness/sandbox/` | `scripts/sandbox_backup.sh` (v8) |
+| Sandbox-only state (`/home/z/my-project/scripts/`, sandbox inventory) | `sandbox/backups` branch, under `harness/sandbox/` | `scripts/sandbox_backup.sh` (v10) |
 | Backup audit trail | `harness/backups/manifest.json` — **branch-owned, append-only, keyed by the (seq, timestamp, message) triple** | same script |
 
 The `sandbox/backups` branch intentionally does not trigger CI
@@ -23,7 +23,7 @@ and the sandbox state. If a run records
 `main_push: failed`, product code is NOT on the remote that checkpoint
 — two consecutive failures raise a loud exit-7 alarm.
 
-## v5–v9 design (hardened by gates G1-iter2 → G1-iter4-i2 → G1-iter5 → G1-iter5-i2 → G1-iter6, 2026-11-13/16/19)
+## v5–v10 design (hardened by gates G1-iter2 → G1-iter4-i2 → G1-iter5 → G1-iter5-i2 → G1-iter6 → G1-iter6-i2, 2026-11-13/16/19)
 
 The v1 design leaked credentials into a would-be push and could brick
 itself; v2 could never complete (`git add` collided with the ignore
@@ -119,6 +119,29 @@ execution order:
   equal the operand's own `.git`; the REPO and target compares are
   CONTAINMENT checks — the production checkout and anything under
   it).
+  G1-iter6-i2 added four more refusal surfaces (all executed E2E by
+  the Red Team against v9 — or, for the sibling, by orchestrator
+  analysis during the fix — all machine/matrix-covered): the
+  BOTH-DIRECTIONS judgment (every operand's PUSH view AND FETCH view
+  are resolved and judged separately — the fetch side of a named
+  remote, `remote.<n>.url`, was never judged: a clone with
+  url=<github-spelled> + pushurl=<local bare> fetched from github in
+  TEST mode, 3× CONNECT github.com:443 at a local sink; and the
+  URL-operand sibling: a typed github-spelled operand under an
+  insteadOf rewrite pushes to the TYPED github spelling while the
+  guard had judged only the clean rewritten fetch view);
+  INCLUDE/INCLUDEIF config sections refused by FILE CONTENT (an
+  includeIf onbranch:sandbox/backups is inactive in the guard's
+  context on main and active at push time in the worktree — a
+  pushInsteadOf key carried by the included file materialized
+  exactly at push time, rc 0, zero refusals); a SYMLINKED .git
+  refused (both identity-compare sides resolve through the symlink —
+  the full checkpoint landed in the stand-in's git state); and the
+  divergence union keeps the LOCAL entry on same-triple collisions
+  (the remote variant overwrote the local ground truth) with the
+  collision count audited in the merged manifest. scp-syntax
+  `user:pass@host:path` passwords are redacted on the refusal
+  surfaces.
   Off-domain redirector URLs are a documented residual (see the
   frozen residual list below) — no client-side spelling check can
   catch them.
@@ -274,7 +297,14 @@ or removing from this list requires a gate finding, not prose**
    (transport-level; G1-iter6 RT minor #4, modeled). No client-side
    spelling check can catch either; the credential never enters a
    TEST push and production pushes are opt-in, so the residual is
-   reachability, not leakage.
+   reachability, not leakage. **Direct TEST egress to THIRD-PARTY
+   hosts (G1-iter6-i2 Architect minor #5, added by gate finding):**
+   the v9/v10 guard is a GITHUB denylist — a non-github network
+   target (gitlab.com, a private forge) passes the spelling rules
+   (raw-IP and helper transports refuse; named hosts do not). The
+   port's allowlist inversion (decision #20: TEST mode addresses ONLY
+   local absolute filesystem paths) closes the family; until then
+   this is the documented shape of the residual.
 2. **pushInsteadOf on direct operands — FIXED at v9** (corrected at
    G1-iter6, RT critical #3, executed E2E): the G1-iter5-i2
    "verified non-residual" claim was probed via the `file://`
@@ -325,11 +355,12 @@ PC_BACKUP_PUSH_REMOTE=/path/to/bare.git scripts/sandbox_backup.sh "msg"
 The hermetic cycle (fresh-create → append → planted-secret abort) is
 also machine-checked in `tests/test_harness_integrity.py` on every
 push to main (POSIX legs), and the sandbox matrices
-(`harness/backups/matrices/verify_backup_v9.sh` + the still-valid
-v5/v6/v7/v8 matrices — REPO-RESIDENT since G1-iter6 (Architect major
+(`harness/backups/matrices/verify_backup_v10.sh` + the still-valid
+v5/v6/v7/v8/v9 matrices — REPO-RESIDENT since G1-iter6 (Architect major
 #2: an exit criterion measured by an artifact nobody is forced to run
 is not a criterion — the sandbox-home copies are retired) — **re-run
-ALL of them after any script change**, see lessons) cover the v8+v9
+ALL of them after any script change**, see lessons) cover the
+v8+v9+v10
 surfaces end-to-end: E19 empty-authority +
 multi-@ spellings, E20 relative-target refusal (+ the stand-in
 mechanism demo), E21 pushurl divergence, E22 fail-closed
@@ -338,7 +369,13 @@ E24 helper transports, E25 pushInsteadOf (refusal + rewrite
 mechanism demo), E26 scp `:22:` port spellings, E27 git-dir identity
 + GIT_DIR scrub, E28 raw-IP/trailing-dot hosts (loopback exempt),
 E29 remote-carried relative URLs (+ mechanism demo), E30 push-target
-containment.
+containment (PROD DERIVED from the script under test since
+G1-iter6-i2 — Architect major #2b — with the E30 skip counted LOUDLY
+in the summary, major #2c/m3); the v10 matrix adds E31
+includeIf-conditional pushInsteadOf (refusal + mechanism demo), E32
+fetch-side divergence (+ clean remote-name control), E33 symlinked
+.git, E34 union-prefers-ours (patched-TS mechanism demo), E35
+scp-syntax redaction.
 
 ## Restore
 

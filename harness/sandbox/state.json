@@ -1,6 +1,6 @@
 {
   "git_branch": "main",
-  "git_head": "0c4b8f9",
+  "git_head": "7a13645",
   "main_push": "ok",
   "sandbox": {
     "download": [
@@ -63,6 +63,7 @@
       "ed25519_verify",
       "extract_wg_section.py",
       "g1i6_mutation_probes.sh",
+      "g1i6i2_probe_battery.sh",
       "hy2_debug.py",
       "inspect_page.py",
       "inspect_page2.py",
@@ -112,5 +113,5 @@
       "xlsx"
     ]
   },
-  "timestamp": "2026-11-19T04:27:28Z"
+  "timestamp": "2026-11-19T05:06:08Z"
 }

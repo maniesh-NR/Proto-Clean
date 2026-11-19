@@ -52,7 +52,7 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   close a loop that `is_running()` (macOS CI caught this, `bdefec5`).
 - Full suite runtime ≈ 80-90 s locally; `python -m pytest tests/ -q
   -p no:asyncio`.
-- Baseline (after the G1-iter6 fix cycle): local 728 passed +
+- Baseline (after the G1-iter6-i2 fix cycle): local 728 passed +
   9 skipped; CI 737 per POSIX leg (windows 605 passed + 132
   platform skips). A changed skip count on a leg means a test
   silently changed behavior — check before/after when adding tests.
@@ -259,6 +259,51 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   stayed green. The owner-side rule now DEFAULTS to splitting the
   subsystem out (S8) after two consecutive subsystem-concentrated
   caps (process doc, decision #19).
+
+- **Config VISIBILITY is context-conditional — judge what the push
+  sees, or refuse the indirection class** (G1-iter6-i2 RT C1,
+  executed E2E): an `includeIf "onbranch:sandbox/backups"` include
+  is INACTIVE in the guard's context (the repo sits on main) and
+  ACTIVE in the push context (the temp worktree on the branch) — a
+  pushInsteadOf key carried by the included file materialized
+  exactly at push time, after the guard judged, rc 0. No visibility
+  check enumerates every conditional (onbranch:, gitdir:,
+  hasconfig:); refuse any [include]/[includeIf] section by FILE
+  CONTENT, and remember the guard's git context and the push's git
+  context are DIFFERENT resolutions of the same config.
+- **A named remote has TWO addresses — judge the one each operation
+  uses** (G1-iter6-i2 RT C2, executed at a local CONNECT sink): the
+  guard resolved remote operands via `get-url --push` while the
+  FETCHES address `remote.<n>.url` — a github-spelled fetch URL was
+  never judged (3× CONNECT github.com:443 in TEST mode). The mirror
+  image exists for URL operands (found by orchestrator analysis, not
+  the RT — generalizing a finding's MECHANISM is part of fixing it):
+  a typed github-spelled operand under insteadOf resolves fetch-side
+  to the clean rewrite while the PUSH travels the typed spelling
+  (insteadOf never rewrites push operands). Judge BOTH directions'
+  EFFECTIVE targets, for every operand shape.
+- **An equality compare through a resolvable indirection is not an
+  identity check** (G1-iter6-i2 RT M1, executed E2E): a symlinked
+  `$REPO/.git` resolves BOTH compare sides (git-common-dir and
+  `$REPO/.git`) through it to the same foreign path — the equality
+  held while the operand shared another checkout's git state and
+  the full checkpoint landed inside it. Identity checks need either
+  a non-resolvable form (refuse the symlink) or a containment
+  anchor independent of the thing being verified.
+- **The local machine's own manifest entries are ground truth**
+  (G1-iter6-i2 RT m1): the divergence union iterated (ours, theirs)
+  so a same-triple collision let the REMOTE variant overwrite what
+  ran locally. Merge order encodes trust — iterate remote first,
+  keep ours, and AUDIT the collision count in the merged doc so the
+  preference is visible in the artifact.
+- **Derivations must assert exactly-one, or they desynchronize
+  silently** (G1-iter6-i2 RT m2 / Architect M2a): the lanes derived
+  PROD_CHECKOUT by FIRST match while bash executes the LAST
+  assignment — an insert-style mutation (a second assignment later
+  in the script) split the guard from its lanes with no failure
+  signal. Same rule as the loud-anchor lesson: a derived identity
+  with a non-unique anchor is an inconclusive derivation, never a
+  best-effort one.
 
 ## CI / GitHub
 
