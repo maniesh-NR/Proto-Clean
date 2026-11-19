@@ -41,9 +41,10 @@ recorded — no outcome pre-recorded here.**)
   the G1-iter6 fix-cycle commit `0c4b8f9`** (run 44458438836, all 7
   legs success, per-leg job-log-verified by the Ship Steward):
   737 × 4 POSIX, 605+132 windows, wheel + Android green — exact,
-  expectation met. Expectation for
-  the G1-iter6-i2 closing commit: unchanged (all new coverage
-  extended existing tests in place). Any change must keep the suite
+  expectation met. **CONFIRMED on the G1-iter6-i2 closing commit
+  `7a13645`** (run 44462797163, all 7 legs success, per-leg
+  job-log-verified): 737 × 4 POSIX, 605+132 windows, wheel + Android
+  green — exact, expectation met. Any change must keep the suite
   green; new features add tests to the baseline.
 
 ## Feature inventory

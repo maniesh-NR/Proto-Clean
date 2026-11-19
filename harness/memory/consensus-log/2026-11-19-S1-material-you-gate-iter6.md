@@ -411,8 +411,9 @@ PROCEED-WITH-FINDINGS** · **Ship Steward PROCEED-WITH-FINDINGS** →
   load-bearing, not vacuous).
 - No accidental-checkpoint incident this cycle (containment held
   through the probe battery).
-- CI expectation for this commit: unchanged (737 × 4 POSIX /
-  605+132 windows); to be confirmed post-push per the checklist —
-  the previous commit's expectation was met exactly (run 44458438836).
+- CI **CONFIRMED** for this commit (run 44462797163, all 7 legs
+  success, per-leg job-log-verified post-push): 737 × 4 POSIX,
+  605+132 windows, wheel + Android green — the expectation met
+  exactly.
 
 FINAL OUTCOME: NO CONSENSUS — iteration cap reached (2 of 2): iteration 2's Red Team BLOCK (the includeIf-conditional pushInsteadOf and the never-judged fetch side of named remotes — both executed E2E on stand-ins with every v9 guard green — plus the symlinked-.git major) vs Devil's Architect and Ship Steward PROCEED-WITH-FINDINGS; every finding from both iterations remediated and machine/matrix-covered in this closing commit, which carries this record; escalated to the project owner — per the owner-side escalation default (adopted this gate, Architect major #3) the decision-#19 split is already recorded: S1 may close on its deliverable (Material You green through six gates, zero deliverable findings) with the harness findings owned by S8's own gate, unless the owner orders another gate; all six cap-exhaustions of this stage were decided by backup/harness-subsystem findings.
