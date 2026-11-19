@@ -1,6 +1,21 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-19 (G1-iter6 CLOSED at the 2-iteration cap —
+Last updated: 2026-11-19 (**S8 PRE-GATE S8-PG1 iteration 1: NO
+CONSENSUS** — Red Team BLOCK (2 criticals: the retiring-family list
+over-reaches — pushInsteadOf + include/includeIf are not subsumed by
+the allowlist inversion and retiring them reopens two executed-E2E
+criticals; the loopback conversion loses the only curl-verbose leak
+witness + the consumer inventory misses the FOURTH loopback consumer
+— machine-suite r2 — and E11 is mischaracterized) · Devil's
+Architect BLOCK (3 criticals: same retirement defect; the STAGE 3/5
+cutover contradiction — identity single-sourcing unsatisfiable
+until STAGE 5; no module design contract) · Ship Steward
+PROCEED-WITH-FINDINGS (same 2 criticals + roadmap drift, coverage
+arithmetic, the 3.8 floor, no STAGE-6 cap contingency). All findings
+document-level; remediation cycle amends the evaluation + plan;
+iteration 2 re-judges — record:
+`memory/consensus-log/2026-11-19-s8-pre-gate.md`. Prior: G1-iter6
+CLOSED at the 2-iteration cap —
 iteration 2, on the fix commit `0c4b8f9`: Red Team BLOCK on two
 executed criticals (includeIf-conditional pushInsteadOf; the fetch
 side of a named remote, 3× CONNECT github.com:443 at a local sink)
@@ -121,8 +136,18 @@ deliverables. No gate outcome is pre-recorded.**)
   adopt/reject evaluation + re-verified consumer inventory
   (decision #20b — `backups/allowlist-inversion-evaluation.md`,
   ADOPT with the loopback trio flagged for conversion) and the S8
-  execution plan (`process/s8-execution-plan.md`); the pre-gate
-  itself has NOT run.
+  execution plan (`process/s8-execution-plan.md`). **PRE-GATE
+  S8-PG1 ITERATION 1 RAN 2026-11-19 on `82fb63c`: NO CONSENSUS —
+  RT BLOCK (2C/4M/4m) + Architect BLOCK (3C/6M/4m) + Steward PWF
+  (2C/5M/4m); the roles independently converged on the retirement
+  over-reach (pushInsteadOf/includeIf survive the inversion), the
+  loopback QUARTET (machine-r2 lane missed by the inventory), and
+  the E11 mischaracterization (failing-push redaction, not
+  success-surface); matrices v5–v10 re-verified 121/0 by the
+  Steward during the gate. Remediation cycle (documents only)
+  amends both deliverables per the record's resolution list;
+  iteration 2 re-judges; no port work before consensus; no
+  iteration-2 outcome pre-recorded.**
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan

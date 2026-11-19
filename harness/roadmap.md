@@ -88,7 +88,7 @@ its results before the NEXT stage proceeds. Status legend:
 
 ## Near term
 
-- ☐ **S8. Harness subsystem hardening + Python port** (decision #19,
+- ◐ **S8. Harness subsystem hardening + Python port** (decision #19,
   split out of S1 at G1-iter6 after five subsystem-concentrated
   cap-exhaustions) — port the backup merge/alarm/guard core to a
   tested Python module against the PROPERTY-based exit criterion
@@ -100,7 +100,15 @@ its results before the NEXT stage proceeds. Status legend:
   structurally impossible; fold the glyph-check date-semantics
   residuals (ledger #10) into the port; keep the repo-resident
   matrices v5–v9 green. **Its own gate before S2's stage gate** (the
-  decision-#18 port schedule, now a stage).
+  decision-#18 port schedule, now a stage). **Pre-gate S8-PG1
+  iteration 1 (2026-11-19): NO CONSENSUS — Red Team BLOCK (2
+  criticals) + Devil's Architect BLOCK (3 criticals) + Ship Steward
+  PROCEED-WITH-FINDINGS; converged findings include the
+  retirement over-reach (pushInsteadOf/includeIf not subsumed by
+  the inversion), the fourth loopback consumer (machine-suite
+  quartet), and the E11 mischaracterization; remediation cycle on
+  the two deliverable documents; iteration 2 re-judges — record:
+  `memory/consensus-log/2026-11-19-s8-pre-gate.md`.**
 - ☐ **S2. Release v0.6.3** — ship Material You + bonding fixes
   (runbook: `memory/03-release-runbook.md`; **adversarial pre-gate
   required before work starts — none has run yet**). Scope (folded in
