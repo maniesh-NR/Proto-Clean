@@ -38,8 +38,39 @@ its results before the NEXT stage proceeds. Status legend:
   guarded identity; matrices repo-resident v5–v9 = 112 checks;
   residual list corrected per findings; the harness subsystem SPLIT
   into S8, decision #19) lands in the commit carrying the iter6
-  record; **iteration 2 (final) re-judges the fix commit — no
-  outcome pre-recorded.**
+  record; **iteration 2 (2026-11-19, on the fix commit `0c4b8f9`):
+  Red Team BLOCK** (2 executed criticals: includeIf-conditional
+  pushInsteadOf — the key is invisible to the guard's context on
+  main and materializes at push time in the worktree, the full TEST
+  checkpoint landed in the unjudged rewrite target, rc 0; the FETCH
+  side of a named remote never judged — a clone with
+  url=<github-spelled> + pushurl=<local bare> fetched from github in
+  TEST mode, 3× CONNECT github.com:443 at a local sink; 1 major:
+  symlinked .git passes the identity compare — both sides resolve
+  through it; 3 minors: union prefers the remote same-triple entry,
+  the PROD derivation is first-match vs bash last-assignment, scp
+  passwords echoed) vs Devil's Architect PROCEED-WITH-FINDINGS (3
+  majors: the port exit criterion's allowlist hedge — resolved by
+  decision #20; the identity-derivation job unfinished — lanes,
+  matrix E30, anchors, all fixed; the split left stale ledger/S6
+  docs — fixed) and Ship Steward PROCEED-WITH-FINDINGS (claim map
+  clean, CI confirmed exact on `0c4b8f9` — run 44458438836, 737×4
+  POSIX / 605+132 windows / wheel+Android green; 2 doc minors,
+  fixed). **NO CONSENSUS at the 2-iteration cap — G1-iter6 closed,
+  escalated to the project owner.** Every iteration-2 finding
+  remediated and machine/matrix-covered in the closing commit
+  (backup v10: both-directions judgment incl. the URL-operand
+  insteadOf sibling found by orchestrator analysis; include/includeIf
+  file-content refusal; symlinked-.git refusal + git-dir containment;
+  union-prefers-ours with the collision audited; scp redaction;
+  derived-exactly-once PROD; matrix v10 E31–E35 + v9 hardening
+  (loud anchors, derived E30, loud skips); decision #20; ledger
+  #10→S8 + rows #11/#12; process-doc item (f) extension +
+  record-before-fix-cycle rule) — **the owner's decision is pending:
+  per the G1-iter6 owner-side escalation default the split (decision
+  #19) is already recorded — S1 may close on its deliverable with
+  the harness findings owned by S8, unless the owner orders another
+  gate; no outcome pre-recorded here.**
   - Desktop: dynamic-color seed (brand / system accent / custom hex),
     OS accent detection (GNOME 47 accent-color, Windows DWM
     AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,
@@ -93,11 +124,12 @@ its results before the NEXT stage proceeds. Status legend:
   (G1-iter6 Architect minor #5): credential storage at rest (keyring
   + the chmod-0600 JSON fallback), TOTP secret storage, session
   persistence, the browser-scrape login relay, API TLS
-  verification**; also decide whether to port
-  the backup merge/alarm/guard core from bash to a tested Python
-  module — now ledger row #9, with the port + a frozen verification
-  matrix as the harness subsystem's bounded exit criterion
-  (G1-iter4-i2 Architect)
+  verification**; the bash→Python port of the backup
+  merge/alarm/guard core is stage **S8** (split out at G1-iter6,
+  decision #19; corrected at G1-iter6-i2 — Architect major #3):
+  ledger row #9, the property-based exit criterion (decisions
+  #19b/#20 — the allowlist inversion mandated), the repo-resident
+  matrices, and ledger #10 ride S8's own gate
 - ☐ **S7. Legacy-stack sunset decision** — Python 3.8 is EOL; decide
   keep/drop for the PySide2-Qt5 / PySide6-6.2 legs (every UI change
   pays the compat tax until decided). Decision due by v0.7 — S2's

@@ -1,8 +1,7 @@
 # Consensus Gate — S1 (iteration 6, owner-ordered fresh gate)
 
 Stage: S1
-Date: 2026-11-19 (iteration 1; iteration 2 pending — no outcome
-pre-recorded)
+Date: 2026-11-19 (both iterations concluded — closed at the cap)
 Gate ID: G1-iter6 (fresh gate ordered by the project owner on
 2026-11-19 per the standing continuation directive, after G1-iter5
 exhausted its 2-iteration cap without consensus; this gate has its
@@ -211,12 +210,209 @@ deliverable finding in any iteration of this gate.
   `memory/session-log/2026-11-19-g1-iter6-sixth-incident.md`
   (reconstructed — provenance disclosed there).
 
-## Iteration 2 (final) — pending
+## Iteration 2 — re-judgment of the fix commit `0c4b8f9` (2026-11-19)
 
-Re-judges THIS fix-cycle commit (SHA recorded in the iteration-2
-section when its verdicts return). No outcome pre-recorded.
+Three roles launched in one parallel round, independent, no shared
+context — no orchestration slip this time, and no context loss: the
+full verdict texts returned to the orchestrator and are condensed
+below from the intact reports (no provenance caveat for this
+iteration).
 
-Iteration 2 outcome: recorded in this file when the re-run's
-verdicts return — not before.
+Verdicts: **Red Team BLOCK** · **Devil's Architect
+PROCEED-WITH-FINDINGS** · **Ship Steward PROCEED-WITH-FINDINGS** →
+**NO CONSENSUS — the 2-iteration cap is exhausted.**
 
-FINAL OUTCOME: NO CONSENSUS — iteration 1 of 2 (Red Team BLOCK on six executed criticals; Architect and Steward PROCEED-WITH-FINDINGS); the v9 fix cycle above lands in this commit, which carries this record; iteration 2 (final) re-judges this remediation commit within the gate's cap.
+### Red Team — BLOCK (2 criticals + 1 major, all executed E2E on stand-ins with all v9 guards green; 3 minors)
+
+- **C1 — includeIf-conditional `pushInsteadOf` is invisible at guard
+  time, active at push time** (reopens the closed C3 class; falsifies
+  residual items 2/6 as written). The v9 refusal greps
+  `git config --get-regexp` from the repo, which sits on `main` at
+  guard time — but the branch pushes execute from the temporary
+  worktree on `sandbox/backups`, where an
+  `includeIf "onbranch:sandbox/backups"` include is ACTIVE. The key
+  materialized exactly at push time; the full TEST checkpoint landed
+  in the unjudged rewrite target (rc 0, zero refusals); with the
+  rewrite value spelled as any github URL the TEST checkpoint
+  reaches github with all guards green. The machine lane and matrix
+  E25 set the key unconditionally (visible on main) — this shape had
+  no coverage.
+- **C2 — the fetch side of a named remote is never judged** (breaks
+  the README's founding invariant "not even via a clone's origin").
+  v9 resolved remote-name operands solely via
+  `git remote get-url --push`; every fetch addresses
+  `remote.<n>.url` — a URL no guard rule ever saw. Executed: a
+  remote with url=<github-spelled> + pushurl=<local bare> ran rc 0
+  with zero refusals while the clone's refs matched the fetch sink's
+  marker commit; with the fetch URL spelled
+  `https://github.com/maniesh-NR/Proto-Clean.git` and https egress
+  forced through a local blackhole sink, **3× CONNECT
+  github.com:443** were observed (fetch_main, fetch_branch, the
+  alarm fetch) — anonymous, no credential, but TEST traffic reached
+  github with all guards green.
+- **M1 — a symlinked `.git` passes the v9 git-dir identity check.**
+  `$REPO/.git` symlinked to another checkout's `.git` resolves BOTH
+  compare sides through it to the same physical path — the equality
+  held while the operand shared the stand-in's git state; the full
+  TEST checkpoint + refs landed inside it (rc 0, zero refusals).
+  Honest caveat stated by the RT: a constructed shape, no accident
+  path identified — hence major, not critical.
+- Minors: **m1** — the divergence union iterates (ours, theirs), so
+  a same-triple collision lets the REMOTE variant overwrite the
+  local ground truth (logic-demo executed: local
+  `main_push:failed`/`git_head:aaaa` replaced by remote
+  same-triple `main_push:ok` + a forged field); **m2** —
+  `_prod_checkout` derives the FIRST `PROD_CHECKOUT=` match while
+  bash executes the LAST — an insert-style mutation desynchronizes
+  the lanes from the guard (demo executed), the one-sided-patch
+  class the v9 fix claimed structurally dead; **m3** — a
+  scheme-less scp operand `user:pass@host:path` echoes its password
+  verbatim through the not-a-remote refusal.
+- Verified-good (honest negatives): the glyph teeth held against
+  CRLF closures, malformed Date headers, unbalanced/indented fences,
+  pre-closure retractions, ☑-with-variant-selector and lookalikes;
+  the host cut, percent/`::`/raw-IP/trailing-dot/relative/containment
+  rules and the env scrub all behaved; the deliverable (Material
+  You) outside the findings, consistent with six gates.
+
+### Devil's Architect — PROCEED-WITH-FINDINGS (3 majors, 5 minors; no criticals)
+
+- **Major #1 — the port exit criterion's keystone is hedged.**
+  Decision #19b's "EVALUATE the allowlist inversion" re-opens what
+  the criterion's first clause already decided (a TEST mode that can
+  only address local absolute paths IS an allowlist); "nothing exits
+  the machine" is mechanically testable only under the inversion;
+  and the decision's own rationale concedes no consumer uses the
+  any-host capability. Required: mandate it, or gate the evaluation
+  as a named S8 pre-gate deliverable with a written accept/reject
+  decision.
+- **Major #2 — the identity-derivation job was unfinished.** (a) the
+  derivation regex is first-match while bash is last-assignment-wins
+  (convergent with RT-m2); (b) matrix E30 hand-copies the production
+  path — the one-sided-patch coupling persisting in a repo-resident
+  artifact the checklist forces every cycle to re-run; (c) the
+  E25/E29 `PROD_CHECKOUT` patches use silent `str.replace` with no
+  loud anchor check, violating the same commit's own loud-anchor
+  rule (the E20 anchor-drift class).
+- **Major #3 — the S1/S8 split left stale authoritative docs.**
+  Ledger #10 gated at "S6 (harness port)" and the S6 bullet still
+  said "decide whether to port … ledger row #9", contradicting
+  decisions #18/#19 and S8's claim on #10.
+- Minors: **m1** — S1's roadmap title must narrow at the ☑ flip
+  (deferred #11); **m2** — the matrices are repo-resident but not
+  CI-forced, and the port must per-lane audit lane mechanics
+  (deferred #12); **m3** — E30's silent SKIP makes the check count
+  machine-dependent; **m4** — add the rule: a gate record commits
+  before its fix cycle starts (adopted this cycle, applies from the
+  next gate); **m5** — the residual list covers indirection-to-
+  github but not direct TEST egress to third-party hosts (added by
+  this gate finding).
+- Verified-good: the provenance disclosure honest — no laundering
+  detected; every claimed remediation verifiable in the commit; the
+  suite independently re-run (728+9 exact, integrity 16/16); the
+  S1/S8 split sound (with the S8-fallback seam flagged for the
+  owner); the bash freeze coherent; the record machinery
+  load-bearing, consolidation due at the port.
+
+### Ship Steward — PROCEED-WITH-FINDINGS (no criticals, no majors; 2 minors)
+
+- Suite re-run: **728 passed + 9 skipped, exact** (737 collected;
+  skip count unchanged); integrity suite 16/16.
+- Matrices re-run (all five): **112 checks, 0 failed** (v5 20, v6
+  22, v7 25, v8 19, v9 26); working tree clean before and after.
+- Doc checklist (a)-(f): 5 of 6 fully verified in `0c4b8f9`;
+  (d) PARTIAL — the README "What gets backed up" table still
+  labeled the script "(v8)".
+- Audit trail: the gate record's Stage/Date/pins/provenance/
+  finding→resolution/closure-line all verified; the sixth-incident
+  disclosure consistent across README + session log + record; the
+  roadmap S1/S8 entries consistent with decision #19; the pushed
+  manifest at seq 16 (main_push ok, prev_branch_push ok); HEAD
+  clean.
+- **CI CONFIRMED on `0c4b8f9`**: run 44458438836, all 7 legs
+  success — 737 × 4 POSIX, 605+132 windows, wheel + Android green,
+  per-leg counts from job logs (read-only, token never printed).
+- Release risk: minimal — the product diff is a pure single-sourcing
+  refactor (`PROTO_BRAND_SEED == "#2f6d3f"` value-identical,
+  runtime-verified; `test_material_you.py` asserts the literal and
+  would catch drift).
+- Minors: **m1** — the stale "(v8)" label (checklist item (d));
+  **m2** — the sixth-incident rule recorded in lessons/README/
+  session log but not in the process doc's item (f).
+
+### Resolution cycle (iteration-2 fixes applied in THIS commit — every finding from all three roles)
+
+- RT-C1 → **include/includeIf class refusal by FILE CONTENT** — any
+  `[include`/`[includeIf` section in the repo config, global config,
+  XDG config or system config refuses a TEST run (content
+  inspection, branch-condition-independent), inside `_judge_target`.
+  [integrity lanes: includeIf + include + clean control; E31 +
+  mechanism demo]
+- RT-C2 + **the URL-operand insteadOf SIBLING (found by orchestrator
+  analysis during this fix cycle, disclosed here)** → **both-directions
+  judgment**: `_judge_target` extracted; the PUSH view (remote name
+  → `get-url --push`; URL/path operand → the TYPED spelling) and the
+  FETCH view (remote name → `get-url`; URL/path operand → the
+  `ls-remote --get-url` insteadOf resolution) are each resolved and
+  judged. The sibling: a typed github-spelled operand under an
+  insteadOf rewrite resolves fetch-side to the clean rewrite while
+  the push travels the typed github spelling — v9 judged only the
+  fetch view. [integrity lanes: ghdiv + bothclean control +
+  insteadOf-push-view; E32 + control]
+- RT-M1 → **symlinked-.git refusal** (`[ -L "$REPO/.git" ]` exits
+  6) + a **git-dir containment compare** against the production
+  checkout (belt-and-braces). [E33; integrity lane]
+- RT-m1 → **union prefers OURS**: the merge iterates (theirs, ours)
+  so the local entry wins same-triple collisions, with
+  `merge_triple_conflicts` audited in the merged doc and a loud
+  stderr line. [E34 patched-TS mechanism demo]
+- RT-m2 / Arch-M2a → `_prod_checkout` asserts **exactly one**
+  `PROD_CHECKOUT` assignment (loud, never best-effort).
+- RT-m3 → scp-syntax `user:pass@` redaction on all three refusal
+  surfaces (not-a-remote message + both push helpers).
+  [E35; integrity lane]
+- Arch-M1 → **decision #20**: the allowlist inversion MANDATED as
+  S8's exit criterion; the evaluation re-framed as a named S8
+  pre-gate deliverable (a rejection requires an owner decision).
+- Arch-M2b → matrix E30 **derives** PROD from the script under test
+  (exactly-one, loud); Arch-M2c → E25/E29 and every v10 patch carry
+  **loud anchors**; Arch-m3 → E30's skip **counted loudly** in the
+  summary line.
+- Arch-M3 → ledger #10's gate column → S8; the S6 bullet → S8
+  (decisions #18/#19/#20); ledger #9's action refreshed.
+- Arch-m1 → deferred row #11 (narrow the S1 title at the ☑ flip);
+  Arch-m2 → deferred row #12 (per-lane mechanism audit + CI-forcing
+  decision at the port); Arch-m4 → the **record-before-fix-cycle**
+  rule adopted in the process doc (applies from the next gate);
+  Arch-m5 → residual item 1 extended with the third-party-egress
+  entry (a gate finding — the two-directional freeze working).
+- Steward-m1 → README script label "(v8)" → "(v10)"; Steward-m2 →
+  process doc item (f) extended with the sixth-incident
+  snapshot-the-working-tree rule.
+- Docs per the fix-cycle checklist: README (v5–v10 design section,
+  matrix list, residual item 1), process doc, decisions #20,
+  deferred findings #9/#10 refreshed + #11/#12 added, roadmap (S1
+  narrative + S6 correction), lessons (+6), project state (CI
+  confirmed on `0c4b8f9`), session log part 3, this record.
+
+### Fix-cycle completion (evidence, at this commit)
+
+- Suite: **728 passed + 9 skipped** local (16 integrity tests, count
+  unchanged — all new coverage extended existing tests in place),
+  re-run on this tree before commit.
+- Matrices: **v5 20/20 · v6 22/22 · v7 25/25 · v8 19/19 · v9 26/26
+  (0 skipped, production present) · v10 9/9 — 121 checks, 0
+  failed**, all repo-resident, ALL re-run (checklist item (e)).
+- Mutation probes (working-tree snapshots per the sixth-incident
+  rule — clone for history + rsync overlay, loud anchors, zero
+  production contact): **5/5 caught** — include-refusal removal,
+  fetch-view removal, symlink-refusal removal, union-order revert
+  and scp-redaction removal each fail their lane (the coverage is
+  load-bearing, not vacuous).
+- No accidental-checkpoint incident this cycle (containment held
+  through the probe battery).
+- CI expectation for this commit: unchanged (737 × 4 POSIX /
+  605+132 windows); to be confirmed post-push per the checklist —
+  the previous commit's expectation was met exactly (run 44458438836).
+
+FINAL OUTCOME: NO CONSENSUS — iteration cap reached (2 of 2): iteration 2's Red Team BLOCK (the includeIf-conditional pushInsteadOf and the never-judged fetch side of named remotes — both executed E2E on stand-ins with every v9 guard green — plus the symlinked-.git major) vs Devil's Architect and Ship Steward PROCEED-WITH-FINDINGS; every finding from both iterations remediated and machine/matrix-covered in this closing commit, which carries this record; escalated to the project owner — per the owner-side escalation default (adopted this gate, Architect major #3) the decision-#19 split is already recorded: S1 may close on its deliverable (Material You green through six gates, zero deliverable findings) with the harness findings owned by S8's own gate, unless the owner orders another gate; all six cap-exhaustions of this stage were decided by backup/harness-subsystem findings.

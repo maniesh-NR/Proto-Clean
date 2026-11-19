@@ -127,8 +127,11 @@ git -C "$S/e25/clone" config --unset \
 python3 - "$SCRIPT" > "$S/patched.sh" <<'PY'
 import sys, pathlib
 src = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
-src = src.replace('PROD_CHECKOUT="/home/z/my-project/cleanroom"',
-                  'PROD_CHECKOUT="/tmp/pc-v9-verify/standin-prod"')
+# G1-iter6-i2 Architect major #2c: LOUD anchors — a silent no-op on a
+# spelling change re-creates the E20 anchor-drift class
+prod = 'PROD_CHECKOUT="/home/z/my-project/cleanroom"'
+assert src.count(prod) == 1, "PROD_CHECKOUT anchor missing or not unique"
+src = src.replace(prod, 'PROD_CHECKOUT="/tmp/pc-v9-verify/standin-prod"')
 old = """  if git config --get-regexp '^url\\..+\\.pushinsteadof$' >/dev/null 2>&1; then
     echo "!! refusing: a url.*.pushInsteadOf key exists in visible git config —" >&2
     echo "   push-time rewrites are invisible to fetch-side resolution, so a" >&2
@@ -248,10 +251,12 @@ fi
 python3 - "$SCRIPT" > "$S/patched2.sh" <<'PY'
 import sys, pathlib
 src = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
-src = src.replace('PROD_CHECKOUT="/home/z/my-project/cleanroom"',
-                  'PROD_CHECKOUT="/tmp/pc-v9-verify/standin-prod"')
+# G1-iter6-i2 Architect major #2c: LOUD anchors (same as E25)
+prod = 'PROD_CHECKOUT="/home/z/my-project/cleanroom"'
+assert src.count(prod) == 1, "PROD_CHECKOUT anchor missing or not unique"
+src = src.replace(prod, 'PROD_CHECKOUT="/tmp/pc-v9-verify/standin-prod"')
 old = """    *)
-      echo "!! refusing: PC_BACKUP_PUSH_REMOTE resolves to a RELATIVE target" >&2
+      echo "!! refusing: the $_dir target (PC_BACKUP_PUSH_REMOTE) resolves to a RELATIVE target" >&2
       echo "   (however carried — direct operand or a remote's URL) — the push" >&2
       echo "   executes from a temporary worktree, so a relative target resolves" >&2
       echo "   somewhere the guard never judged. Use an absolute scratch path" >&2
@@ -287,7 +292,19 @@ cd "$ROOT"
 
 # -- E30: push-target containment -------------------------------------
 mk_lane e30
-PROD="/home/z/my-project/cleanroom"
+# G1-iter6-i2 Architect major #2b: DERIVE the guarded identity from
+# the script under test (exactly-one assignment, loud) — a
+# hand-copied production path is the one-sided-patch coupling in a
+# repo-resident artifact the checklist forces every fix cycle to
+# re-run
+PROD="$(python3 -c '
+import re, pathlib, sys
+src = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+m = re.findall(r"(?m)^PROD_CHECKOUT=\"(.+)\"$", src)
+assert len(m) == 1, "PROD_CHECKOUT not found or not unique"
+print(m[0])
+' "$SCRIPT")" || { bad "E30 PROD derivation failed"; }
+SKIP=0
 if [ -d "$PROD" ]; then
   for t in "$PROD/harness" "$PROD/.git" ; do
     rc=$(run_bk e30 "e30 probe" "$t")
@@ -298,9 +315,10 @@ if [ -d "$PROD" ]; then
     fi
   done
 else
-  echo "SKIP: E30 (production checkout not present on this machine)"
+  SKIP=1
+  echo "SKIP: E30 (2 lanes — the production checkout is not present on this machine); counted loudly, not silent"
 fi
 
 echo "----------------------------------------"
-echo "verify_backup_v9: $PASS passed, $FAIL failed"
+echo "verify_backup_v9: $PASS passed, $FAIL failed, $SKIP skipped"
 [ "$FAIL" = 0 ]

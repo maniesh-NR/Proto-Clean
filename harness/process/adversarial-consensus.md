@@ -84,7 +84,16 @@ MINOR:     [list or none]   — fix-or-file
   mutation lets the lane's production-path reference through, and a
   one-sided constant patch NEUTRALIZES the refusal for every other
   real-path lane (the seq-10 and seq-1'/2'/13 incidents, G1-iter5 /
-  G1-iter5-i2).
+  G1-iter5-i2). **Extended at G1-iter6-i2 (the sixth incident,
+  Steward minor #2):** probe batteries snapshot the WORKING TREE over
+  a history clone (`git clone` + `rsync --delete` overlay), never
+  bare HEAD — a probe clone taken while the fix sits uncommitted
+  re-creates the one-sided patch structurally, and the fix that
+  saves you (derived lanes) is exactly the part the stale clone
+  lacks; patch anchors verify LOUDLY (a missing anchor is an
+  inconclusive probe, never a silent skip); and a debug re-run of a
+  failing production-touching probe is itself production-touching —
+  re-check containment before re-running.
 
 ## Record
 
@@ -137,6 +146,14 @@ Cap-exhausted gates record
 `FINAL OUTCOME: NO CONSENSUS — iteration cap reached` and escalate to
 the project owner; a fresh gate may then be ordered by the owner on
 the remediation commit (the G1 → G1-iter3 precedent).
+**Record-before-fix-cycle (adopted G1-iter6-i2, Architect minor
+#4):** a gate's iteration-1 record lands in its OWN commit BEFORE
+the fix cycle starts — the verdicts, findings and an interim
+closure line first, the remediation in the next commit. A context
+loss mid-cycle then never needs a reconstruction (the G1-iter6
+provenance disclosure is the counterexample that adopted this); the
+interim closure line rewrites per the multi-iteration rule when the
+next iteration concludes.
 
 **Closure choreography (adopted 2026-11-16, G1-iter4-i2 Architect
 minor #8):** when a gate reaches consensus, close it in THIS order,

@@ -1,17 +1,26 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-19 (G1-iter6 IN FLIGHT — iteration 1 returned
-NO CONSENSUS (Red Team BLOCK on six executed criticals: git-dir
-identity redirects, remote-carried relative targets, pushInsteadOf
-on direct operands — falsifying a frozen-residual claim —
-percent-encoded hosts, `ext::` transports, six glyph-forgery
-classes; Architect + Steward PROCEED-WITH-FINDINGS). Every finding
-from all three roles remediated in the fix-cycle commit (backup v9,
-16 integrity tests extended in place, matrices v5–v9 = 112 checks
-all repo-resident, residual list corrected per findings, the harness
-subsystem SPLIT into stage S8 with a property-based port exit
-criterion — decision #19). **Iteration 2 (final) re-judges the fix
-commit — no outcome pre-recorded.**)
+Last updated: 2026-11-19 (G1-iter6 CLOSED at the 2-iteration cap —
+iteration 2, on the fix commit `0c4b8f9`: Red Team BLOCK on two
+executed criticals (includeIf-conditional pushInsteadOf; the fetch
+side of a named remote, 3× CONNECT github.com:443 at a local sink)
++ 1 major (symlinked .git) + 3 minors; Devil's Architect
+PROCEED-WITH-FINDINGS (3 majors, all remediated: the allowlist
+hedge → decision #20, the identity-derivation job finished, the
+stale split docs fixed); Ship Steward PROCEED-WITH-FINDINGS (CI
+confirmed exact on `0c4b8f9`, run 44458438836; 2 doc minors, fixed)
+→ NO CONSENSUS at the cap, escalated to the project owner. The
+closing v10 fix cycle — both-directions target judgment incl. the
+URL-operand insteadOf sibling found by orchestrator analysis,
+include/includeIf file-content refusal, symlinked-.git refusal +
+git-dir containment, union-prefers-ours (collision audited), scp
+redaction, exactly-once PROD derivation, matrices v10 E31–E35 +
+v9 loud anchors/derived E30/loud skips (121 checks v5–v10), decision
+#20, ledger #10→S8 + rows #11/#12, process item (f) extension +
+record-before-fix-cycle rule — landed in the commit carrying the
+iter6 record. **The owner's decision is pending; per the
+owner-side escalation default the decision-#19 split is already
+recorded — no outcome pre-recorded here.**)
 
 ## Identity
 
@@ -28,8 +37,12 @@ commit — no outcome pre-recorded.**)
   bond-desktop loopback-alias skip — runner variance, not drift).
   CONFIRMED on the G1-iter5 closing line (check-runs + job logs,
   G1-iter6 pre-gate verification): `a1607ce` and `32d822f` both
-  7/7 legs — 737 × 4 POSIX, 605+132 windows, exact. Expectation for
-  the G1-iter6 fix-cycle commit: unchanged (all new coverage
+  7/7 legs — 737 × 4 POSIX, 605+132 windows, exact. **CONFIRMED on
+  the G1-iter6 fix-cycle commit `0c4b8f9`** (run 44458438836, all 7
+  legs success, per-leg job-log-verified by the Ship Steward):
+  737 × 4 POSIX, 605+132 windows, wheel + Android green — exact,
+  expectation met. Expectation for
+  the G1-iter6-i2 closing commit: unchanged (all new coverage
   extended existing tests in place). Any change must keep the suite
   green; new features add tests to the baseline.
 
@@ -72,21 +85,27 @@ commit — no outcome pre-recorded.**)
 | v0.6.0 | interop hardening, perf/stability/memory pass (669 tests) |
 | v0.6.1 | region-grouped server list, guest-mode fixes, release-signed APKs |
 | v0.6.2 | uBO-parity default blocklists, region-tree expansion fix (684 tests) |
-| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `6324a4d`), backup v5 + hardened gate-record integrity (723+9 local; G1-iter4 fix cycle), backup v6 + declaration-bound gate-record authority (727+9 local; G1-iter4-i2 fix cycle — escalated at the cap), backup v7/v8 + mutation-covered integrity suite + decision #18 bounded-exit (728+9 local; G1-iter5 both iterations, 737×4 / 605+132 CI at `1f3d1cf` — closed NO CONSENSUS at the cap, escalated), backup v9 + glyph-rule hardening + repo-resident matrices + S8 split/decision #19 (728+9 local; G1-iter6 iteration 1 fix cycle) |
+| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `6324a4d`), backup v5 + hardened gate-record integrity (723+9 local; G1-iter4 fix cycle), backup v6 + declaration-bound gate-record authority (727+9 local; G1-iter4-i2 fix cycle — escalated at the cap), backup v7/v8 + mutation-covered integrity suite + decision #18 bounded-exit (728+9 local; G1-iter5 both iterations, 737×4 / 605+132 CI at `1f3d1cf` — closed NO CONSENSUS at the cap, escalated), backup v9 + glyph-rule hardening + repo-resident matrices + S8 split/decision #19 (728+9 local; G1-iter6 iteration 1 fix cycle, CI 7/7 exact at `0c4b8f9`), backup v10 + both-directions judgment + include-class refusal + decision #20 allowlist mandate (728+9 local; G1-iter6-i2 closing fix cycle — gate closed at the cap, escalated) |
 
 ## Known open threads
 
-- **S1 gate: G1-iter6 iteration 2 (final) pending** — iteration 1
-  (2026-11-19, on `a1607ce`+`32d822f`): RT BLOCK / Architect PWF /
-  Steward PWF → NO CONSENSUS; the fix cycle (backup v9, glyph-rule
-  hardening, matrix check-in, S8 split) landed in the commit
-  carrying the iter6 record; iteration 2 re-judges that commit.
-  History: G1 → G1-iter5, five cap-exhaustions, all decided by
-  backup/harness findings (records in `memory/consensus-log/`).
+- **S1 gate: G1-iter6 CLOSED at the cap (both iterations), owner
+  decision PENDING** — iteration 1 (`a1607ce`+`32d822f`): RT BLOCK /
+  Architect PWF / Steward PWF; the v9 fix cycle landed at
+  `0c4b8f9`. Iteration 2 (`0c4b8f9`): RT BLOCK (includeIf-conditional
+  pushInsteadOf + the fetch side of a named remote, both executed
+  E2E; symlinked .git major) / Architect PWF (3 majors, all
+  remediated) / Steward PWF (CI confirmed exact) → NO CONSENSUS at
+  the cap; the v10 closing fix cycle landed with the record. Per
+  the owner-side escalation default the decision-#19 split is
+  already recorded: S1 may close on its deliverable with the
+  harness findings owned by S8 — the owner decides. History: G1 →
+  G1-iter6, six cap-exhaustions, all decided by backup/harness
+  findings (records in `memory/consensus-log/`).
 - **S8 (new, decision #19): harness subsystem hardening + Python
   port** — property-based exit criterion (TEST runs address only
   local scratch paths physically disjoint from production; allowlist
-  inversion evaluated; identity single-sourced); gated before S2's
+  inversion MANDATED per decision #20; identity single-sourced); gated before S2's
   stage gate; ledger #10 rides the port.
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)

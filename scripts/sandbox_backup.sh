@@ -62,7 +62,18 @@
 #     or a linked worktree into the production .git — G1-iter6 RT
 #     critical #1, executed E2E on a stand-in), and an unresolvable
 #     target refused fail-closed — so test traffic can touch neither
-#     github nor the production repo, not even via a clone's origin
+#     github nor the production repo, not even via a clone's origin.
+#     G1-iter6-i2 adds: BOTH directions' EFFECTIVE targets are judged
+#     (the fetch side of a named remote was never judged — a clone
+#     with url=<github-spelled> + pushurl=<local bare> FETCHED from
+#     github in TEST mode; the URL-operand sibling: a typed
+#     github-spelled operand under an insteadOf rewrite PUSHES to the
+#     typed github spelling while the guard judged only the clean
+#     rewritten fetch view), include/includeIf config sections refuse
+#     by FILE CONTENT (an includeIf onbranch:sandbox/backups is
+#     inactive at guard time and active at push time), a symlinked
+#     .git refuses (both identity-compare sides resolve through it),
+#     and same-triple manifest collisions keep the LOCAL entry
 #   * trace/config env is neutralized by PATTERN over the live
 #     environment (G1-iter4-i2 RT major #1: v5's enumerated unset list
 #     missed the legacy alias GIT_CURL_VERBOSE, which printed the raw
@@ -244,6 +255,19 @@ fi
 #    operand's own .git, PHYSICALLY. Production mode is exempt (the
 #    production checkout IS the repo being backed up).
 if [ "$TEST_MODE" = 1 ]; then
+  # symlinked-.git refusal (G1-iter6-i2 RT major #1, executed E2E):
+  # $REPO/.git symlinked to ANOTHER checkout's .git resolves BOTH
+  # compare sides below through it — the equality held while the
+  # operand shared the stand-in's git state (the full TEST checkpoint
+  # + refs landed inside it, rc 0, zero refusals). A test repo is
+  # always a real clone with its own .git; a symlinked one refuses.
+  if [ -L "$REPO/.git" ]; then
+    echo "!! refusing: PC_BACKUP_REPO/.git is a symlink — the git dir it names" >&2
+    echo "   is not the repo's own (test traffic would operate on another" >&2
+    echo "   checkout's git state). Clone a full scratch checkout (see" >&2
+    echo "   harness/backups/README.md)." >&2
+    exit 6
+  fi
   _cgd="$(git rev-parse --git-common-dir 2>/dev/null || true)"
   [ -n "$_cgd" ] || _cgd=".git"
   case "$_cgd" in /*) ;; *) _cgd="$REPO/$_cgd" ;; esac
@@ -256,6 +280,18 @@ if [ "$TEST_MODE" = 1 ]; then
     echo "   (see harness/backups/README.md)." >&2
     exit 6
   fi
+  # git-dir CONTAINMENT against the production checkout (the same
+  # finding, belt-and-braces for future edits of the checks above):
+  # the discovered git dir must not BE or sit under the production
+  # checkout or its .git, literally or physically.
+  case "$_ccgd" in
+    "$PROD_CHECKOUT"|"$PROD_CHECKOUT"/*|"$PROD_CHECKOUT/.git"|"$PROD_CHECKOUT/.git"/*)
+      echo "!! refusing: PC_BACKUP_REPO's git dir resolves into the production" >&2
+      echo "   checkout — test traffic never operates on it (see" >&2
+      echo "   harness/backups/README.md)." >&2
+      exit 6
+      ;;
+  esac
 fi
 
 # -- git identity self-sufficiency (G1-iter3 fix-cycle extension,
@@ -295,7 +331,7 @@ case "$PUSH_URL" in
       # (G1-iter4-i2 Architect minor #2: a credentialed scp-syntax
       # target was printed verbatim by this exact message under v5)
       _safe_tgt="$(printf '%s\n' "$PUSH_URL" | sed -E \
-        's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/(ghp_|gho_|ghs_|ghv_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g')"
+        's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/(ghp_|gho_|ghs_|ghv_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g; s#^[^/@[:space:]]+:[^/@[:space:]]+@#[REDACTED]@#')"
       echo "!! push target '$_safe_tgt' is not a configured remote (set PC_BACKUP_PUSH_REMOTE to a remote name, path or URL)" >&2
       exit 6
     fi
@@ -353,36 +389,23 @@ _norm_url() {
     -e 's#/$##' \
     -e 's#^\./##'
 }
-if [ "$TEST_MODE" = 1 ]; then
-  # Resolve the target THE WAY GIT WILL at push time (G1-iter5 RT
-  # major #1 / Architect major #1): a raw-string guard never sees
-  # url.*.insteadOf rewrites living in config FILES — an innocent
-  # local-looking PC_BACKUP_PUSH_REMOTE was rewritten to
-  # git@github.com at push time and sailed past the v6 guard
-  # (executed in scratch with a real receive-pack attempt). Remote
-  # NAMES resolve through remote.<n>.pushurl when one exists
-  # (`git remote get-url --push` — the fetch-URL resolution v6 used
-  # never saw a pushurl divergence); URL and path operands resolve
-  # through insteadOf (`git ls-remote --get-url` — local, no
-  # network). The resolved value is NEVER printed (it may embed a
-  # credential).
-  _tgt="$PUSH_URL"
-  if git remote get-url --push "$PUSH_URL" >/dev/null 2>&1; then
-    _tgt="$(git remote get-url --push "$PUSH_URL")"
-  else
-    _tgt="$(git ls-remote --get-url "$PUSH_URL" 2>/dev/null || printf '%s' "$PUSH_URL")"
-  fi
-  # fail CLOSED on an unresolvable target (G1-iter5-i2 Architect
-  # minor #1: the v7 block wrapped every target check in
-  # `if [ -n "$_tgt" ]` — an empty resolution silently skipped them
-  # all). The resolved value is NEVER printed (may embed a credential).
-  if [ -z "${_tgt:-}" ]; then
-    echo "!! refusing: the push target could not be resolved — a TEST run" >&2
-    echo "   never pushes to an unverifiable target. Point" >&2
-    echo "   PC_BACKUP_PUSH_REMOTE at a scratch bare repo (see" >&2
-    echo "   harness/backups/README.md)." >&2
-    exit 6
-  fi
+_judge_target() {
+  # G1-iter6-i2: judge ONE direction's EFFECTIVE target ($1), labeled
+  # $2 ("push"/"fetch"). Every per-target refusal that v9 ran ONCE
+  # on the push-side resolution now runs on EACH direction's
+  # effective target — RT critical #2 (the fetch side of a named
+  # remote was never judged: a clone with url=<github-spelled> +
+  # pushurl=<local bare> FETCHED from github in TEST mode, 3×
+  # CONNECT github.com:443 observed at a local sink with all guards
+  # green) plus the URL-operand insteadOf sibling found by
+  # orchestrator analysis during this fix cycle (a TYPED
+  # github-spelled operand under an url.*.insteadOf rewrite resolves
+  # fetch-side to the clean rewritten target while the PUSH travels
+  # the TYPED operand unrewritten — insteadOf never applies to push
+  # operands). The config-level refusals below (pushInsteadOf,
+  # include/includeIf) are idempotent and run per-direction. The
+  # value is NEVER printed (it may embed a credential).
+  local _tgt="$1" _dir="$2" _pct _nt _host _ptgt _cpt
   # url.*.pushInsteadOf refusal (G1-iter6 RT critical #3, executed
   # E2E): git 2.47.3 DOES rewrite DIRECT URL/path push operands at
   # push time — the typed operand …/innocent.git landed the checkpoint
@@ -401,6 +424,36 @@ if [ "$TEST_MODE" = 1 ]; then
     echo "   repo (see harness/backups/README.md)." >&2
     exit 6
   fi
+  # include/includeIf refusal (G1-iter6-i2 RT critical #1, executed
+  # E2E): an includeIf "onbranch:sandbox/backups" section is
+  # INACTIVE in the guard's context (the repo sits on main while the
+  # guard judges) and ACTIVE in the push context (the temporary
+  # worktree on sandbox/backups) — a pushInsteadOf key carried by the
+  # included file materializes exactly at push time, after the guard
+  # judged; the full TEST checkpoint landed in the unjudged rewrite
+  # target, rc 0, zero refusals. No visibility check can enumerate
+  # every conditional (onbranch:, gitdir:, hasconfig:…), so the CLASS
+  # refuses: any [include]/[includeIf …] section in any config FILE
+  # visible to the run — the repo's own config, the user's global
+  # config, the XDG config, the system config — refuses a TEST run
+  # outright. CONTENT inspection, not resolution: the section exists
+  # in the file whether or not its condition matches in this context
+  # (GIT_CONFIG_GLOBAL/SYSTEM env redirection and GIT_CONFIG_KEY*
+  # injection are already scrubbed above).
+  for _cf in "$(git rev-parse --git-path config)" \
+             "$HOME/.gitconfig" \
+             "${XDG_CONFIG_HOME:-$HOME/.config}/git/config" \
+             /etc/gitconfig; do
+    [ -f "$_cf" ] || continue
+    if grep -qiE '^[[:space:]]*\[include' "$_cf" 2>/dev/null; then
+      echo "!! refusing: an [include]/[includeIf] section exists in git config" >&2
+      echo "   ($_cf) — include conditions (onbranch:, gitdir:, hasconfig:) are" >&2
+      echo "   invisible to the guard's context and materialize at push time," >&2
+      echo "   so a TEST run refuses the class outright (see" >&2
+      echo "   harness/backups/README.md)." >&2
+      exit 6
+    fi
+  done
   # helper-TRANSPORT refusal (G1-iter6 RT critical #5, executed E2E):
   # a remote named ext::git-receive-pack <path> pushed the checkpoint
   # by EXECUTING that command against the path — the destination lives
@@ -411,7 +464,7 @@ if [ "$TEST_MODE" = 1 ]; then
   # colon.
   case "$_tgt" in
     *::*)
-      echo "!! refusing: the push target carries a helper-transport (::) spelling" >&2
+      echo "!! refusing: the $_dir target carries a helper-transport (::) spelling" >&2
       echo "   — ext::/fd::/vendor::/… execute an arbitrary command as the push" >&2
       echo "   itself. Point PC_BACKUP_PUSH_REMOTE at a scratch bare repo (see" >&2
       echo "   harness/backups/README.md)." >&2
@@ -428,7 +481,7 @@ if [ "$TEST_MODE" = 1 ]; then
   _pct="${_pct%%/*}"
   case "$_pct" in
     *%*)
-      echo "!! refusing: the push target carries percent-encoding — the transport" >&2
+      echo "!! refusing: the $_dir target carries percent-encoding — the transport" >&2
       echo "   decodes it before connecting, so the guard cannot judge what it" >&2
       echo "   reaches. Point PC_BACKUP_PUSH_REMOTE at a scratch bare repo (see" >&2
       echo "   harness/backups/README.md)." >&2
@@ -449,7 +502,7 @@ if [ "$TEST_MODE" = 1 ]; then
     *://*) : ;;   # a URL — judged by the host rules below
     /*)    : ;;   # an absolute path — canonicalized + compared below
     *)
-      echo "!! refusing: PC_BACKUP_PUSH_REMOTE resolves to a RELATIVE target" >&2
+      echo "!! refusing: the $_dir target (PC_BACKUP_PUSH_REMOTE) resolves to a RELATIVE target" >&2
       echo "   (however carried — direct operand or a remote's URL) — the push" >&2
       echo "   executes from a temporary worktree, so a relative target resolves" >&2
       echo "   somewhere the guard never judged. Use an absolute scratch path" >&2
@@ -486,7 +539,7 @@ if [ "$TEST_MODE" = 1 ]; then
       127.*) : ;;
       *[!0-9.]*) : ;;
       *)
-        echo "!! refusing: the push target is a raw-IP (or empty) host — test" >&2
+        echo "!! refusing: the $_dir target is a raw-IP (or empty) host — test" >&2
         echo "   traffic never targets IP literals; name a scratch path instead" >&2
         echo "   (see harness/backups/README.md)." >&2
         exit 6
@@ -494,7 +547,7 @@ if [ "$TEST_MODE" = 1 ]; then
     esac
     case "$_host" in
       github.com|*.github.com)
-        echo "!! refusing: env overrides mark this as a TEST run, but the push" >&2
+        echo "!! refusing: env overrides mark this as a TEST run, but the $_dir" >&2
         echo "   target resolves to a github host — test traffic never reaches" >&2
         echo "   github (github.com, ssh.github.com or ANY subdomain: gist.," >&2
         echo "   www., api., …), whatever the spelling. Point PC_BACKUP_PUSH_REMOTE at a" >&2
@@ -522,7 +575,7 @@ if [ "$TEST_MODE" = 1 ]; then
         _ptgt="${_ptgt%/}"
         ;;
       file://*)
-        echo "!! refusing: a file:// push target that is not an absolute path —" >&2
+        echo "!! refusing: a file:// $_dir target that is not an absolute path —" >&2
         echo "   the transport resolves it relative to a base the guard never" >&2
         echo "   judged. Use a plain absolute scratch path (see" >&2
         echo "   harness/backups/README.md)." >&2
@@ -540,7 +593,7 @@ if [ "$TEST_MODE" = 1 ]; then
       while [ "${_cpt:0:2}" = "//" ]; do _cpt="${_cpt#/}"; done
       case "$_ptgt" in
         "$PROD_CHECKOUT"|"$PROD_CHECKOUT"/*|"$PROD_CHECKOUT/.git"|"$PROD_CHECKOUT/.git"/*)
-          echo "!! refusing: env overrides mark this as a TEST run, but the push" >&2
+          echo "!! refusing: env overrides mark this as a TEST run, but the $_dir" >&2
           echo "   target is the production checkout (or inside it / its .git) —" >&2
           echo "   test traffic never touches it. Point PC_BACKUP_PUSH_REMOTE at a" >&2
           echo "   scratch bare repo (see harness/backups/README.md)." >&2
@@ -549,7 +602,7 @@ if [ "$TEST_MODE" = 1 ]; then
       esac
       case "$_cpt" in
         "$PROD_CHECKOUT"|"$PROD_CHECKOUT"/*|"$PROD_CHECKOUT/.git"|"$PROD_CHECKOUT/.git"/*)
-          echo "!! refusing: env overrides mark this as a TEST run, but the push" >&2
+          echo "!! refusing: env overrides mark this as a TEST run, but the $_dir" >&2
           echo "   target resolves to the production checkout (or inside it / its" >&2
           echo "   .git) — test traffic never touches it. Point PC_BACKUP_PUSH_REMOTE" >&2
           echo "   at a scratch bare repo (see harness/backups/README.md)." >&2
@@ -557,6 +610,39 @@ if [ "$TEST_MODE" = 1 ]; then
           ;;
       esac
     fi
+}
+
+if [ "$TEST_MODE" = 1 ]; then
+  # BOTH-DIRECTIONS resolution (G1-iter6-i2 RT critical #2): resolve
+  # what each direction will ACTUALLY address, then judge both —
+  # remote NAMES: fetch = remote.<n>.url, push = remote.<n>.pushurl
+  # when set (G1-iter5 RT major #1 / Architect major #1); URL/path
+  # operands: fetch = the insteadOf-resolved form (ls-remote
+  # --get-url — local, no network), push = the TYPED operand
+  # (pushInsteadOf rewrites are refused at the config level inside
+  # _judge_target). Resolved values are NEVER printed (they may
+  # embed credentials).
+  _fetch_tgt="$PUSH_URL"
+  _push_tgt="$PUSH_URL"
+  if git remote get-url "$PUSH_URL" >/dev/null 2>&1; then
+    _fetch_tgt="$(git remote get-url "$PUSH_URL")"
+    _push_tgt="$(git remote get-url --push "$PUSH_URL")"
+  else
+    _fetch_tgt="$(git ls-remote --get-url "$PUSH_URL" 2>/dev/null || printf '%s' "$PUSH_URL")"
+  fi
+  # fail CLOSED on an unresolvable target (G1-iter5-i2 Architect
+  # minor #1: the v7 block wrapped every target check in
+  # `if [ -n "$_tgt" ]` — an empty resolution silently skipped them
+  # all) — EITHER direction unresolvable refuses the run.
+  if [ -z "${_fetch_tgt:-}" ] || [ -z "${_push_tgt:-}" ]; then
+    echo "!! refusing: the push target could not be resolved (fetch or push view) — a TEST run" >&2
+    echo "   never pushes to an unverifiable target. Point" >&2
+    echo "   PC_BACKUP_PUSH_REMOTE at a scratch bare repo (see" >&2
+    echo "   harness/backups/README.md)." >&2
+    exit 6
+  fi
+  _judge_target "$_push_tgt" "push"
+  _judge_target "$_fetch_tgt" "fetch"
 fi
 
 # -- secret patterns (ERE — grep -E / grep -En everywhere) ------------
@@ -665,7 +751,7 @@ _push_main() {
   fi
   MAIN_PUSH="failed"
   echo "!! main push failed (diverged? network?) — stderr (credentials redacted):" >&2
-  sed -E 's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/(ghp_|gho_|ghs_|ghv_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g; s/^/   /' "$_pe" >&2
+  sed -E 's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/(ghp_|gho_|ghs_|ghv_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g; s#([[:space:]])[^/@[:space:]]+:[^/@[:space:]]+@#\1[REDACTED]@#g; s/^/   /' "$_pe" >&2
   rm -f "$_pe"
   return 1
 }
@@ -678,7 +764,7 @@ _push_branch() {
   fi
   BRANCH_PUSH="failed"
   echo "!! branch push failed — stderr (credentials redacted):" >&2
-  sed -E 's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/(ghp_|gho_|ghs_|ghv_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g; s/^/   /' "$_pe" >&2
+  sed -E 's#(://)[^/@[:space:]]+:[^/@[:space:]]+@#\1#g; s/(ghp_|gho_|ghs_|ghv_|github_pat_)[A-Za-z0-9_]+/[REDACTED]/g; s#([[:space:]])[^/@[:space:]]+:[^/@[:space:]]+@#\1[REDACTED]@#g; s/^/   /' "$_pe" >&2
   rm -f "$_pe"
   return 1
 }
@@ -1124,11 +1210,20 @@ elif theirs is None:
     print("!! remote manifest unparseable — kept our entries (marker recorded)",
           file=sys.stderr)
 else:
+    # G1-iter6-i2 RT minor #1: OURS (this machine's own entries) is
+    # the ground truth for what ran locally — iterate the REMOTE side
+    # first so a same-triple collision keeps the LOCAL entry (the
+    # remote variant overwrote it under v9), and count the collisions
+    # the union resolved (audited in the merged doc).
     merged = {}
-    for side in (ours, theirs):
+    triple_conflicts = 0
+    for side in (theirs, ours):
         for e in side.get("backups", []):
             e = scrub(e)
-            merged[(e.get("seq"), e.get("timestamp"), e.get("message", ""))] = e
+            _k = (e.get("seq"), e.get("timestamp"), e.get("message", ""))
+            if _k in merged and json.dumps(merged[_k], sort_keys=True) != json.dumps(e, sort_keys=True):
+                triple_conflicts += 1
+            merged[_k] = e
     # count entries the scrub actually changed (audit marker)
     def _flat(s):
         return json.dumps(s.get("backups", []), sort_keys=True)
@@ -1145,6 +1240,11 @@ else:
     for e in doc["backups"]:
         if json.dumps(e, sort_keys=True) not in raw_ours and json.dumps(e, sort_keys=True) not in raw_theirs:
             scrubbed += 1
+    if triple_conflicts:
+        doc["merge_triple_conflicts"] = triple_conflicts
+        print(f"== manifest union: {triple_conflicts} same-triple collision(s) "
+              f"resolved — the LOCAL entry kept (the remote variant differed)",
+              file=sys.stderr)
     if scrubbed:
         doc["merge_scrubbed_entries"] = scrubbed
         print(f"== manifest union scrubbed {scrubbed} entry(ies) carrying "

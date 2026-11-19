@@ -58,3 +58,46 @@ loss, continuation
   re-judges this commit; no outcome pre-recorded.**
 - Next: push main, event backup, then launch iteration 2 (three
   roles, parallel, independent).
+
+## Part 3 (the continuation orchestrator — iteration 2 + the v10 closing fix cycle)
+
+- **`0c4b8f9` landed and pushed** (fix cycle + iter6 record + logs);
+  event backup seq 16 (`957cb01`, both pushes ok).
+- **Iteration 2 launched** — three roles in ONE parallel round, no
+  shared context, no orchestration slip: Red Team, Devil's
+  Architect, Ship Steward against `0c4b8f9`.
+- **Verdicts: RT BLOCK** (2 executed criticals — includeIf-conditional
+  pushInsteadOf, the never-judged fetch side of named remotes with
+  3× CONNECT github.com:443 at a local sink; symlinked-.git major;
+  3 minors) · **Architect PWF** (3 majors — the allowlist hedge, the
+  unfinished identity derivation, the stale split docs; 5 minors) ·
+  **Steward PWF** (0 criticals/majors; CI CONFIRMED exact on
+  `0c4b8f9` — run 44458438836, 737×4 / 605+132 / wheel+Android; 2
+  doc minors). **NO CONSENSUS at the 2-iteration cap — G1-iter6
+  closed, escalated to the owner** (the decision-#19 split default
+  applies; nothing pre-recorded).
+- **v10 closing fix cycle** (every finding from all three roles):
+  both-directions target judgment via `_judge_target` — including
+  the URL-operand insteadOf SIBLING found by orchestrator analysis
+  during the fix (a typed github-spelled operand pushes to the typed
+  spelling while the fetch view resolves clean under insteadOf;
+  same class as RT-C2, disclosed in the record); include/includeIf
+  class refusal by FILE CONTENT; symlinked-.git refusal + git-dir
+  containment; union-prefers-ours with `merge_triple_conflicts`
+  audited; scp-syntax redaction; exactly-once PROD derivation; v9
+  matrix hardening (loud anchors, derived E30, loud skip); v10
+  matrix E31-E35; decision #20 (allowlist inversion mandated);
+  ledger #10→S8 + rows #11/#12; process-doc item (f) extension +
+  record-before-fix-cycle rule; all doc checklist items.
+- **Verification**: suite **728 passed + 9 skipped** (16 integrity
+  tests, count unchanged); matrices **v5 20 · v6 22 · v7 25 · v8 19
+  · v9 26 · v10 9 = 121 checks, 0 failed**, all re-run; mutation
+  probes from WORKING-TREE snapshots (the sixth-incident rule) —
+  **5/5 caught** (include/fetch/symlink/union/redaction removals
+  each fail their lane); zero production contact; no incident this
+  cycle.
+- This closing commit carries the v10 cycle + the completed iter6
+  record (both iterations, cap closure, escalation). The probe
+  battery script is preserved at
+  `harness/sandbox/scripts/g1i6i2_probe_battery.sh` on the branch
+  (live copy: `~/scripts/g1i6i2_probe_battery.sh`).

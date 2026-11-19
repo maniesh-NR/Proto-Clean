@@ -258,9 +258,18 @@ def _prod_checkout():
     """
     src = (ROOT / "scripts" / "sandbox_backup.sh").read_text(
         encoding="utf-8")
-    m = re.search(r'(?m)^PROD_CHECKOUT="(.+)"$', src)
-    assert m, "PROD_CHECKOUT constant not found in the backup script"
-    return m.group(1)
+    matches = re.findall(r'(?m)^PROD_CHECKOUT="(.+)"$', src)
+    assert matches, "PROD_CHECKOUT constant not found in the backup script"
+    # G1-iter6-i2 RT minor #2 / Architect major #2a: bash is
+    # last-assignment-wins — a FIRST-match derivation desynchronizes
+    # the lanes from the guard under an insert-style mutation (a
+    # second assignment added later in the script). Exactly one
+    # assignment, or the derivation is inconclusive (loud, never
+    # silent).
+    assert len(matches) == 1, (
+        f"expected exactly one PROD_CHECKOUT assignment, found "
+        f"{len(matches)} — the guarded identity must be single-sourced")
+    return matches[0]
 
 
 def test_roadmap_glyphs_backed_by_gate_records():
@@ -1117,6 +1126,156 @@ def test_backup_script_guard_refuses_github_spellings(tmp_path):
          "refs/heads/sandbox/backups"],
         capture_output=True, text=True).stdout, (
         "the GIT_DIR export redirected the run into the stand-in")
+
+    # G1-iter6-i2 RT critical #2: the FETCH side of a named remote was
+    # never judged — the guard resolved remote-name operands solely
+    # via `get-url --push` while the fetches address remote.<n>.url;
+    # a clone with url=<github-spelled> + pushurl=<local bare>
+    # FETCHED from github in TEST mode (3× CONNECT github.com:443 at
+    # a local sink, all guards green). Both directions' effective
+    # targets are now judged.
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "ghdiv",
+                    "https://github.com/maniesh-NR/Proto-Clean.git"],
+                   check=True)
+    subprocess.run(["git", "-C", str(repo), "remote", "set-url", "--push",
+                    "ghdiv", str(bare)], check=True)
+    e = dict(os.environ)
+    e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+              "PC_BACKUP_PUSH_REMOTE": "ghdiv",
+              "HOME": str(empty_home)})
+    r = subprocess.run(["bash", str(script), "fetch-divergence probe"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=120)
+    out = r.stdout + r.stderr
+    assert r.returncode == 6, (r.returncode, out)
+    assert "fetch" in out, out   # the FETCH view triggered the refusal
+    # control: a remote whose BOTH views are the clean bare passes —
+    # remote-NAME operands were never given a clean lane before
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "bothclean",
+                    str(bare)], check=True)
+    e = dict(os.environ)
+    e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+              "PC_BACKUP_PUSH_REMOTE": "bothclean",
+              "HOME": str(empty_home)})
+    r = subprocess.run(["bash", str(script), "bothclean control"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=240)
+    assert r.returncode == 0, (r.returncode, r.stdout + r.stderr)
+
+    # G1-iter6-i2 (orchestrator analysis during the fix cycle,
+    # disclosed in the gate record): the URL-operand SIBLING of the
+    # fetch-side hole — a TYPED github-spelled operand under an
+    # url.*.insteadOf rewrite resolves fetch-side (ls-remote
+    # --get-url) to the clean rewritten target while the PUSH
+    # travels the TYPED operand unrewritten (insteadOf never applies
+    # to push operands). v9 judged only the fetch view; the push view
+    # refuses now.
+    subprocess.run(["git", "-C", str(repo), "config",
+                    "url." + str(bare) + ".insteadOf",
+                    "https://github.com/maniesh-NR/Proto-Clean.git"],
+                   check=True)
+    e = dict(os.environ)
+    e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+              "PC_BACKUP_PUSH_REMOTE":
+                  "https://github.com/maniesh-NR/Proto-Clean.git",
+              "HOME": str(empty_home)})
+    r = subprocess.run(["bash", str(script), "insteadOf push-view probe"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=120)
+    out = r.stdout + r.stderr
+    assert r.returncode == 6, (r.returncode, out)
+    assert "push" in out, out   # the PUSH view (the typed operand) refused
+    subprocess.run(["git", "-C", str(repo), "config", "--unset",
+                    "url." + str(bare) + ".insteadOf"], check=True)
+
+    # G1-iter6-i2 RT critical #1: includeIf-conditional config is
+    # invisible to the guard's context (the repo sits on main while
+    # the guard judges) and materializes at push time (the temporary
+    # worktree sits on sandbox/backups) — a pushInsteadOf key carried
+    # by the included file sailed past v9 (executed E2E: the full
+    # TEST checkpoint landed in the unjudged rewrite target, rc 0,
+    # zero refusals). include/includeIf sections refuse by FILE
+    # CONTENT — the conditional AND the unconditional form.
+    evil_inc = repo / ".git" / "evil.inc"
+    evil_inc.write_text('[url "' + str(other_bare) + '"]\n'
+                        "\tpushInsteadOf = " + str(bare) + "\n",
+                        encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "config",
+                    "includeif.onbranch:sandbox/backups.path",
+                    str(evil_inc)], check=True)
+    e = dict(os.environ)
+    e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+              "PC_BACKUP_PUSH_REMOTE": str(bare),
+              "HOME": str(empty_home)})
+    r = subprocess.run(["bash", str(script), "includeIf probe"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=120)
+    out = r.stdout + r.stderr
+    assert r.returncode == 6, (r.returncode, out)
+    assert "[include" in out, out
+    assert "refs/heads/sandbox/backups" not in subprocess.run(
+        ["git", "--git-dir", str(other_bare), "for-each-ref",
+         "refs/heads/sandbox/backups"],
+        capture_output=True, text=True).stdout, (
+        "the includeIf probe reached the rewrite target")
+    subprocess.run(["git", "-C", str(repo), "config",
+                    "include.path", str(evil_inc)], check=True)
+    r = subprocess.run(["bash", str(script), "include probe"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=120)
+    assert r.returncode == 6, (r.returncode, r.stdout + r.stderr)
+    # control: with both include keys removed the run passes again —
+    # the refusal was the include, not the environment
+    subprocess.run(["git", "-C", str(repo), "config", "--unset",
+                    "include.path"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "--unset",
+                    "includeif.onbranch:sandbox/backups.path"], check=True)
+    r = subprocess.run(["bash", str(script), "include-clean control"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=240)
+    assert r.returncode == 0, (r.returncode, r.stdout + r.stderr)
+
+    # G1-iter6-i2 RT major #1: a symlinked .git resolves BOTH
+    # identity-compare sides through it (the equality held while the
+    # operand shared the stand-in's git state — a full TEST
+    # checkpoint landed inside it, rc 0, zero refusals) — a
+    # symlinked .git refuses outright.
+    sym_repo = tmp_path / "symrepo"
+    sym_repo.mkdir()
+    (sym_repo / ".git").symlink_to(sub_repo / ".git")
+    e = dict(os.environ)
+    e.update({"PC_BACKUP_REPO": str(sym_repo),
+              "PC_SANDBOX_HOME": str(home),
+              "PC_BACKUP_PUSH_REMOTE": str(bare),
+              "HOME": str(empty_home)})
+    r = subprocess.run(["bash", str(script), "symlinked-dotgit probe"],
+                       cwd=str(sym_repo), env=e,
+                       capture_output=True, text=True, timeout=120)
+    out = r.stdout + r.stderr
+    assert r.returncode == 6, (r.returncode, out)
+    assert "symlink" in out, out
+    assert "refs/heads/sandbox/backups" not in subprocess.run(
+        ["git", "--git-dir", str(sub_repo) + "/.git", "for-each-ref",
+         "refs/heads/sandbox/backups"],
+        capture_output=True, text=True).stdout, (
+        "the symlinked-.git probe wrote into the stand-in's git state")
+
+    # G1-iter6-i2 RT minor #3: a scheme-less scp-syntax operand
+    # embeds user:pass BEFORE the host — the not-a-remote refusal
+    # echoed it verbatim under v9 (inert as a credential — git parses
+    # host "user" — but a redaction surface is a redaction surface)
+    e = dict(os.environ)
+    e.update({"PC_BACKUP_REPO": str(repo), "PC_SANDBOX_HOME": str(home),
+              "PC_BACKUP_PUSH_REMOTE":
+                  "user:SeCrEtNeverPrintMe@evil-nowhere.invalid:x.git",
+              "HOME": str(empty_home)})
+    r = subprocess.run(["bash", str(script), "scp-redaction probe"],
+                       cwd=str(repo), env=e,
+                       capture_output=True, text=True, timeout=120)
+    out = r.stdout + r.stderr
+    assert r.returncode == 6, (r.returncode, out)
+    assert "SeCrEtNeverPrintMe" not in out, out
+    assert "[REDACTED]" in out, out
 
 
 @pytest.mark.skipif(os.name != "posix", reason="backup script is POSIX")
