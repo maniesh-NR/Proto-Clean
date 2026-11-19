@@ -232,6 +232,16 @@
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "ok"
+    },
+    {
+      "seq": 21,
+      "timestamp": "2026-11-19T14:19:51Z",
+      "trigger": "event",
+      "message": "S8-PG1 closed at the cap: no consensus, escalated to owner; closing remediation landed with the record (865580e)",
+      "git_head": "865580e",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
     }
   ],
   "merged_divergence": true

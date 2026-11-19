@@ -88,19 +88,44 @@ its results before the NEXT stage proceeds. Status legend:
 
 ## Near term
 
-- ☐ **S8. Harness subsystem hardening + Python port** (decision #19,
+- ◐ **S8. Harness subsystem hardening + Python port** (decision #19,
   split out of S1 at G1-iter6 after five subsystem-concentrated
   cap-exhaustions) — port the backup merge/alarm/guard core to a
   tested Python module against the PROPERTY-based exit criterion
   (a TEST run addresses ONLY local absolute filesystem paths,
   physically disjoint from the production checkout; production
   opt-in; nothing exits the machine in TEST mode; the allowlist
-  inversion is EVALUATED, not assumed away); single-source the
-  guarded identity so the one-sided-patch accident class is
-  structurally impossible; fold the glyph-check date-semantics
-  residuals (ledger #10) into the port; keep the repo-resident
-  matrices v5–v9 green. **Its own gate before S2's stage gate** (the
-  decision-#18 port schedule, now a stage).
+  inversion is MANDATED per decision #20 and its ADOPT evaluation
+  is amended at S8-PG1 — family-by-family disposition: the
+  pushInsteadOf / includeIf-content / symlinked-.git refusals
+  SURVIVE the inversion; loopback QUARTET converts); single-source
+  the guarded identity so the one-sided-patch accident class is
+  structurally impossible; ledger #10 (glyph-check date-semantics
+  residuals) DEFERRED OUT of S8 at the cap closure — next
+  record-format change; keep the repo-resident
+  matrices v5–v10 green (121 checks). **Its own gate before S2's
+  stage gate** (the decision-#18 port schedule, now a stage).
+  **Pre-gate S8-PG1 (2026-11-19): CLOSED AT THE 2-ITERATION CAP —
+  NO CONSENSUS, escalated to the project owner.** Iteration 1 (on
+  `82fb63c`): RT BLOCK (2 criticals) + Devil's Architect BLOCK (3
+  criticals) + Ship Steward PROCEED-WITH-FINDINGS; remediation
+  `eb459b1`. Iteration 2 (on `eb459b1`): all three roles BLOCK on
+  new criticals of the same boundary-contradiction class (the 3a
+  parity oracle unsatisfiable — the five anchor-patching demo
+  lanes break at the delegation; realpath-or-refuse red-lining
+  five resilience lanes; the transport-allowlist backstop
+  undeliverable as claimed) while CONFIRMING the iteration-1
+  findings resolved in substance. Closing remediation landed with
+  the record (documents only; no port work started): 3a edit list
+  re-scoped, ancestor-canonicalized containment, bash-side `_git`
+  wrapper with the honest network-only claim, STAGE 3c added, 4
+  split 4a/4b, matrix retirement moved to/after the STAGE-6 gate,
+  Seq deferred out (ledger #10), pattern-parity lanes, module
+  location decided, seam protocol fail-closed. **Owner
+  disposition PENDING (fresh gate on the remediation line per the
+  G1→G1-iter3 precedent / further split / descope) — not
+  pre-recorded. Record:
+  `memory/consensus-log/2026-11-19-s8-pre-gate.md`.**
 - ☐ **S2. Release v0.6.3** — ship Material You + bonding fixes
   (runbook: `memory/03-release-runbook.md`; **adversarial pre-gate
   required before work starts — none has run yet**). Scope (folded in

@@ -1,6 +1,24 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-19 (G1-iter6 CLOSED at the 2-iteration cap —
+Last updated: 2026-11-19 (**S8 PRE-GATE S8-PG1 CLOSED AT THE
+2-ITERATION CAP — NO CONSENSUS, escalated to the project owner**.
+Iteration 1 on `82fb63c`: RT BLOCK + Architect BLOCK + Steward PWF
+(the retirement over-reach — pushInsteadOf/includeIf not subsumed;
+the missed machine-r2 loopback consumer; the E11
+mischaracterization) → remediation `eb459b1`. Iteration 2 on
+`eb459b1`: RT BLOCK (3C) + Architect BLOCK (2C) + Steward BLOCK
+(2C) on NEW criticals of the same boundary-contradiction class —
+the 3a parity oracle unsatisfiable (the five anchor-patching demo
+lanes break at the delegation), realpath-or-refuse red-lining five
+resilience lanes, the transport-allowlist backstop undeliverable
+as claimed — while all three roles CONFIRMED the iteration-1
+findings resolved in substance. The closing remediation landed
+with the record (documents only; NO port work has started — both
+rounds judged documents only). Owner disposition PENDING (fresh
+gate on the remediation line per the G1→G1-iter3 precedent /
+further split / descope) — not pre-recorded. Record:
+`memory/consensus-log/2026-11-19-s8-pre-gate.md`. Prior: G1-iter6
+CLOSED at the 2-iteration cap —
 iteration 2, on the fix commit `0c4b8f9`: Red Team BLOCK on two
 executed criticals (includeIf-conditional pushInsteadOf; the fetch
 side of a named remote, 3× CONNECT github.com:443 at a local sink)
@@ -116,13 +134,28 @@ deliverables. No gate outcome is pre-recorded.**)
   exit criterion (TEST runs address only local scratch paths
   physically disjoint from production; allowlist inversion
   MANDATED per decision #20; identity single-sourced); gated
-  before S2's stage gate; ledger #10 rides the port. Pre-gate
-  deliverables LANDED 2026-11-19: the allowlist-inversion
-  adopt/reject evaluation + re-verified consumer inventory
-  (decision #20b — `backups/allowlist-inversion-evaluation.md`,
-  ADOPT with the loopback trio flagged for conversion) and the S8
-  execution plan (`process/s8-execution-plan.md`); the pre-gate
-  itself has NOT run.
+  before S2's stage gate. Pre-gate deliverables landed 2026-11-19
+  (decision #20b evaluation + execution plan). **PRE-GATE S8-PG1
+  RAN BOTH ITERATIONS AND CLOSED AT THE CAP (2026-11-19): iter 1
+  on `82fb63c` NO CONSENSUS (RT BLOCK 2C/4M/4m + Architect BLOCK
+  3C/6M/4m + Steward PWF 2C/5M/4m; remediation `eb459b1`); iter 2
+  on `eb459b1` NO CONSENSUS (RT BLOCK 3C/4M/5m + Architect BLOCK
+  2C/6M/6m + Steward BLOCK 2C/2M/6m) — the iteration-1 findings
+  were all confirmed resolved in substance; the new BLOCKs were
+  the same class: the 3a parity oracle (anchor-demo lanes), item-2
+  realpath-or-refuse (resilience lanes), the transport backstop
+  claim. Closing remediation landed with the record: the 3a edit
+  list re-scoped (demo lanes re-home AT 3a; v6-E10/v7-E15
+  de-hardcode at 3a), item 2 → ancestor-canonicalized containment,
+  item 7 → bash-side `_git` wrapper with an honest network-only
+  claim + recorded local-rewrite residual, STAGE 3c (merge/alarm/
+  state.json cutover), STAGE 4 split 4a/4b, matrix retirement
+  moved to/after STAGE 6, Seq field DEFERRED OUT of S8 (ledger #10
+  updated), pattern-parity lanes pin the live bash scrub/sed,
+  module location DECIDED (scripts/backup_core.py), seam protocol
+  fail-closed, coverage table derivable. ESCALATED TO THE OWNER —
+  disposition pending; no port work started (documents only
+  throughout).**
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan
