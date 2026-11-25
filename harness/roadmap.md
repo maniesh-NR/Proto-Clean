@@ -77,7 +77,9 @@ its results before the NEXT stage proceeds. Status legend:
   narrowing (deferred #11) land with that gate's backing record,
   scheduled 2026-11-20+ — the iter6-i2 record (2026-11-19, NO
   CONSENSUS, declares S1) withdraws a same-date close under the
-  fail-safe tie rule. No closing-gate outcome is pre-recorded.**
+  fail-safe tie rule. **Disposition #22 (2026-11-25): the closing
+  gate runs FIRST — before S8-PG1-iter3 — today, 2026-11-25; its
+  outcome is still not pre-recorded.**
   - Desktop: dynamic-color seed (brand / system accent / custom hex),
     OS accent detection (GNOME 47 accent-color, Windows DWM
     AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,
@@ -122,9 +124,12 @@ its results before the NEXT stage proceeds. Status legend:
   split 4a/4b, matrix retirement moved to/after the STAGE-6 gate,
   Seq deferred out (ledger #10), pattern-parity lanes, module
   location decided, seam protocol fail-closed. **Owner
-  disposition PENDING (fresh gate on the remediation line per the
-  G1→G1-iter3 precedent / further split / descope) — not
-  pre-recorded. Record:
+  disposition RECORDED (2026-11-25, decision #22 — the owner
+  instructed "D1:a, d2:a"): a fresh gate S8-PG1-iter3 (its OWN
+  2-iteration cap) is ordered on the closing-remediation line
+  `865580e`+, re-judging the two STAGE-1 deliverables as amended;
+  it runs AFTER the S1-closing gate (D2:a — S1-close first). No
+  fresh-gate outcome is pre-recorded. Predecessor record:
   `memory/consensus-log/2026-11-19-s8-pre-gate.md`.**
 - ☐ **S2. Release v0.6.3** — ship Material You + bonding fixes
   (runbook: `memory/03-release-runbook.md`; **adversarial pre-gate
