@@ -90,9 +90,23 @@ its results before the NEXT stage proceeds. Status legend:
   PWF (the same off-by-one major + 1 minor). All three roles
   confirmed the S8-PG1 iteration-2 criticals (C-A/C-B/C-C) resolved
   in substance — the new BLOCKs are narrower boundary defects of
-  the same class. Remediation next commit per the
-  record-before-fix-cycle rule; the gate re-runs as iteration 2
-  (cap 2). Record:
+  the same class. Remediation LANDED with the record's
+  resolution list (documents only): RT-C1 — the 3a module-lookup
+  rule pinned $0-relative with module-copy steps at the four
+  mutated-copy probe sites (E4 ×2, E18 ×2) + the stale-citation
+  edit ledgered (RT-m2); RT-C2/Arch-M2 — the later-materialized-
+  alias claim corrected in BOTH documents to the honest
+  not-covered form, recorded as the FILESYSTEM face of frozen
+  residual item 3 (README amended by gate finding), closed at the
+  port by the push helpers' push-time re-canonicalization (a
+  STAGE 4b commitment); the coverage table corrected to 122 after
+  3b (v6 23, lane map) — RT-M1/Arch-M1/Steward-M1; the 3b list
+  gains the matrix twins (RT-m1) + the `_git` rewiring (Arch-m2);
+  the neutralization-hook pass-through (Arch-m1); E34's twin to
+  3c (Arch-m3); STAGE-2 supersession (Arch-m4); v9 E26 wording
+  (Arch-m5); the STAGE-5 retirement radius (Arch-m6); the 3c
+  `_alarms` surface wording (Steward-m1). The gate re-runs as
+  iteration 2 (cap 2). Record:
   `memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`.
   Predecessor record:
   `memory/consensus-log/2026-11-19-s8-pre-gate.md`.**

@@ -1,6 +1,11 @@
 # Allowlist inversion — adopt/reject evaluation (S8 pre-gate
 deliverable, decision #20b; AMENDED at S8-PG1 iteration 1,
-2026-11-19)
+2026-11-19, and at S8-PG1-iter3 iteration 1, 2026-11-25 — record
+`memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`: the
+later-materialized-alias coverage claim corrected to the honest
+not-covered form + the residual recording + the push-time
+re-canonicalization commitment, RT-C2/Arch-M2; the v9 E26
+half-lane wording, Arch-m5)
 
 Status: **ADOPT** (recommended), with the loopback-observability
 QUARTET (v6 E11, v5 E3, v9 E28, machine-suite r2) converted at the
@@ -34,9 +39,12 @@ typed string alone:
   what subsumes the insteadOf family);
 - a remote NAME is judged as `remote.<n>.url` (fetch view) and
   `remote.<n>.pushurl` if set (push view) — clean remote names
-  remain LEGAL operands (the bothclean control lanes and v9 E26
-  stay rc-0; the criterion never refused names, only their
-  resolved targets).
+  remain LEGAL operands (the bothclean control lanes stay rc-0,
+  and v9 E26's plain-remote control sub-lane stays rc-0 — its
+  scp-`:22:` sub-lane correctly stays a refusal under the type
+  inversion, its resolved target being a remote URL — wording
+  corrected at S8-PG1-iter3, Arch-m5; the criterion never
+  refused names, only their resolved targets).
 
 A TEST run's resolved effective targets must be ONLY local absolute
 filesystem paths, physically disjoint from the production checkout
@@ -47,12 +55,21 @@ non-existent operand under a scratch ancestor stays LEGAL (the
 unreachable-push resilience lanes keep their semantics — see the
 inventory note below), while an operand whose existing ancestor
 resolves into/under production refuses; the
-later-materialized-alias class is covered at push time by the
-retained symlinked-.git + git-dir containment (corrected at cap
-closure, S8-PG1 iteration 2: RT-C1/Steward-C2 — the earlier
+later-materialized-alias class is NOT covered at push time — the
+retained symlinked-.git + git-dir containment are guard-time
+REPO-side checks (CORRECTED at S8-PG1-iter3, RT-C2/Arch-M2: the
+prior "covered at push time" claim was falsified by executed E2E
+— a symlink planted at a non-existent suffix after judgment
+landed the checkpoint in a stand-in production .git, rc 0): it is
+the FILESYSTEM face of frozen residual item 3 (recorded by that
+gate finding, README amended), closed at the port by the
+module-contract push helpers' push-time target
+re-canonicalization (a STAGE 4b commitment of the plan). (The
+ancestor-canonicalization itself was corrected at cap closure,
+S8-PG1 iteration 2: RT-C1/Steward-C2 — the earlier
 "realpath-or-refuse for non-existent operands" wording would have
 refused five green resilience lanes and contradicted the E11
-failure-lane re-homing).
+failure-lane re-homing.)
 
 ## Consumer inventory (re-verified 2026-11-19, `5e70fae`; quartet
 correction from S8-PG1: RT-C2b / Steward-C1 / Arch-M1)
@@ -270,4 +287,11 @@ list, per S8-PG1 RT-M3: mount-namespace aliasing — unprivileged
 `unshare -rm mount --bind` works in this environment and realpath
 cannot see through it; the port either implements device/inode
 identity containment (bind mounts preserve st_dev/st_ino) or the
-class joins the frozen list by gate finding.**
+class joins the frozen list by gate finding.** **Recorded at
+S8-PG1-iter3 (RT-C2/Arch-M2, by gate finding): the
+later-materialized-alias class — a symlink planted at a
+non-existent push-target suffix after judgment — is the
+FILESYSTEM face of frozen residual item 3 (the README item is
+amended accordingly); the plan's module contract closes it at
+the port via the push helpers' push-time target
+re-canonicalization (STAGE 4b).**

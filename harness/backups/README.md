@@ -322,7 +322,16 @@ or removing from this list requires a gate finding, not prose**
    in the multi-second window re-opens the lane. Requires a
    concurrent writer on the machine (same boundary as item 4);
    relative operands — the form that made the two bases DIFFER — are
-   refused outright since v8.
+   refused outright since v8. **FILESYSTEM face added by gate
+   finding (S8-PG1-iter3, RT-C2/Arch-M2 — executed E2E: a symlink
+   planted at a non-existent push-target suffix AFTER judgment
+   lands the checkpoint in the aliased production .git with every
+   guard green; the guard-time symlinked-.git/containment checks
+   inspect the REPO side, not the push target at push time). The
+   S8 port closes this face: the module-contract push helpers
+   re-canonicalize the target immediately before each push
+   (STAGE 4b). Until the port, this is the documented shape of
+   the residual.**
 4. **Scan→add TOCTOU below ~100 ms** — closed STRUCTURALLY by the
    index re-scan (anything committed was staged and scanned); the
    residual window is between the index scan and the commit itself,

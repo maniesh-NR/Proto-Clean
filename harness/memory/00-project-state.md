@@ -14,8 +14,12 @@ closing-remediation line `865580e`+) ran iteration 1 on `2ccb4fb`
 coverage overclaim, executed E2E) / Architect PWF / Steward PWF;
 the coverage-table post-3b off-by-one (v6 22→23, total 122) found
 independently by all three roles. All three confirmed the prior
-iteration-2 criticals resolved in substance. Remediation next
-commit; iteration 2 re-runs within the cap. Record:
+iteration-2 criticals resolved in substance. Remediation LANDED (documents
+only, per the record's resolution list: the $0-relative
+module-lookup rule + copy sites; the honest alias-claim + residual
+recording + the STAGE-4b push-time re-canonicalization commitment;
+the coverage 122 correction; all majors/minors); iteration 2
+re-runs within the cap. Record:
 `memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`.** Then
 S8's port + its own gate → S2 (full chain per decisions #18/#19).** Prior this
 session: owner disposition of the S8-PG1 escalation recorded —
