@@ -1,49 +1,35 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-19 (**S8 PRE-GATE S8-PG1 CLOSED AT THE
-2-ITERATION CAP — NO CONSENSUS, escalated to the project owner**.
-Iteration 1 on `82fb63c`: RT BLOCK + Architect BLOCK + Steward PWF
-(the retirement over-reach — pushInsteadOf/includeIf not subsumed;
-the missed machine-r2 loopback consumer; the E11
-mischaracterization) → remediation `eb459b1`. Iteration 2 on
-`eb459b1`: RT BLOCK (3C) + Architect BLOCK (2C) + Steward BLOCK
-(2C) on NEW criticals of the same boundary-contradiction class —
-the 3a parity oracle unsatisfiable (the five anchor-patching demo
-lanes break at the delegation), realpath-or-refuse red-lining five
-resilience lanes, the transport-allowlist backstop undeliverable
-as claimed — while all three roles CONFIRMED the iteration-1
-findings resolved in substance. The closing remediation landed
-with the record (documents only; NO port work has started — both
-rounds judged documents only). Owner disposition PENDING (fresh
-gate on the remediation line per the G1→G1-iter3 precedent /
-further split / descope) — not pre-recorded. Record:
-`memory/consensus-log/2026-11-19-s8-pre-gate.md`. Prior: G1-iter6
-CLOSED at the 2-iteration cap —
-iteration 2, on the fix commit `0c4b8f9`: Red Team BLOCK on two
-executed criticals (includeIf-conditional pushInsteadOf; the fetch
-side of a named remote, 3× CONNECT github.com:443 at a local sink)
-+ 1 major (symlinked .git) + 3 minors; Devil's Architect
-PROCEED-WITH-FINDINGS (3 majors, all remediated: the allowlist
-hedge → decision #20, the identity-derivation job finished, the
-stale split docs fixed); Ship Steward PROCEED-WITH-FINDINGS (CI
-confirmed exact on `0c4b8f9`, run 44458438836; 2 doc minors, fixed)
-→ NO CONSENSUS at the cap, escalated to the project owner. The
-closing v10 fix cycle — both-directions target judgment incl. the
-URL-operand insteadOf sibling found by orchestrator analysis,
-include/includeIf file-content refusal, symlinked-.git refusal +
-git-dir containment, union-prefers-ours (collision audited), scp
-redaction, exactly-once PROD derivation, matrices v10 E31–E35 +
-v9 loud anchors/derived E30/loud skips (121 checks v5–v10), decision
-#20, ledger #10→S8 + rows #11/#12, process item (f) extension +
-record-before-fix-cycle rule — landed in the commit carrying the
-iter6 record. **OWNER DISPOSITION RECORDED (2026-11-19, decision
-#21): the owner instructed "Continue" — no override; the
-decision-#19 split is operative. S1 closes on its deliverable via
-a scoped closing gate (fresh-gate precedent, remediation line
-`7a13645`+), scheduled 2026-11-20+ because the iter6-i2 record
-(same date, NO CONSENSUS, declares S1) withdraws a same-date close
-per the fail-safe tie rule; S8 is activated for its named pre-gate
-deliverables. No gate outcome is pre-recorded.**)
+Last updated: 2026-11-25 (**S1 CLOSED — the S1-closing gate
+reached CONSENSUS at iteration 1 (all three roles
+PROCEED-WITH-FINDINGS, zero criticals; record:
+`memory/consensus-log/2026-11-25-S1-closing-gate.md`) and the S1
+done-glyph flip + title narrowing (deferred #11) + harness-sub-bullet
+removal landed in the same commit per the closure choreography.
+Sequencing per decision #22 ("D1:a, d2:a", recorded at `5bf91ad`):
+S8-PG1-iter3 (fresh pre-gate, own 2-iteration cap, on the
+closing-remediation line `865580e`+) runs NEXT — then S8's port +
+its own gate → S2 (full chain per decisions #18/#19).** Prior this
+session: owner disposition of the S8-PG1 escalation recorded —
+decision #22; the S1-closing gate ran first per D2:a, scoped per
+decision #21 (deliverable closure + split boundary correctness +
+disposition recording — NOT harness re-judgment; date constraint
+satisfied, 2026-11-25 > 2026-11-19). Prior (2026-11-19): S8
+pre-gate S8-PG1 CLOSED AT THE 2-ITERATION CAP — NO CONSENSUS,
+escalated to the project owner (iteration 1 on `82fb63c`:
+RT/Architect BLOCK + Steward PWF → remediation `eb459b1`;
+iteration 2 on `eb459b1`: all three roles BLOCK on NEW
+boundary-contradiction criticals — the 3a parity oracle
+unsatisfiable via the five anchor-demo lanes, realpath-or-refuse
+red-lining five resilience lanes, the transport-allowlist backstop
+undeliverable as claimed — while all three CONFIRMED the
+iteration-1 findings resolved in substance; closing remediation
+landed with the record, documents only, no port code changed;
+full record `memory/consensus-log/2026-11-19-s8-pre-gate.md`).
+And prior: G1-iter6-i2 CLOSED at the cap — owner disposition #21
+(2026-11-19, "Continue"): the decision-#19 split operative, S1
+closing gate scheduled 2026-11-20+, S8 activated; closing v10 fix
+cycle in `7a13645` (CI run 44462797163, 7/7 legs job-log-verified).)
 
 ## Identity
 
@@ -67,7 +53,11 @@ deliverables. No gate outcome is pre-recorded.**)
   expectation met. **CONFIRMED on the G1-iter6-i2 closing commit
   `7a13645`** (run 44462797163, all 7 legs success, per-leg
   job-log-verified): 737 × 4 POSIX, 605+132 windows, wheel + Android
-  green — exact, expectation met. Any change must keep the suite
+  green — exact, expectation met. **CONFIRMED on the S1-closing line `5bf91ad` (run
+45551538029, all 7 jobs success via the API, S1-closing-gate
+Steward)**; the documents-only commits between are green except
+`eb459b1` (run 44536786320 — macOS-latest 3.12 leg only, recovered
+on the next push; S2 release-watch note, roadmap S2 row). Any change must keep the suite
   green; new features add tests to the baseline.
 
 ## Feature inventory
@@ -109,12 +99,24 @@ deliverables. No gate outcome is pre-recorded.**)
 | v0.6.0 | interop hardening, perf/stability/memory pass (669 tests) |
 | v0.6.1 | region-grouped server list, guest-mode fixes, release-signed APKs |
 | v0.6.2 | uBO-parity default blocklists, region-tree expansion fix (684 tests) |
-| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `6324a4d`), backup v5 + hardened gate-record integrity (723+9 local; G1-iter4 fix cycle), backup v6 + declaration-bound gate-record authority (727+9 local; G1-iter4-i2 fix cycle — escalated at the cap), backup v7/v8 + mutation-covered integrity suite + decision #18 bounded-exit (728+9 local; G1-iter5 both iterations, 737×4 / 605+132 CI at `1f3d1cf` — closed NO CONSENSUS at the cap, escalated), backup v9 + glyph-rule hardening + repo-resident matrices + S8 split/decision #19 (728+9 local; G1-iter6 iteration 1 fix cycle, CI 7/7 exact at `0c4b8f9`), backup v10 + both-directions judgment + include-class refusal + decision #20 allowlist mandate (728+9 local; G1-iter6-i2 closing fix cycle — gate closed at the cap, escalated) |
+| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `6324a4d`), backup v5 + hardened gate-record integrity (723+9 local; G1-iter4 fix cycle), backup v6 + declaration-bound gate-record authority (727+9 local; G1-iter4-i2 fix cycle — escalated at the cap), backup v7/v8 + mutation-covered integrity suite + decision #18 bounded-exit (728+9 local; G1-iter5 both iterations, 737×4 / 605+132 CI at `1f3d1cf` — closed NO CONSENSUS at the cap, escalated), backup v9 + glyph-rule hardening + repo-resident matrices + S8 split/decision #19 (728+9 local; G1-iter6 iteration 1 fix cycle, CI 7/7 exact at `0c4b8f9`), backup v10 + both-directions judgment + include-class refusal + decision #20 allowlist mandate (728+9 local; G1-iter6-i2 closing fix cycle — gate closed at the cap, escalated) 
+| S1 closed | Material You deliverable closed by the S1-closing gate — CONSENSUS REACHED (728+9 local re-verified by all three roles; CI 7/7 on `5bf91ad`; matrices 121/0; residuals ledgered #13–#16; decision #22 sequencing: S8-PG1-iter3 next) |
 
 ## Known open threads
 
-- **S1 gate: G1-iter6 CLOSED at the cap (both iterations); owner
-  disposition RECORDED 2026-11-19 (decision #21)** — iteration 1 (`a1607ce`+`32d822f`): RT BLOCK /
+- **S1 CLOSED (2026-11-25 — the S1-closing gate reached CONSENSUS
+  at iteration 1; record:
+  `memory/consensus-log/2026-11-25-S1-closing-gate.md`)** — the
+  scoped closing gate per decisions #21/#22 (deliverable closure +
+  split boundary correctness + disposition recording — NOT harness
+  re-judgment): all three roles PROCEED-WITH-FINDINGS, zero
+  criticals; the roadmap glyph flipped ◐→☑ with the narrowed title
+  and the harness sub-bullet removed (deferred #11 resolved in the
+  same commit); RT-M1 (pre-S1 settings-loader crash) ledgered #13,
+  RT-m1/m2 → #14/#15, Arch-m3/m4 → #16; residuals #1–#4+#7→S2,
+  #5→S5. Gate history before the close: G1-iter6 CLOSED at the cap
+  (both iterations); owner disposition RECORDED 2026-11-19
+  (decision #21) — iteration 1 (`a1607ce`+`32d822f`): RT BLOCK /
   Architect PWF / Steward PWF; the v9 fix cycle landed at
   `0c4b8f9`. Iteration 2 (`0c4b8f9`): RT BLOCK (includeIf-conditional
   pushInsteadOf + the fetch side of a named remote, both executed
@@ -126,9 +128,11 @@ deliverables. No gate outcome is pre-recorded.**)
   harness findings owned by S8 — DECIDED 2026-11-19 (decision
   #21): the owner instructed "Continue"; the S1-closing gate is
   scheduled 2026-11-20+ (the same-date close-withdrawal tie
-  constraint). History: G1 → G1-iter6, six cap-exhaustions, all
-  decided by backup/harness findings (records in
-  `memory/consensus-log/`).
+  constraint); per decision #22 (2026-11-25, "d2:a") the closing
+  gate runs FIRST — before S8-PG1-iter3, on 2026-11-25 — its
+  outcome not pre-recorded at the disposition commit. History:
+  G1 → G1-iter6, six cap-exhaustions, all decided by
+  backup/harness findings (records in `memory/consensus-log/`).
 - **S8 (decision #19; ACTIVATED 2026-11-19 per decision #21):
   harness subsystem hardening + Python port** — property-based
   exit criterion (TEST runs address only local scratch paths
@@ -154,7 +158,11 @@ deliverables. No gate outcome is pre-recorded.**)
   updated), pattern-parity lanes pin the live bash scrub/sed,
   module location DECIDED (scripts/backup_core.py), seam protocol
   fail-closed, coverage table derivable. ESCALATED TO THE OWNER —
-  disposition pending; no port work started (documents only
+  disposition RECORDED (2026-11-25, decision #22, the owner
+  instructed "D1:a, d2:a"): fresh gate S8-PG1-iter3 (its own
+  2-iteration cap) ordered on the closing-remediation line
+  `865580e`+, running AFTER the S1-closing gate; no fresh-gate
+  outcome pre-recorded; no port work started (documents only
   throughout).**
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)

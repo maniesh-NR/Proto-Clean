@@ -263,3 +263,31 @@ Format: **decision** — context — date. Newest last.
     record sequence field per deferred #10). No gate outcome is
     pre-recorded. (2026-11-19, owner disposition on the G1-iter6-i2
     escalation)
+
+22. **Owner disposition of the S8-PG1 escalation — a fresh pre-gate
+    is ordered on the closing-remediation line, and the S1-closing
+    gate runs FIRST (2026-11-25).** Presented with the S8-PG1
+    cap-closure escalation (commit `865580e`, closing remediation
+    landed with the record — documents only, no port code changed)
+    and its three tabled options — (a) a fresh gate on the
+    closing-remediation line per the G1→G1-iter3 precedent, (b)
+    further splitting S8 (spec line vs port implementation), (c)
+    owner-descoped S8→S2 ordering — the owner instructed
+    **"D1:a, d2:a"**: **D1 = option (a)** — S8-PG1-iter3, a fresh
+    pre-gate with its OWN 2-iteration cap, re-judging the two
+    STAGE-1 deliverables (the allowlist-inversion evaluation + the
+    S8 execution plan) as amended through the S8-PG1 closing
+    remediation, pinned on the line `865580e` and later; **D2 = the
+    S1-closing gate runs FIRST** (the first-listed sequencing
+    option: S1-close before the S8 fresh gate), so the execution
+    order is S1-closing gate → S8-PG1-iter3 → S2. The S1-closing
+    gate's scope stays exactly as decision #21 defines it (the
+    deliverable's closure + the split's boundary correctness + the
+    dispositions' recording — NOT a re-judgment of the harness
+    findings, which S8's own gate owns); the date constraint is
+    satisfied (2026-11-25 > 2026-11-19, the iter6-i2 record's
+    date). No outcome for either gate is pre-recorded; if the
+    fresh gate again exhausts its cap, the escalation returns to
+    the owner with the split/descope options re-tabled per the
+    owner-side escalation rule. (2026-11-25, owner disposition on
+    the S8-PG1 escalation)
