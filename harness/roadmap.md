@@ -11,82 +11,27 @@ its results before the NEXT stage proceeds. Status legend:
   region-grouped servers, guest-mode fixes, uBO-parity blocklists
 - ☑ Link bonding across desktop platforms (bond/balance, failover,
   self-host server) + E2E desktop test matrix + shutdown fixes
-
-## In gate (outcome pending — no pre-recording)
-
-- ◐ **S1. Material You across all OSes + agent harness + event-driven
-  backups** — the DELIVERABLE (desktop + Android dynamic color, seed
-  persistence, OS accent detection) shipped green in the first gate
-  and has stayed green since; all five cap-exhaustions of this gate
-  were decided by backup/harness-subsystem findings (full narratives:
-  `memory/consensus-log/2026-11-13-S1-material-you-gate.md` and its
-  iter2/iter3/iter4/iter5 successors). G1-iter6 (owner-ordered
-  2026-11-19, on the G1-iter5 closing line `a1607ce` +
-  `32d822f`): iteration 1 — Red Team BLOCK (git-dir identity
-  redirects, remote-carried relative targets, pushInsteadOf on direct
-  operands — falsifying a frozen-residual claim — percent-encoded
-  hosts, `ext::` transports, six new glyph-forgery classes; all
-  executed E2E) + Devil's Architect PROCEED-WITH-FINDINGS (identity
-  coupling, port exit-criterion shape, gate convergence) + Ship
-  Steward PROCEED-WITH-FINDINGS (claim map clean, CI exact, one
-  stale-log major) → **NO CONSENSUS — iteration 1 of 2.** The fix
-  cycle (backup v9: git-dir identity check + env-family scrub,
-  every-relative refusal, pushInsteadOf/transport/percent/raw-IP
-  refusals, first-colon + post-@ host cut, containment compares;
-  glyph rules: backing adoption date, multi-Date, multi-id,
-  lookalike glyphs, id-less ◐, post-closure fences; lanes derive the
-  guarded identity; matrices repo-resident v5–v9 = 112 checks;
-  residual list corrected per findings; the harness subsystem SPLIT
-  into S8, decision #19) lands in the commit carrying the iter6
-  record; **iteration 2 (2026-11-19, on the fix commit `0c4b8f9`):
-  Red Team BLOCK** (2 executed criticals: includeIf-conditional
-  pushInsteadOf — the key is invisible to the guard's context on
-  main and materializes at push time in the worktree, the full TEST
-  checkpoint landed in the unjudged rewrite target, rc 0; the FETCH
-  side of a named remote never judged — a clone with
-  url=<github-spelled> + pushurl=<local bare> fetched from github in
-  TEST mode, 3× CONNECT github.com:443 at a local sink; 1 major:
-  symlinked .git passes the identity compare — both sides resolve
-  through it; 3 minors: union prefers the remote same-triple entry,
-  the PROD derivation is first-match vs bash last-assignment, scp
-  passwords echoed) vs Devil's Architect PROCEED-WITH-FINDINGS (3
-  majors: the port exit criterion's allowlist hedge — resolved by
-  decision #20; the identity-derivation job unfinished — lanes,
-  matrix E30, anchors, all fixed; the split left stale ledger/S6
-  docs — fixed) and Ship Steward PROCEED-WITH-FINDINGS (claim map
-  clean, CI confirmed exact on `0c4b8f9` — run 44458438836, 737×4
-  POSIX / 605+132 windows / wheel+Android green; 2 doc minors,
-  fixed). **NO CONSENSUS at the 2-iteration cap — G1-iter6 closed,
-  escalated to the project owner.** Every iteration-2 finding
-  remediated and machine/matrix-covered in the closing commit
-  (backup v10: both-directions judgment incl. the URL-operand
-  insteadOf sibling found by orchestrator analysis; include/includeIf
-  file-content refusal; symlinked-.git refusal + git-dir containment;
-  union-prefers-ours with the collision audited; scp redaction;
-  derived-exactly-once PROD; matrix v10 E31–E35 + v9 hardening
-  (loud anchors, derived E30, loud skips); decision #20; ledger
-  #10→S8 + rows #11/#12; process-doc item (f) extension +
-  record-before-fix-cycle rule) — **OWNER DISPOSITION RECORDED
-  (2026-11-19, decision #21): the owner instructed "Continue" — no
-  override, so the decision-#19 split is operative. S1 closes on
-  its deliverable via a scoped closing gate (fresh-gate precedent
-  G1→G1-iter3, on the remediation line `7a13645`+; scope = the
-  deliverable's closure + the split's boundary correctness + the
-  disposition's recording — NOT a re-judgment of the harness
-  findings, which S8's own gate owns). The done-glyph flip + title
-  narrowing (deferred #11) land with that gate's backing record,
-  scheduled 2026-11-20+ — the iter6-i2 record (2026-11-19, NO
-  CONSENSUS, declares S1) withdraws a same-date close under the
-  fail-safe tie rule. **Disposition #22 (2026-11-25): the closing
-  gate runs FIRST — before S8-PG1-iter3 — today, 2026-11-25; its
-  outcome is still not pre-recorded.**
-  - Desktop: dynamic-color seed (brand / system accent / custom hex),
-    OS accent detection (GNOME 47 accent-color, Windows DWM
-    AccentColor, macOS AppleHighlightColor), full-scheme re-derivation,
-    settings UI + persistence
-  - Android: `dynamicColorScheme()` on 12+, DataStore toggle
-  - Agent harness + event-driven backups (v6 remediated) + adversarial
-    process
+- ☑ **S1. Material You across all OSes** — desktop dynamic-color seed
+  (brand / system accent / custom hex), OS accent detection (GNOME 47
+  accent-color, Windows DWM AccentColor, macOS AppleHighlightColor),
+  full-scheme re-derivation, settings UI + persistence; Android
+  `dynamicColorScheme()` on 12+ with a DataStore toggle (defaults:
+  brand green desktop, wallpaper dynamic color Android 12+ — decision
+  #10). The deliverable shipped green in the first gate iteration and
+  stayed green through every re-verification since — the six G1-line
+  cap-exhaustions were all decided by backup/harness-subsystem
+  findings, split to S8 per decision #19; the deliverable itself never
+  drew a finding. CLOSED by the S1-closing gate (2026-11-25, CONSENSUS
+  REACHED — Red Team / Devil's Architect / Ship Steward all
+  PROCEED-WITH-FINDINGS, zero criticals; record:
+  `memory/consensus-log/2026-11-25-S1-closing-gate.md`; scope per
+  decision #21 — deliverable closure + split boundary correctness +
+  disposition recording, NOT harness re-judgment; ordered first per
+  decision #22). Deliverable residuals ledgered: #1–#4 + #7 → S2
+  (v0.6.3 tag), #5 → S5, #13–#16 → S2/S5. Title narrowed and the
+  harness sub-bullet removed at this flip per deferred #11.
+  Sequencing from here (decision #22, full chain per #18/#19):
+  S8-PG1-iter3 (fresh pre-gate) → S8's port + its own gate → S2.
 
 ## Near term
 
@@ -128,13 +73,20 @@ its results before the NEXT stage proceeds. Status legend:
   instructed "D1:a, d2:a"): a fresh gate S8-PG1-iter3 (its OWN
   2-iteration cap) is ordered on the closing-remediation line
   `865580e`+, re-judging the two STAGE-1 deliverables as amended;
-  it runs AFTER the S1-closing gate (D2:a — S1-close first). No
-  fresh-gate outcome is pre-recorded. Predecessor record:
+  it ran after the S1-closing gate (D2:a — S1 closed 2026-11-25,
+  CONSENSUS REACHED, record
+  `memory/consensus-log/2026-11-25-S1-closing-gate.md`) — S8-PG1-iter3
+  is the ACTIVE next gate. No fresh-gate outcome is pre-recorded.
+  Predecessor record:
   `memory/consensus-log/2026-11-19-s8-pre-gate.md`.**
 - ☐ **S2. Release v0.6.3** — ship Material You + bonding fixes
   (runbook: `memory/03-release-runbook.md`; **adversarial pre-gate
   required before work starts — none has run yet**). Scope (folded in
   from old S3 per G1):
+  Release-watch (S1-closing gate, Steward minor #1, 2026-11-25): the
+  macOS-latest 3.12 CI leg flaked once on the documents-only `eb459b1`
+  (run 44536786320, sole failing leg; recovered on the next push) —
+  watch that leg at the v0.6.3 tag.
   - SHA-256 checksums of every asset in the release body
   - seed-corpus WCAG contrast property test (≥ 4.5 on the fixed tone
     pairs across ~200 seeds) gating the tag

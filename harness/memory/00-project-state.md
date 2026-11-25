@@ -1,16 +1,20 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-25 (**Owner disposition of the S8-PG1
-escalation recorded — decision #22, the owner instructed
-"D1:a, d2:a": a fresh gate S8-PG1-iter3 (its own 2-iteration cap)
-is ordered on the closing-remediation line `865580e`+, re-judging
-the two STAGE-1 deliverables as amended through the S8-PG1 closing
-remediation — and the S1-closing gate (scoped per decision #21:
-deliverable closure + split boundary correctness + disposition
-recording — NOT harness re-judgment; date constraint satisfied,
-2026-11-25 > 2026-11-19) runs FIRST, so the execution order is
-S1-closing gate → S8-PG1-iter3 → S2. Neither gate's outcome is
-pre-recorded at the disposition commit.** Prior (2026-11-19): S8
+Last updated: 2026-11-25 (**S1 CLOSED — the S1-closing gate
+reached CONSENSUS at iteration 1 (all three roles
+PROCEED-WITH-FINDINGS, zero criticals; record:
+`memory/consensus-log/2026-11-25-S1-closing-gate.md`) and the S1
+done-glyph flip + title narrowing (deferred #11) + harness-sub-bullet
+removal landed in the same commit per the closure choreography.
+Sequencing per decision #22 ("D1:a, d2:a", recorded at `5bf91ad`):
+S8-PG1-iter3 (fresh pre-gate, own 2-iteration cap, on the
+closing-remediation line `865580e`+) runs NEXT — then S8's port +
+its own gate → S2 (full chain per decisions #18/#19).** Prior this
+session: owner disposition of the S8-PG1 escalation recorded —
+decision #22; the S1-closing gate ran first per D2:a, scoped per
+decision #21 (deliverable closure + split boundary correctness +
+disposition recording — NOT harness re-judgment; date constraint
+satisfied, 2026-11-25 > 2026-11-19). Prior (2026-11-19): S8
 pre-gate S8-PG1 CLOSED AT THE 2-ITERATION CAP — NO CONSENSUS,
 escalated to the project owner (iteration 1 on `82fb63c`:
 RT/Architect BLOCK + Steward PWF → remediation `eb459b1`;
@@ -49,7 +53,11 @@ cycle in `7a13645` (CI run 44462797163, 7/7 legs job-log-verified).)
   expectation met. **CONFIRMED on the G1-iter6-i2 closing commit
   `7a13645`** (run 44462797163, all 7 legs success, per-leg
   job-log-verified): 737 × 4 POSIX, 605+132 windows, wheel + Android
-  green — exact, expectation met. Any change must keep the suite
+  green — exact, expectation met. **CONFIRMED on the S1-closing line `5bf91ad` (run
+45551538029, all 7 jobs success via the API, S1-closing-gate
+Steward)**; the documents-only commits between are green except
+`eb459b1` (run 44536786320 — macOS-latest 3.12 leg only, recovered
+on the next push; S2 release-watch note, roadmap S2 row). Any change must keep the suite
   green; new features add tests to the baseline.
 
 ## Feature inventory
@@ -91,12 +99,24 @@ cycle in `7a13645` (CI run 44462797163, 7/7 legs job-log-verified).)
 | v0.6.0 | interop hardening, perf/stability/memory pass (669 tests) |
 | v0.6.1 | region-grouped server list, guest-mode fixes, release-signed APKs |
 | v0.6.2 | uBO-parity default blocklists, region-tree expansion fix (684 tests) |
-| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `6324a4d`), backup v5 + hardened gate-record integrity (723+9 local; G1-iter4 fix cycle), backup v6 + declaration-bound gate-record authority (727+9 local; G1-iter4-i2 fix cycle — escalated at the cap), backup v7/v8 + mutation-covered integrity suite + decision #18 bounded-exit (728+9 local; G1-iter5 both iterations, 737×4 / 605+132 CI at `1f3d1cf` — closed NO CONSENSUS at the cap, escalated), backup v9 + glyph-rule hardening + repo-resident matrices + S8 split/decision #19 (728+9 local; G1-iter6 iteration 1 fix cycle, CI 7/7 exact at `0c4b8f9`), backup v10 + both-directions judgment + include-class refusal + decision #20 allowlist mandate (728+9 local; G1-iter6-i2 closing fix cycle — gate closed at the cap, escalated) |
+| main since | bonding failover fix, desktop bonding test matrix (700/leg), Material You UI + agent harness (728/leg POSIX, 604+124 windows at `6324a4d`), backup v5 + hardened gate-record integrity (723+9 local; G1-iter4 fix cycle), backup v6 + declaration-bound gate-record authority (727+9 local; G1-iter4-i2 fix cycle — escalated at the cap), backup v7/v8 + mutation-covered integrity suite + decision #18 bounded-exit (728+9 local; G1-iter5 both iterations, 737×4 / 605+132 CI at `1f3d1cf` — closed NO CONSENSUS at the cap, escalated), backup v9 + glyph-rule hardening + repo-resident matrices + S8 split/decision #19 (728+9 local; G1-iter6 iteration 1 fix cycle, CI 7/7 exact at `0c4b8f9`), backup v10 + both-directions judgment + include-class refusal + decision #20 allowlist mandate (728+9 local; G1-iter6-i2 closing fix cycle — gate closed at the cap, escalated) 
+| S1 closed | Material You deliverable closed by the S1-closing gate — CONSENSUS REACHED (728+9 local re-verified by all three roles; CI 7/7 on `5bf91ad`; matrices 121/0; residuals ledgered #13–#16; decision #22 sequencing: S8-PG1-iter3 next) |
 
 ## Known open threads
 
-- **S1 gate: G1-iter6 CLOSED at the cap (both iterations); owner
-  disposition RECORDED 2026-11-19 (decision #21)** — iteration 1 (`a1607ce`+`32d822f`): RT BLOCK /
+- **S1 CLOSED (2026-11-25 — the S1-closing gate reached CONSENSUS
+  at iteration 1; record:
+  `memory/consensus-log/2026-11-25-S1-closing-gate.md`)** — the
+  scoped closing gate per decisions #21/#22 (deliverable closure +
+  split boundary correctness + disposition recording — NOT harness
+  re-judgment): all three roles PROCEED-WITH-FINDINGS, zero
+  criticals; the roadmap glyph flipped ◐→☑ with the narrowed title
+  and the harness sub-bullet removed (deferred #11 resolved in the
+  same commit); RT-M1 (pre-S1 settings-loader crash) ledgered #13,
+  RT-m1/m2 → #14/#15, Arch-m3/m4 → #16; residuals #1–#4+#7→S2,
+  #5→S5. Gate history before the close: G1-iter6 CLOSED at the cap
+  (both iterations); owner disposition RECORDED 2026-11-19
+  (decision #21) — iteration 1 (`a1607ce`+`32d822f`): RT BLOCK /
   Architect PWF / Steward PWF; the v9 fix cycle landed at
   `0c4b8f9`. Iteration 2 (`0c4b8f9`): RT BLOCK (includeIf-conditional
   pushInsteadOf + the fetch side of a named remote, both executed
