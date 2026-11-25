@@ -14,12 +14,21 @@ closing-remediation line `865580e`+) ran iteration 1 on `2ccb4fb`
 coverage overclaim, executed E2E) / Architect PWF / Steward PWF;
 the coverage-table post-3b off-by-one (v6 22→23, total 122) found
 independently by all three roles. All three confirmed the prior
-iteration-2 criticals resolved in substance. Remediation LANDED (documents
-only, per the record's resolution list: the $0-relative
-module-lookup rule + copy sites; the honest alias-claim + residual
-recording + the STAGE-4b push-time re-canonicalization commitment;
-the coverage 122 correction; all majors/minors); iteration 2
-re-runs within the cap. Record:
+iteration-2 criticals resolved in substance. Remediation landed (`7c3bd4b`, documents only); **ITERATION 2
+(on `7c3bd4b`): RT BLOCK + Architect BLOCK on the same executed
+critical (the copy-both shape re-homes the identity onto the
+lane area — jointly unsatisfiable with the pinned rules; RT-i1-C2
++ the coverage 122 + all nine minors CONFIRMED RESOLVED; Steward
+PROCEED) → THE FRESH GATE CLOSED AT ITS CAP — NO CONSENSUS,
+ESCALATED TO THE OWNER** per decision #22's tail clause; the
+closing remediation landed WITH the record (probe-dir
+relocations + honest proof scope; the $0-relative seam spelling;
+the STAGE-4b deliverable + ledgered planted-alias lane; the
+magnitude/scoping minors). TWO consecutive cap-exhaustions on
+the same pre-gate → the split default applies; owner options
+re-tabled: (a) further split / start the port, (b) another fresh
+gate (justify against the split default), (c) S8→S2 descope —
+no disposition pre-recorded. Record:
 `memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`.** Then
 S8's port + its own gate → S2 (full chain per decisions #18/#19).** Prior this
 session: owner disposition of the S8-PG1 escalation recorded —

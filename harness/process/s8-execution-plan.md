@@ -41,6 +41,18 @@ table made derivable; the seam protocol
          completed (Arch-m6); the 3c alarm-surface wording
          corrected (Steward-m1); the stale-citation edit moved
          into the ledgered 3a list (RT-m2).**
+**AMENDED at the S8-PG1-iter3 CAP CLOSURE (2026-11-25, same
+commit as the iteration-2 record): the four mutated-copy sites
+re-ledgered as PROBE-DIR RELOCATIONS with the honest
+proof-scope statement (i2-RT-C1/i2-Arch-C1 — the copy-beside
+shape was jointly unsatisfiable with the pinned lookup and
+identity rules); the seam-protocol invocation re-spelled
+$0-relative (i2-RT-M1); STAGE 4b gains the push-time
+re-canonicalization as a named deliverable with a LEDGERED
+planted-alias lane (i2-RT-m1/i2-Arch-M1); the `_alarms`
+magnitude corrected to the 52-line function with the region
+figure relabeled the combined 3c surface (i2-RT-m2/i2-Arch-m1);
+the 3b "need NO edits" sentence scoped 3b-relative (i2-RT-m3).**
 
 ```
 PLAN: S8 — harness subsystem hardening + Python port
@@ -111,20 +123,45 @@ STAGE 3a: PARITY PORT + DELEGATION (own commit; S8-PG1 Arch-C2/
                probes); v5 E4 and v7 E18's ASSERTIONS and script
                mutations survive unedited (their anchors stay in
                bash) — their lane scripts gain ONLY the
-               module-copy step of item (4).
-           (4) (ADDED at S8-PG1-iter3 — RT-C1: the four
-               mutated-copy probe sites — v5 E4's two sed/cp
-               copies, v7 E18's two — place mutated script copies
-               in scratch lane dirs with NO module beside them;
-               under $0-relative lookup they fail-closed exit 6 ≠
-               the expected 5/4) each of the four sites COPIES THE
-               MODULE BESIDE THE MUTATED SCRIPT COPY (module +
-               script copied together into the lane dir, so the
-               $0-relative lookup resolves to the seam-consistent
-               module); the seam-anomaly lane stubs THE SAME WAY
-               (a garbage module placed beside a copy of the
-               script) — one stubbing mechanism, no
-               contradiction.
+               probe-dir relocation of item (4) (the copy
+               destination changes; nothing asserted changes).
+           (4) (ADDED at S8-PG1-iter3 iteration 1; RE-LEDGERED at
+               the iter3 cap closure — i2-RT-C1/i2-Arch-C1, both
+               executed the same falsification: the iteration-1
+               "copy the module BESIDE the mutated script copy"
+               shape re-homes the location-derived identity onto
+               the lane area, so the guard refuses the lanes' own
+               operands (rc 6 ≠ the expected 5/4) and would allow
+               production-adjacent operands from the re-homed
+               probe — the three constraints ($0-relative lookup,
+               identity-from-module-location,
+               copy-beside-its-operands) are jointly
+               unsatisfiable) the four mutated-copy probe sites
+               (v5 E4's two sed/cp copies, v7 E18's two) re-locate
+               as PROBE-DIR RELOCATIONS: the mutated script copy
+               AND the module copy land together in a probe
+               SUBDIRECTORY (e.g. $lane/probe/) that is DISJOINT
+               from the lane's operands (the operands stay
+               siblings — $lane/clone, $lane/nope.git, $lane/
+               bare.git — NOT descendants of the probe dir), so
+               the $0-relative lookup resolves the module AND the
+               location-derived identity (the probe dir) never
+               contains the operands → the guard passes them and
+               the run reaches the sabotaged stage (E4's exit 5,
+               E18's exit 4). PROOF-SCOPE, stated honestly (per
+               i2-RT-C1(c), the inverted-protection finding):
+               these lanes prove the SABOTAGE-DETECTION mechanisms
+               — the self-test canary catch (E4) and the index
+               re-scan (E18) — NOT the guard's production
+               protection; production protection is pinned
+               separately by the repo-resident script's refusal
+               lanes (E10/E33 + the machine refusal lanes) and
+               the re-homed module-seam lanes of item (3). The
+               seam-anomaly lane stubs the SAME probe-dir shape
+               (a garbage module in the probe dir beside a copy
+               of the script → module found, crashes → exit 6)
+               and asserts its label, keeping its observable
+               distinct from the green-path exits.
            (5) (ADDED at S8-PG1-iter3 — RT-m2: the port-time note
                said "fix at 3a" but the exhaustive list omitted
                it) the stale citation comment at
@@ -177,8 +214,11 @@ STAGE 3b: INVERSION + LANE CONVERSION (own commit): the allowlist
          bash edit of 3b; named in the STAGE 3b prose and the
          stays-in-bash list, now ledgered here too). The
          non-existent-operand resilience lanes (machine alarm,
-         key-scrub run 2, v5 E4, v6 E12 run 2) need NO edits:
-         the corrected exit-criterion item 2 keeps them green by
+         key-scrub run 2, v5 E4, v6 E12 run 2) need no 3B EDITS
+         (scoped at the iter3 cap closure, i2-RT-m3: v5 E4's
+         lane script already gains the 3a item-(4) probe-dir
+         relocation — the 3b stage adds nothing to it): the
+         corrected exit-criterion item 2 keeps them green by
          design (ancestor-canonicalized containment).
 STAGE 3c: MERGE/ALARM/STATE.JSON CUTOVER (own commit; added at
          cap closure — Arch-M2: "transitively pinned" overstated;
@@ -186,12 +226,14 @@ STAGE 3c: MERGE/ALARM/STATE.JSON CUTOVER (own commit; added at
          merge_union, and the state.json serialization move from
          the three Python heredocs (L895/L947/L1168) into the
          module — AND the alarm machinery proper: the `_alarms`
-         BASH FUNCTION (L1052, ~260 lines, invoked L1165/1263/
-         1275/1284/1310) plus the alarms_check/alarm_raise
-         semantics (corrected at S8-PG1-iter3, Steward-m1:
-         "heredocs" understated the function surface the 3c
-         implementer must port); the existing machine tests that
-         exercise
+         BASH FUNCTION (the function proper L1059–1110 = 52
+         lines, invoked at L1165/1263/1275/1284/1310; the
+         L1052→L1310 REGION the iteration-1 wording called ~260
+         lines is the COMBINED 3c surface — the three heredocs
+         217 lines + the function 52 — magnitude corrected at
+         the iter3 cap closure, i2-RT-m2/i2-Arch-m1) plus the
+         alarms_check/alarm_raise semantics; the existing
+         machine tests that exercise
          merge/alarm/manifest behavior (the union-scrubs lanes,
          the alarm lane, the manifest lanes) pin the module
          functions from this commit — stated per-function: guard
@@ -209,12 +251,24 @@ STAGE 4a: Matrix conversion + per-lane MECHANISM audit (deferred
          that needs it destroys the gate's independence; "retire
          with a gate finding" now means BY a finding of the
          STAGE-6 gate or later).
-STAGE 4b: CI-forcing decision (own commit; split from 4a at cap
-         closure — Arch-m6: STAGE 4 did four jobs): ported-
-         pytest-only vs ported-pytest + bash-matrix CI job until
-         retirement — today ci.yml runs pytest only, so the
-         E4-class stale-lane drift can recur between gates; the
-         ported suite running IN CI closes exactly this.
+STAGE 4b: GUARDED-PUSHER HARDENING + CI-forcing decision (own
+         commit; split from 4a at cap closure — Arch-m6; the
+         first deliverable ADDED at the iter3 cap closure —
+         i2-RT-m1/i2-Arch-M1: the push-time re-canonicalization
+         was a prose-only commitment absent from this block):
+         (1) the guarded push helpers gain the PUSH-TIME TARGET
+         RE-CANONICALIZATION (see the module contract +
+         exit-criterion item 2 — closes the later-materialized-
+         alias filesystem face of residual item 3), LEDGERED as a
+         lane: the planted-alias scenario (plant a suffix symlink
+         at a non-existent scratch operand AFTER judgment;
+         assert the push refuses exit 6 — the lane rides the 4b
+         edit list and the coverage table's integrity row);
+         (2) the CI-forcing decision: ported-pytest-only vs
+         ported-pytest + bash-matrix CI job until retirement —
+         today ci.yml runs pytest only, so the E4-class
+         stale-lane drift can recur between gates; the ported
+         suite running IN CI closes exactly this.
 STAGE 5: scripts/sandbox_backup.sh becomes a thin shim over the
          module (or retires — open decision 4, blast radius: every
          one of the 16 tests + 6 matrices invokes this entrypoint;
@@ -331,7 +385,13 @@ floor and import seam below), Python 3.8-compatible, stdlib-only:
   delegation — so the E20/E25/E29/E31-class lanes drive the hook
   end-to-end through the real entrypoint.
 - **Shim invocation + seam protocol** (pinned at cap closure —
-  Arch-M1): `python3 scripts/backup_core.py <subcommand>` with a
+  Arch-M1; invocation spelling CORRECTED at the iter3 cap
+  closure — i2-RT-M1: the cwd-relative `python3 scripts/
+  backup_core.py` form is the lookup candidate (b) the
+  iteration-1 falsification rejected, and it would red v5 E5
+  (cd / && run) — a SURVIVING check — at 3a; the $0-relative
+  MODULE-LOOKUP RULE governs here too): the script invokes
+  `python3 "$(dirname "$0")/backup_core.py" <subcommand>` with a
   FIXED-SCHEMA line protocol on stdout (one `key=value` pair per
   line — no jq dependency on the legacy legs; bash reads lines
   directly). **Fail-closed taxonomy: ANY seam anomaly — module

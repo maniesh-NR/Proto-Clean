@@ -105,9 +105,34 @@ its results before the NEXT stage proceeds. Status legend:
   the neutralization-hook pass-through (Arch-m1); E34's twin to
   3c (Arch-m3); STAGE-2 supersession (Arch-m4); v9 E26 wording
   (Arch-m5); the STAGE-5 retirement radius (Arch-m6); the 3c
-  `_alarms` surface wording (Steward-m1). The gate re-runs as
-  iteration 2 (cap 2). Record:
-  `memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`.
+  `_alarms` surface wording (Steward-m1). **Iteration 2
+  (on the remediation `7c3bd4b`): RT BLOCK + Architect BLOCK on
+  the same executed critical (the copy-both module-lookup shape
+  re-homes the location-derived identity onto the lane area —
+  guard refuses the lanes' own operands, rc 6 ≠ 5/4; three
+  one-clause escape shapes identified) + i2 majors (the
+  two-headed invocation spelling; the STAGE-4b commitment
+  prose-only) vs Steward PROCEED (the coverage table derives
+  exactly; the delivery contract holds) — RT-i1-C2, the coverage
+  122, and all nine i1 minors CONFIRMED RESOLVED. **THE FRESH
+  GATE CLOSED AT ITS 2-ITERATION CAP — NO CONSENSUS, ESCALATED
+  TO THE OWNER** per decision #22's tail clause; the closing
+  remediation landed with the record (documents only): the four
+  sites re-ledgered as PROBE-DIR RELOCATIONS with the honest
+  proof-scope statement, the seam-protocol invocation re-spelled
+  $0-relative, STAGE 4b gains the push-time re-canonicalization
+  deliverable + a LEDGERED planted-alias lane, the `_alarms`
+  magnitude corrected, the 3b sentence scoped. TWO consecutive
+  cap-exhaustions on the same pre-gate → the owner-side
+  escalation rule's SPLIT DEFAULT now applies: options re-tabled
+  — (a) further split (land the converged spec fixes and start
+  the port, where the parity-oracle question becomes an executed
+  green/red fact per stage boundary, judged by the STAGE-6
+  closing gate), (b) another fresh gate (must be justified
+  against the split default — eight total cap-exhaustions
+  across S1 + the S8 pre-gates), (c) owner-descoped S8→S2
+  ordering. No disposition pre-recorded. Record:
+  `memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`.**
   Predecessor record:
   `memory/consensus-log/2026-11-19-s8-pre-gate.md`.**
 - ☐ **S2. Release v0.6.3** — ship Material You + bonding fixes
