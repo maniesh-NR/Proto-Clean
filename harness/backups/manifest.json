@@ -252,6 +252,16 @@
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "ok"
+    },
+    {
+      "seq": 23,
+      "timestamp": "2026-11-25T07:24:22Z",
+      "trigger": "event",
+      "message": "S8-PG1-iter3 closed at the cap: no consensus, escalated to owner (253e01c); S1 closed this session (2ccb4fb); disposition decision #22 (5bf91ad); awaiting owner disposition: split default applies",
+      "git_head": "253e01c",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
     }
   ],
   "merged_divergence": true

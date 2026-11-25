@@ -1,6 +1,6 @@
 {
   "git_branch": "main",
-  "git_head": "2ccb4fb",
+  "git_head": "253e01c",
   "main_push": "ok",
   "sandbox": {
     "download": [
@@ -76,6 +76,7 @@
       "probe_guest_api.py",
       "profile_e2e.py",
       "qt_tree_probe.py",
+      "remediate_s8_pg1_iter3.py",
       "rename_proto_clean.py",
       "rename_proton_clean.py",
       "socks_min.py",
@@ -113,5 +114,5 @@
       "xlsx"
     ]
   },
-  "timestamp": "2026-11-25T05:31:41Z"
+  "timestamp": "2026-11-25T07:24:22Z"
 }

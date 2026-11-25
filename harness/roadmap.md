@@ -75,8 +75,64 @@ its results before the NEXT stage proceeds. Status legend:
   `865580e`+, re-judging the two STAGE-1 deliverables as amended;
   it ran after the S1-closing gate (D2:a — S1 closed 2026-11-25,
   CONSENSUS REACHED, record
-  `memory/consensus-log/2026-11-25-S1-closing-gate.md`) — S8-PG1-iter3
-  is the ACTIVE next gate. No fresh-gate outcome is pre-recorded.
+  `memory/consensus-log/2026-11-25-S1-closing-gate.md`).
+  **S8-PG1-iter3 iteration 1 (2026-11-25, on `2ccb4fb`; deliverables
+  unchanged since `865580e`): NO CONSENSUS — Red Team BLOCK (2
+  criticals: the 3a module-lookup gap — E4/E18's mutated script
+  copies cannot resolve the module under any CI-compatible,
+  identity-correct lookup, falsifying the "survive unedited +
+  exhaustive" pair; the later-materialized-alias coverage overclaim
+  — executed E2E falsification landing the checkpoint in a
+  stand-in production .git with all guards green) + 1 major (the
+  coverage-table post-3b off-by-one: v6 22→23, total 122 — found
+  independently by ALL THREE roles) vs Architect PWF (2 majors —
+  the same two findings at major severity; 6 minors) and Steward
+  PWF (the same off-by-one major + 1 minor). All three roles
+  confirmed the S8-PG1 iteration-2 criticals (C-A/C-B/C-C) resolved
+  in substance — the new BLOCKs are narrower boundary defects of
+  the same class. Remediation LANDED with the record's
+  resolution list (documents only): RT-C1 — the 3a module-lookup
+  rule pinned $0-relative with module-copy steps at the four
+  mutated-copy probe sites (E4 ×2, E18 ×2) + the stale-citation
+  edit ledgered (RT-m2); RT-C2/Arch-M2 — the later-materialized-
+  alias claim corrected in BOTH documents to the honest
+  not-covered form, recorded as the FILESYSTEM face of frozen
+  residual item 3 (README amended by gate finding), closed at the
+  port by the push helpers' push-time re-canonicalization (a
+  STAGE 4b commitment); the coverage table corrected to 122 after
+  3b (v6 23, lane map) — RT-M1/Arch-M1/Steward-M1; the 3b list
+  gains the matrix twins (RT-m1) + the `_git` rewiring (Arch-m2);
+  the neutralization-hook pass-through (Arch-m1); E34's twin to
+  3c (Arch-m3); STAGE-2 supersession (Arch-m4); v9 E26 wording
+  (Arch-m5); the STAGE-5 retirement radius (Arch-m6); the 3c
+  `_alarms` surface wording (Steward-m1). **Iteration 2
+  (on the remediation `7c3bd4b`): RT BLOCK + Architect BLOCK on
+  the same executed critical (the copy-both module-lookup shape
+  re-homes the location-derived identity onto the lane area —
+  guard refuses the lanes' own operands, rc 6 ≠ 5/4; three
+  one-clause escape shapes identified) + i2 majors (the
+  two-headed invocation spelling; the STAGE-4b commitment
+  prose-only) vs Steward PROCEED (the coverage table derives
+  exactly; the delivery contract holds) — RT-i1-C2, the coverage
+  122, and all nine i1 minors CONFIRMED RESOLVED. **THE FRESH
+  GATE CLOSED AT ITS 2-ITERATION CAP — NO CONSENSUS, ESCALATED
+  TO THE OWNER** per decision #22's tail clause; the closing
+  remediation landed with the record (documents only): the four
+  sites re-ledgered as PROBE-DIR RELOCATIONS with the honest
+  proof-scope statement, the seam-protocol invocation re-spelled
+  $0-relative, STAGE 4b gains the push-time re-canonicalization
+  deliverable + a LEDGERED planted-alias lane, the `_alarms`
+  magnitude corrected, the 3b sentence scoped. TWO consecutive
+  cap-exhaustions on the same pre-gate → the owner-side
+  escalation rule's SPLIT DEFAULT now applies: options re-tabled
+  — (a) further split (land the converged spec fixes and start
+  the port, where the parity-oracle question becomes an executed
+  green/red fact per stage boundary, judged by the STAGE-6
+  closing gate), (b) another fresh gate (must be justified
+  against the split default — eight total cap-exhaustions
+  across S1 + the S8 pre-gates), (c) owner-descoped S8→S2
+  ordering. No disposition pre-recorded. Record:
+  `memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`.**
   Predecessor record:
   `memory/consensus-log/2026-11-19-s8-pre-gate.md`.**
 - ☐ **S2. Release v0.6.3** — ship Material You + bonding fixes
