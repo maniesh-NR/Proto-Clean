@@ -8,8 +8,16 @@ done-glyph flip + title narrowing (deferred #11) + harness-sub-bullet
 removal landed in the same commit per the closure choreography.
 Sequencing per decision #22 ("D1:a, d2:a", recorded at `5bf91ad`):
 S8-PG1-iter3 (fresh pre-gate, own 2-iteration cap, on the
-closing-remediation line `865580e`+) runs NEXT — then S8's port +
-its own gate → S2 (full chain per decisions #18/#19).** Prior this
+closing-remediation line `865580e`+) ran iteration 1 on `2ccb4fb`
+(deliverables unchanged since `865580e`): **NO CONSENSUS — RT BLOCK
+(2C: the 3a module-lookup gap; the later-materialized-alias
+coverage overclaim, executed E2E) / Architect PWF / Steward PWF;
+the coverage-table post-3b off-by-one (v6 22→23, total 122) found
+independently by all three roles. All three confirmed the prior
+iteration-2 criticals resolved in substance. Remediation next
+commit; iteration 2 re-runs within the cap. Record:
+`memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`.** Then
+S8's port + its own gate → S2 (full chain per decisions #18/#19).** Prior this
 session: owner disposition of the S8-PG1 escalation recorded —
 decision #22; the S1-closing gate ran first per D2:a, scoped per
 decision #21 (deliverable closure + split boundary correctness +

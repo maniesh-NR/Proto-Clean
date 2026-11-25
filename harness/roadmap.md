@@ -75,8 +75,25 @@ its results before the NEXT stage proceeds. Status legend:
   `865580e`+, re-judging the two STAGE-1 deliverables as amended;
   it ran after the S1-closing gate (D2:a — S1 closed 2026-11-25,
   CONSENSUS REACHED, record
-  `memory/consensus-log/2026-11-25-S1-closing-gate.md`) — S8-PG1-iter3
-  is the ACTIVE next gate. No fresh-gate outcome is pre-recorded.
+  `memory/consensus-log/2026-11-25-S1-closing-gate.md`).
+  **S8-PG1-iter3 iteration 1 (2026-11-25, on `2ccb4fb`; deliverables
+  unchanged since `865580e`): NO CONSENSUS — Red Team BLOCK (2
+  criticals: the 3a module-lookup gap — E4/E18's mutated script
+  copies cannot resolve the module under any CI-compatible,
+  identity-correct lookup, falsifying the "survive unedited +
+  exhaustive" pair; the later-materialized-alias coverage overclaim
+  — executed E2E falsification landing the checkpoint in a
+  stand-in production .git with all guards green) + 1 major (the
+  coverage-table post-3b off-by-one: v6 22→23, total 122 — found
+  independently by ALL THREE roles) vs Architect PWF (2 majors —
+  the same two findings at major severity; 6 minors) and Steward
+  PWF (the same off-by-one major + 1 minor). All three roles
+  confirmed the S8-PG1 iteration-2 criticals (C-A/C-B/C-C) resolved
+  in substance — the new BLOCKs are narrower boundary defects of
+  the same class. Remediation next commit per the
+  record-before-fix-cycle rule; the gate re-runs as iteration 2
+  (cap 2). Record:
+  `memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`.
   Predecessor record:
   `memory/consensus-log/2026-11-19-s8-pre-gate.md`.**
 - ☐ **S2. Release v0.6.3** — ship Material You + bonding fixes
