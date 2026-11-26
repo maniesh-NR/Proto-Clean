@@ -1,6 +1,25 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-25 (**S1 CLOSED — the S1-closing gate
+Last updated: 2026-11-26 (**Owner-input-free roadmap session
+(scheduled 20:00 UTC, one-time; the owner's
+implement-everything-owner-input-free mandate): verification pass
+GREEN — suite 728+9 (env restored after a partial venv wipe on the
+recycled sandbox; disclosed), integrity 16, matrices v5–v10 121/0
+(20/22/25/19/26/9); CI on main: `253e01c` run 45567864237 SUCCESS via
+the API — the escalation commit is green; `7c3bd4b`/`5bf91ad`
+re-confirmed; the one red run (45801988856) is a dependabot PR branch,
+not main. Backup continuity CLEAN: manifest 25 entries, seq 1→23 (two
+documented divergence-union repeats), newest entry backs `253e01c`,
+no stale lock, no divergence. Docs sweep landed (`423230e`): the
+STAGE-4b planted-alias lane's coverage-table cross-reference
+completed (the one under-landed item from the iter3 closing
+remediation — documents-only, per the landed-with-record precedent,
+no gate outcome recorded) + stale post-closure status sentences
+fixed + ledger echoes #8/#12/#13/#14/#15/#16 added to the roadmap.
+Decision-#23 packet prepared (`562b392`):
+`session-log/2026-11-26-decision-23-packet.md` — the S8-PG1-iter3
+cap-closure escalation AWAITS the owner; NO disposition recorded, no
+gate launched, no port code.** Prior this session (2026-11-25): S1 CLOSED — the S1-closing gate
 reached CONSENSUS at iteration 1 (all three roles
 PROCEED-WITH-FINDINGS, zero criticals; record:
 `memory/consensus-log/2026-11-25-S1-closing-gate.md`) and the S1
@@ -29,8 +48,8 @@ the same pre-gate → the split default applies; owner options
 re-tabled: (a) further split / start the port, (b) another fresh
 gate (justify against the split default), (c) S8→S2 descope —
 no disposition pre-recorded. Record:
-`memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`.** Then
-S8's port + its own gate → S2 (full chain per decisions #18/#19).** Prior this
+`memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`. Then
+S8's port + its own gate → S2 (full chain per decisions #18/#19). Prior this
 session: owner disposition of the S8-PG1 escalation recorded —
 decision #22; the S1-closing gate ran first per D2:a, scoped per
 decision #21 (deliverable closure + split boundary correctness +
@@ -182,9 +201,10 @@ on the next push; S2 release-watch note, roadmap S2 row). Any change must keep t
   disposition RECORDED (2026-11-25, decision #22, the owner
   instructed "D1:a, d2:a"): fresh gate S8-PG1-iter3 (its own
   2-iteration cap) ordered on the closing-remediation line
-  `865580e`+, running AFTER the S1-closing gate; no fresh-gate
-  outcome pre-recorded; no port work started (documents only
-  throughout).**
+  `865580e`+, ran AFTER the S1-closing gate (2026-11-25) and closed
+  at its own 2-iteration cap — NO CONSENSUS, escalated to the owner,
+  disposition pending (see the header block); no port work started
+  (documents only throughout).**
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan

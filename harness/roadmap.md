@@ -146,11 +146,13 @@ its results before the NEXT stage proceeds. Status legend:
   - SHA-256 checksums of every asset in the release body
   - seed-corpus WCAG contrast property test (≥ 4.5 on the fixed tone
     pairs across ~200 seeds) gating the tag
-  - clear every deferred-findings row gated at this tag: **#1–#4 and
-    #7** (Android dynamicColor QA, accessor allow-list test,
-    accent-probe caching — legacy-leg behavior specified, Flatpak
-    dconf, raw-hex ban in painter modules) — the ledger is
-    authoritative; runbook §2 derives from it
+  - clear every deferred-findings row gated at this tag: **#1–#4,
+    #7, #13, #14 and #16** (Android dynamicColor QA, accessor
+    allow-list test, accent-probe caching — legacy-leg behavior
+    specified, Flatpak dconf, raw-hex ban in painter modules, the
+    settings-loader dict-type guard, `_hex_to_rgb` hardening, the
+    QSS/comment nits) — the ledger is authoritative; runbook §2
+    derives from it
 - ☐ **S3. Bond server packaging + docs** — one-command self-host
   (docker image or static binary), token guidance. **Blocked by S6**
   (security review): do not promote the attack surface before
@@ -161,9 +163,12 @@ its results before the NEXT stage proceeds. Status legend:
 ## Mid term (each gets its own gate before starting)
 
 - ☐ **S5. Accessibility pass** — keyboard nav, screen-reader labels,
-  "accent not detected" UX for KDE/XFCE (deferred finding #5)
+  "accent not detected" UX for KDE/XFCE (deferred findings #5 and
+  #15 — the Windows accent-fallback hardening joins this pass)
 - ☐ **S6. Security/threat-model review** — helper privileges, DNS
-  server surface, blocklist download chain, **bond server exposure
+  server surface, blocklist download chain, **backup-branch tamper
+  evidence (deferred finding #8: second remote or manifest
+  entry-count continuity check)**, **bond server exposure
   (must gate or accompany S3's packaging work — do not promote the
   attack surface before reviewing it)**, **the account/auth chain
   (G1-iter6 Architect minor #5): credential storage at rest (keyring
@@ -174,7 +179,8 @@ its results before the NEXT stage proceeds. Status legend:
   decision #19; corrected at G1-iter6-i2 — Architect major #3):
   ledger row #9, the property-based exit criterion (decisions
   #19b/#20 — the allowlist inversion mandated), the repo-resident
-  matrices, and ledger #10 ride S8's own gate
+  matrices, and ledger #12 (port-time per-lane mechanism audit)
+  ride S8's own gate
 - ☐ **S7. Legacy-stack sunset decision** — Python 3.8 is EOL; decide
   keep/drop for the PySide2-Qt5 / PySide6-6.2 legs (every UI change
   pays the compat tax until decided). Decision due by v0.7 — S2's

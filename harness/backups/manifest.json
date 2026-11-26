@@ -292,6 +292,16 @@
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "ok"
+    },
+    {
+      "seq": 27,
+      "timestamp": "2026-11-26T20:31:12Z",
+      "trigger": "event",
+      "message": "Re-backup after the backup-repo mismatch: entries #24-#26 snapshotted the stale cleanroom tree at 253e01c (script REPO hardcoded at sandbox_backup.sh:129) while the session worked in download/Proto-Clean; checkout reconciled ff to origin/main; this entry snapshots the true tree - docs sweep 423230e, decision-#23 packet 562b392, closure 0dcf9d2, disclosure commit de78aff; see the README anomaly log (BACKUP-REPO MISMATCH)",
+      "git_head": "0dcf9d2",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
     }
   ],
   "merged_divergence": true

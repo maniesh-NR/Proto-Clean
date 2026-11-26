@@ -1,6 +1,6 @@
 {
   "git_branch": "main",
-  "git_head": "253e01c",
+  "git_head": "0dcf9d2",
   "main_push": "ok",
   "sandbox": {
     "download": [
@@ -115,5 +115,5 @@
       "xlsx"
     ]
   },
-  "timestamp": "2026-11-26T20:27:38Z"
+  "timestamp": "2026-11-26T20:31:12Z"
 }
