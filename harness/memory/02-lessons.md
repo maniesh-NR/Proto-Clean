@@ -60,7 +60,7 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   showed 736+1 — the bond-desktop loopback-alias skip, runner
   instance variance, not drift.)
 
-## Harness / adversarial process (gates G1 → G1-iter6)
+## Harness / adversarial process (gates G1 → G1-iter6-i2)
 
 - Enumeration is how defenses die. v5's unset list enumerated trace
   variables and missed the legacy alias `GIT_CURL_VERBOSE` (raw
@@ -97,8 +97,8 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   between editor batches — the only (never-committed) state in which
   the gate did not fire — and completed a production checkpoint
   (manifest seq 7, annotated invalid). Test from HEAD: stash first,
-  or point the test at a clean clone. Three incidents, three
-  variants: env loss (t5, E9c), half-edited script (seq 7) — the
+  or point the test at a clean clone. Three incidents, two variant
+  classes: env loss (t5, E9c), half-edited script (seq 7) — the
   common factor is a production-capable path reachable by accident.
 - Empty-credential URL spellings parse differently from their
   populated forms: `https://@github.com/…`, `github.com:/…` and scp
@@ -163,7 +163,10 @@ Hard-won gotchas. rediscovering these costs 10+ minutes each.
   characterization: the frozen residual list claimed pushInsteadOf
   applies to direct URL operands at push time — git does NOT
   (executed at G1-iter5-i2; the phantom was corrected per the list's
-  own gate-finding rule). A residual list is only as good as its
+  own gate-finding rule; SUPERSEDED at G1-iter6: the probe rode the
+  `file://` spelling, the one non-rewritten form — plain-path direct
+  push operands DO rewrite at push time and v9 refuses the class).
+  A residual list is only as good as its
   executed facts.
 
 - **Judge the git dir, not the path spelling** (G1-iter6 RT C1,

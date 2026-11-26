@@ -29,8 +29,8 @@ the same pre-gate → the split default applies; owner options
 re-tabled: (a) further split / start the port, (b) another fresh
 gate (justify against the split default), (c) S8→S2 descope —
 no disposition pre-recorded. Record:
-`memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`.** Then
-S8's port + its own gate → S2 (full chain per decisions #18/#19).** Prior this
+`memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`. Then
+S8's port + its own gate → S2 (full chain per decisions #18/#19). Prior this
 session: owner disposition of the S8-PG1 escalation recorded —
 decision #22; the S1-closing gate ran first per D2:a, scoped per
 decision #21 (deliverable closure + split boundary correctness +
@@ -182,9 +182,10 @@ on the next push; S2 release-watch note, roadmap S2 row). Any change must keep t
   disposition RECORDED (2026-11-25, decision #22, the owner
   instructed "D1:a, d2:a"): fresh gate S8-PG1-iter3 (its own
   2-iteration cap) ordered on the closing-remediation line
-  `865580e`+, running AFTER the S1-closing gate; no fresh-gate
-  outcome pre-recorded; no port work started (documents only
-  throughout).**
+  `865580e`+, ran AFTER the S1-closing gate (2026-11-25) and closed
+  at its own 2-iteration cap — NO CONSENSUS, escalated to the owner,
+  disposition pending (see the header block); no port work started
+  (documents only throughout).**
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan

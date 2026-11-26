@@ -281,7 +281,8 @@ is never masked by the abort.
 
 ## Frozen residual-threat list (adopted G1-iter5, decision #18;
 corrected G1-iter5-i2 per gate findings; corrected again G1-iter6
-per gate findings — the two-directional freeze working as designed)
+and at S8-PG1-iter3 per gate findings — the two-directional freeze
+working as designed)
 
 These are the KNOWN residuals future gates judge against — a fixed
 list, so each gate no longer re-derives the attack surface from
@@ -395,6 +396,14 @@ scp-syntax redaction.
   `git log` (commit SHAs are recorded by git itself, not the manifest).
 
 ## Known audit-trail anomalies
+
+- VERIFICATION FALSE-FAILS, no trail pollution (S8-PG1-iter3,
+  2026-11-25): during the fresh pre-gate's concurrent role batteries
+  the integrity suite false-failed twice on contention for the
+  machine-global `/tmp/pc-sandbox-backup.lock` (exit 3 by design);
+  clean re-runs 16/16 — no manifest or branch entries were created.
+  Disclosed in the S8-PG1-iter3 record; documented here next to the
+  exit-3 lock semantics.
 
 - LOCAL-ONLY, cleaned by reset (`310555e`/`b43e3fa`/`0c41aff` and
   `580fbb3`/`f87a8b3`/`dd4bf0e`, reflog 2026-11-19T03:34-03:35Z —
