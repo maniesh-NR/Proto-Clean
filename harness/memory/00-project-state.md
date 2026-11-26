@@ -1,6 +1,25 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-25 (**S1 CLOSED — the S1-closing gate
+Last updated: 2026-11-26 (**Owner-input-free roadmap session
+(scheduled 20:00 UTC, one-time; the owner's
+implement-everything-owner-input-free mandate): verification pass
+GREEN — suite 728+9 (env restored after a partial venv wipe on the
+recycled sandbox; disclosed), integrity 16, matrices v5–v10 121/0
+(20/22/25/19/26/9); CI on main: `253e01c` run 45567864237 SUCCESS via
+the API — the escalation commit is green; `7c3bd4b`/`5bf91ad`
+re-confirmed; the one red run (45801988856) is a dependabot PR branch,
+not main. Backup continuity CLEAN: manifest 25 entries, seq 1→23 (two
+documented divergence-union repeats), newest entry backs `253e01c`,
+no stale lock, no divergence. Docs sweep landed (`423230e`): the
+STAGE-4b planted-alias lane's coverage-table cross-reference
+completed (the one under-landed item from the iter3 closing
+remediation — documents-only, per the landed-with-record precedent,
+no gate outcome recorded) + stale post-closure status sentences
+fixed + ledger echoes #8/#12/#13/#14/#15/#16 added to the roadmap.
+Decision-#23 packet prepared (`562b392`):
+`session-log/2026-11-26-decision-23-packet.md` — the S8-PG1-iter3
+cap-closure escalation AWAITS the owner; NO disposition recorded, no
+gate launched, no port code.** Prior this session (2026-11-25): S1 CLOSED — the S1-closing gate
 reached CONSENSUS at iteration 1 (all three roles
 PROCEED-WITH-FINDINGS, zero criticals; record:
 `memory/consensus-log/2026-11-25-S1-closing-gate.md`) and the S1
