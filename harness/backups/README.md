@@ -397,6 +397,22 @@ scp-syntax redaction.
 
 ## Known audit-trail anomalies
 
+- BACKUP-REPO MISMATCH, no data loss (2026-11-26): the script's
+  production REPO/PROD_CHECKOUT are HARDCODED to
+  `/home/z/my-project/cleanroom` (sandbox_backup.sh:129/134) — the
+  owner-input-free session worked in a parallel clone
+  (`/home/z/my-project/download/Proto-Clean`, re-cloned after a
+  recycle) and pushed main correctly (`423230e`/`562b392`/`0dcf9d2`,
+  origin verified via ls-remote), but manifest entries #24–#26
+  honestly recorded what they snapshotted: the STALE cleanroom tree
+  at `253e01c` (the git_head field was CORRECT for its content;
+  today's session files were absent from those branch snapshots).
+  The checkout was reconciled (ff to origin/main) and entry #27
+  re-snapshotted the true tree. No force-push, no history rewrite;
+  the stale-snapshot entries stand as recorded. The hardcoded-path
+  coupling is identity-single-sourcing surface — port-stage material
+  (decision #18 keeps the script capability-frozen; no patch).
+
 - VERIFICATION FALSE-FAILS, no trail pollution (S8-PG1-iter3,
   2026-11-25): during the fresh pre-gate's concurrent role batteries
   the integrity suite false-failed twice on contention for the
