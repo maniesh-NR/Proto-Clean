@@ -4,6 +4,7 @@
   "main_push": "ok",
   "sandbox": {
     "download": [
+      "Proto-Clean",
       "Proto-Clean-src.zip",
       "Proto-Clean.bundle",
       "Proton-Clean-src.zip",
@@ -114,5 +115,5 @@
       "xlsx"
     ]
   },
-  "timestamp": "2026-11-25T07:24:22Z"
+  "timestamp": "2026-11-26T20:24:47Z"
 }
