@@ -120,6 +120,29 @@ relaunch loop.
   default branch") printed on every push — pre-existing repo state,
   not a CI/test result.
 
+## Addendum — backup-repo mismatch (post-closure discovery)
+
+The three event backups this session (#24–#26) snapshotted the STALE
+production checkout, not this session's tree: the script's production
+REPO/PROD_CHECKOUT are hardcoded to `/home/z/my-project/cleanroom`
+(sandbox_backup.sh:129/134), while this session re-cloned and worked
+in `/home/z/my-project/download/Proto-Clean` per its brief. Main was
+pushed correctly throughout (`423230e`/`562b392`/`0dcf9d2`; origin
+verified via ls-remote — the primary backup path was never at risk),
+but the branch snapshots for #24–#26 honestly record the stale
+cleanroom tree at `253e01c` (their git_head fields were CORRECT for
+their content; today's session files were absent from those
+snapshots). Discovery: the manifest's git_head fields stayed
+`253e01c` across all three entries while main moved — traced to the
+hardcoded REPO, confirmed by the backup branch missing the session
+log/packet. Remediation: the cleanroom checkout reconciled (ff to
+origin/main after discarding the hook-regenerated PROJECT_MEMORY.md
+activity section), the anomaly log gains a BACKUP-REPO MISMATCH
+entry, and entry #27 re-snapshots the true tree. The script stays
+capability-frozen (decision #18) — the hardcoded-path coupling is
+identity-single-sourcing surface, port-stage material; no patch, no
+gate launched, no disposition recorded.
+
 ## Owner-input items (DEFERRED — exactly what is needed)
 
 1. **DECISION #23** (the only blocker): the S8-PG1-iter3 cap closure —

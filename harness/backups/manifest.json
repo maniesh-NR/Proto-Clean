@@ -302,6 +302,16 @@
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "ok"
+    },
+    {
+      "seq": 28,
+      "timestamp": "2026-11-26T20:31:41Z",
+      "trigger": "event",
+      "message": "Final backup of the owner-input-free session: cleanroom ff'd to origin/main de78aff (the BACKUP-REPO MISMATCH disclosure commit - anomaly-log entry + session-log addendum); entries #24-#26 recorded stale-tree snapshots (honestly, git_head correct for content), #27 the reconciled 0dcf9d2 tree, this entry the complete final tree; awaiting owner decision #23 (packet in session-log/)",
+      "git_head": "de78aff",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
     }
   ],
   "merged_divergence": true
