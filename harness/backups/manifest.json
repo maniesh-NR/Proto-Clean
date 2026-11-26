@@ -272,6 +272,16 @@
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "ok"
+    },
+    {
+      "seq": 25,
+      "timestamp": "2026-11-26T20:25:05Z",
+      "trigger": "event",
+      "message": "Decision-#23 packet prepared (session-log/2026-11-26-decision-23-packet.md): S8-PG1-iter3 escalation digest for the owner - options a/b/c neutral, no disposition pre-recorded",
+      "git_head": "253e01c",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
     }
   ],
   "merged_divergence": true
