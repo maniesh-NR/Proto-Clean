@@ -1,6 +1,6 @@
 # Decision #23 packet — S8-PG1-iter3 cap-closure escalation (prepared 2026-11-26)
 
-NO DISPOSITION RECORDED — awaiting decision #23; no outcome pre-recorded.
+DISPOSITION RECORDED 2026-11-27 — decision #23, the owner instructed "d1:b": option (b), another fresh gate (S8-PG1-iter4, own 2-iteration cap, on the line `253e01c`+) — see `2026-11-27-owner-disposition-decision-23.md` and `memory/01-decisions.md` #23. No outcome pre-recorded.
 
 Self-contained owner packet for the S8-PG1-iter3 cap-closure
 escalation, prepared by the owner-input-free roadmap session
@@ -245,10 +245,16 @@ only throughout** — no port code has ever changed (`82fb63c` →
 
 ## 6. Status
 
-NO DISPOSITION RECORDED — awaiting decision #23; no outcome
-pre-recorded. No gate has been launched since the cap closure; no
-port code has been written; the escalation record and the re-tabled
-options are untouched.
+DISPOSITION RECORDED (2026-11-27) — decision #23: the owner
+instructed "d1:b" — option (b), another fresh gate S8-PG1-iter4
+(own 2-iteration cap) ordered on the line `253e01c`+; the owner's
+explicit order is the justification against the split default
+required by the owner-side escalation rule. Recorded in
+`2026-11-27-owner-disposition-decision-23.md` and
+`memory/01-decisions.md` #23; execution scheduled (the 20:00 UTC
+autonomous session). No gate has been launched as of the disposition
+record; no port code has been written; no outcome is pre-recorded;
+the options above remain verbatim as re-tabled.
 
 ## Appendix A — S7 memo (FUTURE OWNER DECISION — due by v0.7, informational only)
 

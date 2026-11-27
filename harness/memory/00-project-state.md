@@ -1,25 +1,30 @@
 # Project State (living snapshot)
 
-Last updated: 2026-11-26 (**Owner-input-free roadmap session
-(scheduled 20:00 UTC, one-time; the owner's
-implement-everything-owner-input-free mandate): verification pass
-GREEN — suite 728+9 (env restored after a partial venv wipe on the
-recycled sandbox; disclosed), integrity 16, matrices v5–v10 121/0
-(20/22/25/19/26/9); CI on main: `253e01c` run 45567864237 SUCCESS via
-the API — the escalation commit is green; `7c3bd4b`/`5bf91ad`
-re-confirmed; the one red run (45801988856) is a dependabot PR branch,
-not main. Backup continuity CLEAN: manifest 25 entries, seq 1→23 (two
-documented divergence-union repeats), newest entry backs `253e01c`,
-no stale lock, no divergence. Docs sweep landed (`423230e`): the
-STAGE-4b planted-alias lane's coverage-table cross-reference
-completed (the one under-landed item from the iter3 closing
-remediation — documents-only, per the landed-with-record precedent,
-no gate outcome recorded) + stale post-closure status sentences
-fixed + ledger echoes #8/#12/#13/#14/#15/#16 added to the roadmap.
-Decision-#23 packet prepared (`562b392`):
-`session-log/2026-11-26-decision-23-packet.md` — the S8-PG1-iter3
-cap-closure escalation AWAITS the owner; NO disposition recorded, no
-gate launched, no port code.** Prior this session (2026-11-25): S1 CLOSED — the S1-closing gate
+Last updated: 2026-11-27 (**Owner disposition of the S8-PG1-iter3
+cap-closure escalation RECORDED — decision #23 (the owner instructed
+"d1:b", chat, 2026-11-27, alongside "Start the next session at 8PM
+UTC"): D1 = option (b) — a fresh pre-gate **S8-PG1-iter4** with its
+OWN 2-iteration cap is ordered on the line `253e01c`+ (through the
+2026-11-26 completeness landing `423230e`), re-judging the two
+STAGE-1 deliverables as amended. The owner's explicit order IS the
+justification against the split default required by the owner-side
+escalation rule — the rule binds the agent-side default, and the
+override is the owner's to make; the packet's recorded consequences
+for (b) stand acknowledged (documents-only again; the
+jointly-unsatisfiable-pinning BLOCK; the fresh gate re-judges the
+same deliverables with the landed escape-shape / probe-dir material
+as its input). Execution is scheduled for the one-time autonomous
+session at 20:00 UTC 2026-11-27, which also carries the standing
+implement-everything-owner-input-free directive. This commit records
+the disposition ONLY — NO gate launched, no port code, no stage
+work, no outcome pre-recorded.** Prior (2026-11-26): the
+owner-input-free roadmap session — verification pass GREEN (suite
+728+9 after env restore, disclosed; integrity 16; matrices v5–v10
+121/0; CI `253e01c` run 45567864237 SUCCESS — the escalation commit
+green on main; backup continuity clean), docs sweep `423230e`, and
+the decision-#23 packet `562b392`
+(`session-log/2026-11-26-decision-23-packet.md`) — the escalation
+then awaited the owner; dispositioned above. Prior this session (2026-11-25): S1 CLOSED — the S1-closing gate
 reached CONSENSUS at iteration 1 (all three roles
 PROCEED-WITH-FINDINGS, zero criticals; record:
 `memory/consensus-log/2026-11-25-S1-closing-gate.md`) and the S1
@@ -47,7 +52,8 @@ magnitude/scoping minors). TWO consecutive cap-exhaustions on
 the same pre-gate → the split default applies; owner options
 re-tabled: (a) further split / start the port, (b) another fresh
 gate (justify against the split default), (c) S8→S2 descope —
-no disposition pre-recorded. Record:
+no disposition pre-recorded at the escalation (disposition RECORDED
+2026-11-27: decision #23, "d1:b", see above). Record:
 `memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`. Then
 S8's port + its own gate → S2 (full chain per decisions #18/#19). Prior this
 session: owner disposition of the S8-PG1 escalation recorded —
@@ -202,9 +208,12 @@ on the next push; S2 release-watch note, roadmap S2 row). Any change must keep t
   instructed "D1:a, d2:a"): fresh gate S8-PG1-iter3 (its own
   2-iteration cap) ordered on the closing-remediation line
   `865580e`+, ran AFTER the S1-closing gate (2026-11-25) and closed
-  at its own 2-iteration cap — NO CONSENSUS, escalated to the owner,
-  disposition pending (see the header block); no port work started
-  (documents only throughout).**
+  at its own 2-iteration cap — NO CONSENSUS, escalated to the owner;
+  disposition RECORDED (2026-11-27, decision #23, the owner
+  instructed "d1:b"): fresh gate S8-PG1-iter4 (its own 2-iteration
+  cap) ordered on the line `253e01c`+ — execution scheduled for the
+  20:00 UTC autonomous session (see the header block); no port work
+  started (documents only throughout).**
 - SHA-256 checksums in release body (proposed, not yet requested-done)
 - Copilot PR review pass (instructions in place, unused so far)
 - See `roadmap.md` for the consensus-gated forward plan

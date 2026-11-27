@@ -291,3 +291,42 @@ Format: **decision** — context — date. Newest last.
     the owner with the split/descope options re-tabled per the
     owner-side escalation rule. (2026-11-25, owner disposition on
     the S8-PG1 escalation)
+
+23. **Owner disposition of the S8-PG1-iter3 cap-closure escalation —
+    another fresh pre-gate is ordered, the owner's explicit override
+    of the split default (2026-11-27).** Presented with the
+    S8-PG1-iter3 cap-closure escalation (commit `253e01c`, closing
+    remediation landed with the record — documents only, no port code
+    changed; self-contained packet
+    `session-log/2026-11-26-decision-23-packet.md`, prepared
+    2026-11-26 by the owner-input-free session) and its three
+    re-tabled options — (a) further split (land the converged spec
+    fixes and start the port, where the parity-oracle question
+    becomes an executed green/red fact per stage boundary, judged by
+    the STAGE-6 closing gate — the split default's shape), (b)
+    another fresh gate (must be justified against the split default —
+    eight total cap-exhaustions across S1 + the S8 pre-gates), (c)
+    owner-descoped S8→S2 ordering — the owner instructed **"d1:b"**
+    (chat, 2026-11-27, alongside "Start the next session at 8PM
+    UTC"): **D1 = option (b)** — **S8-PG1-iter4**, a fresh pre-gate
+    with its OWN 2-iteration cap, re-judging the two STAGE-1
+    deliverables (the allowlist-inversion evaluation + the S8
+    execution plan) as amended through the S8-PG1-iter3 closing
+    remediation and the 2026-11-26 post-cap completeness landing
+    (`423230e`), pinned on the line `253e01c` and later. The owner's
+    explicit order IS the justification against the split default
+    that the owner-side escalation rule (process doc, adopted
+    G1-iter6) requires — the rule binds the agent-side default, and
+    the override is the owner's to make; the packet's recorded
+    consequences for (b) stand acknowledged: documents-only again,
+    the iteration-2 BLOCK is a jointly-unsatisfiable-pinning
+    contradiction, and the fresh gate re-judges the same deliverables
+    with the landed escape-shape / probe-dir material as its input.
+    Per the owner's accompanying instruction, execution is scheduled
+    for the one-time autonomous session at 20:00 UTC 2026-11-27,
+    which also carries the standing
+    implement-everything-owner-input-free directive. No outcome for
+    S8-PG1-iter4 is pre-recorded; if it again exhausts its cap, the
+    escalation returns to the owner with the split/descope options
+    re-tabled per the owner-side escalation rule. (2026-11-27, owner
+    disposition on the S8-PG1-iter3 cap-closure escalation)
