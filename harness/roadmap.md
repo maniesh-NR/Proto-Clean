@@ -131,7 +131,16 @@ its results before the NEXT stage proceeds. Status legend:
   closing gate), (b) another fresh gate (must be justified
   against the split default — eight total cap-exhaustions
   across S1 + the S8 pre-gates), (c) owner-descoped S8→S2
-  ordering. No disposition pre-recorded. Record:
+  ordering. Disposition RECORDED (2026-11-27, decision #23; the
+  owner instructed "d1:b"): option (b) — **a fresh gate
+  S8-PG1-iter4 with its OWN 2-iteration cap is ordered on the line
+  `253e01c`+** (through the 2026-11-26 completeness landing
+  `423230e`), re-judging the two STAGE-1 deliverables as amended;
+  the owner's explicit order IS the justification against the split
+  default per the owner-side escalation rule — no outcome
+  pre-recorded; execution scheduled for the 20:00 UTC one-time
+  autonomous session (owner instruction "Start the next session at
+  8PM UTC"). Record:
   `memory/consensus-log/2026-11-25-s8-pre-gate-iter3.md`.**
   Predecessor record:
   `memory/consensus-log/2026-11-19-s8-pre-gate.md`.**
