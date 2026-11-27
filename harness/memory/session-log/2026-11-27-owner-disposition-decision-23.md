@@ -81,3 +81,21 @@ Recorded as **decision #23** (`memory/01-decisions.md`).
 
 No gate has been launched at this commit — no gate outcome is
 pre-recorded anywhere in this commit.
+
+## Addendum — CI verification of the disposition commit (post-backup)
+
+CI run 45938867875 on `171fd9b` (queried via the REST API, token
+never printed): the first attempt completed 6/7 legs green with the
+macOS-latest 3.12 leg failing on
+`tests/test_bond_desktop.py::TestMultiAdapterBonding::test_two_adapters_distinct_source_ips`
+(a byte-blob assert — runner variance: the SAME leg, same
+sole-failing-leg, same documents-only-commit pattern as the
+documented `eb459b1` flake, run 44536786320, "recovered on the next
+push" per the S1-closing Steward's release-watch note; this commit
+touches zero code — 6 markdown files only, suite 728+9 and integrity
+16 green locally before the push). The failed job was re-run via the
+API (rerun-failed-jobs, HTTP 201) and RECOVERED: the run completed
+SUCCESS on attempt 2 with all 7 legs green — CI green on `171fd9b`,
+the verification contract satisfied. Disclosed per the
+runner-variance precedent; the S2 release-watch note for that leg
+stands. Backup entry #30 backs this addendum.

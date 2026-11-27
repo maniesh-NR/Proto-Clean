@@ -53,7 +53,7 @@
 ## 3. Verification Contracts
 
 - **Full suite**: `python -m pytest -q -p no:asyncio` from repo root → **728 passed, 9 skipped, 0 failed** (4 pyOpenSSL deprecation warnings, ~96 s). Re-verified 2026-11-19 after a full env reinstall. CI equivalents: 737 × 4 POSIX legs, 605 + 132 Windows, wheel + Android green.
-- **CI green on `main`**: latest confirmed run 45567864237 on `253e01c` (7/7 legs success, API-verified 2026-11-26); `7c3bd4b` (run 45560767073) and the S1-closing line `5bf91ad` (run 45551538029) also 7/7. Any change must keep the suite green; new features add tests to the baseline.
+- **CI green on `main`**: latest confirmed run 45938867875 on `171fd9b` (the decision-#23 disposition commit; 7/7 legs success on attempt 2, API-verified 2026-11-27 — the macOS-latest 3.12 leg's first attempt hit the documented runner-variance flake, sole failing leg, recovered by a failed-job API re-run, disclosed in the disposition session log); prior: `253e01c` (run 45567864237, 7/7, API-verified 2026-11-26), `7c3bd4b` (run 45560767073) and the S1-closing line `5bf91ad` (run 45551538029) also 7/7. Any change must keep the suite green; new features add tests to the baseline.
 - **Backup**: `git push` exit 0; `git status -sb` → `## main...origin/main` with no ahead marker.
 - **Memory**: `python3 update_memory.py` from repo root exits 0 and refreshes the auto activity section; post-commit hook installed (`.git/hooks/post-commit`, local-only).
 - **Governance**: consensus records live only in `harness/memory/consensus-log/`; outcomes are never pre-recorded anywhere.
@@ -70,6 +70,15 @@ Revert = restore those three lines from the upload. The script replaces everythi
 ## Recent Progress & Git Activity
 
 ```diff
+### Commit: 171fd9b - Decision #23 owner disposition recorded (D1:b): fresh pre-gate S8-PG1-iter4 ordered - presented with the S8-PG1-iter3 cap-closure escalation (253e01c + the 2026-11-26 packet 562b392, options re-tabled verbatim), the owner instructed "d1:b" in chat (2026-11-27, alongside "Start the next session at 8PM UTC"): D1 = option (b) - S8-PG1-iter4, a fresh pre-gate with its OWN 2-iteration cap, ordered on the line 253e01c+ (through the 423230e completeness landing), re-judging the two STAGE-1 deliverables as amended; the owner's explicit order IS the justification against the split default per the owner-side escalation rule (the override is the owner's to make; the packet's recorded consequences for (b) acknowledged: documents-only again, the jointly-unsatisfiable-pinning BLOCK, the fresh gate re-judges the same deliverables with the landed escape-shape/probe-dir material); execution scheduled for the one-time 20:00 UTC 2026-11-27 autonomous session, which also carries the standing implement-everything-owner-input-free directive; this commit records the disposition ONLY - no gate launched, no port code, no stage work, no outcome pre-recorded (hard rule 7); ledger entry #23 + disposition session log 2026-11-27-owner-disposition-decision-23.md + roadmap S8 narrative + packet dated status amendment + state/playbook refresh; baseline re-verified: suite 728+9 (env restored after the recycle - 21 collection errors from missing optional deps, per the runbook, disclosed), integrity 16 passed (Z User, 2026-11-27)
+ PROJECT_MEMORY.md                                  | 32 ++++-----
+ harness/memory/00-project-state.md                 | 57 ++++++++-------
+ harness/memory/01-decisions.md                     | 39 ++++++++++
+ .../session-log/2026-11-26-decision-23-packet.md   | 16 +++--
+ .../2026-11-27-owner-disposition-decision-23.md    | 83 ++++++++++++++++++++++
+ harness/roadmap.md                                 | 11 ++-
+ 6 files changed, 189 insertions(+), 49 deletions(-)
+
 ### Commit: de78aff - Backup-repo mismatch disclosure + session-log addendum (2026-11-26): manifest entries #24-#26 snapshotted the STALE production checkout - the script's production REPO/PROD_CHECKOUT are hardcoded to /home/z/my-project/cleanroom (sandbox_backup.sh:129/134) while this session re-cloned and worked in download/Proto-Clean per its brief; main was pushed correctly throughout (423230e/562b392/0dcf9d2, origin verified via ls-remote - the primary backup path was never at risk) and the stale entries' git_head fields were CORRECT for their content (the branch snapshots honestly record the 253e01c tree, session files absent). Discovery path: git_head frozen across three entries while main moved -> hardcoded REPO -> confirmed by the backup branch missing the session log/packet. Remediation: cleanroom reconciled ff to origin/main (0 local commits, hook-regenerated PROJECT_MEMORY.md discarded, no force-push), anomaly-log BACKUP-REPO MISMATCH entry added, entry #27 re-snapshots the true tree. The script stays capability-frozen per decision #18 - the hardcoded-path coupling is identity-single-sourcing surface, port-stage material; no patch, no gate launched, no disposition recorded (Z User, 2026-11-26)
  harness/backups/README.md                          | 16 +++++++++++++++
  .../2026-11-26-owner-input-free-session.md         | 23 ++++++++++++++++++++++
@@ -80,9 +89,5 @@ Revert = restore those three lines from the upload. The script replaces everythi
  harness/memory/00-project-state.md                 |  21 +++-
  .../2026-11-26-owner-input-free-session.md         | 136 +++++++++++++++++++++
  3 files changed, 171 insertions(+), 18 deletions(-)
-
-### Commit: 562b392 - Decision-#23 packet prepared: session-log/2026-11-26-decision-23-packet.md - self-contained escalation digest for the S8-PG1-iter3 cap closure: the chain (S8-PG1 cap 2026-11-19 -> decision #22 D1:a/d2:a -> S1 closed by consensus -> iter3 iteration 1 NO CONSENSUS -> remediation 7c3bd4b -> iteration 2 -> cap closed at 253e01c), the ONE executed critical (the copy-both identity semantics re-homing location-derived identity onto the lane area - guard refuses the lanes' own operands rc 6 != 5/4, would allow prod-adjacent operands; the three pinned constraints jointly unsatisfiable; three one-clause escape shapes identified by both BLOCKing roles), what all roles CONFIRMED resolved, what is NOT in dispute (criterion, inversion mandate, module location, coverage 122, port schedule), the three re-tabled options VERBATIM each with consequences/blast radius/constraining decisions, the neutral verdict split, the S2-timing table, the precedent map (#15/#19/#21/#22 + the owner-side escalation rule), the S7 memo (FUTURE decision due by v0.7, informational only). NO DISPOSITION RECORDED - awaiting decision #23; no outcome pre-recorded; no gate launched; no port code; documents only per the owner's implement-everything-owner-input-free mandate (Z User, 2026-11-26)
- .../session-log/2026-11-26-decision-23-packet.md   | 265 +++++++++++++++++++++
- 1 file changed, 265 insertions(+)
 ```
 

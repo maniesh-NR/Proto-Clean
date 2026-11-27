@@ -17,7 +17,13 @@ as its input). Execution is scheduled for the one-time autonomous
 session at 20:00 UTC 2026-11-27, which also carries the standing
 implement-everything-owner-input-free directive. This commit records
 the disposition ONLY — NO gate launched, no port code, no stage
-work, no outcome pre-recorded.** Prior (2026-11-26): the
+work, no outcome pre-recorded. CI on this commit's line (`171fd9b`):
+run 45938867875 SUCCESS on attempt 2, all 7 legs green — the first
+attempt had the macOS-latest 3.12 leg fail on the documented
+runner-variance flake (sole failing leg; byte-blob assert in
+test_bond_desktop; `eb459b1` precedent), recovered by a failed-job
+API re-run, disclosed in the disposition session log's addendum.**
+Prior (2026-11-26): the
 owner-input-free roadmap session — verification pass GREEN (suite
 728+9 after env restore, disclosed; integrity 16; matrices v5–v10
 121/0; CI `253e01c` run 45567864237 SUCCESS — the escalation commit
