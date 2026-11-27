@@ -322,6 +322,16 @@
       "git_branch": "main",
       "main_push": "ok",
       "prev_branch_push": "ok"
+    },
+    {
+      "seq": 30,
+      "timestamp": "2026-11-27T04:32:24Z",
+      "trigger": "event",
+      "message": "Disposition session CI addendum: run 45938867875 on 171fd9b green on attempt 2 after the macOS 3.12 runner-variance flake was recovered by a failed-job re-run (eb459b1 precedent, disclosed in the session log); cleanroom ff'd to 3beb3d1",
+      "git_head": "3beb3d1",
+      "git_branch": "main",
+      "main_push": "ok",
+      "prev_branch_push": "ok"
     }
   ],
   "merged_divergence": true
